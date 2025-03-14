@@ -4,6 +4,7 @@ const utils = require('../utils');
 const fs = require('fs');
 const crypto = require('crypto');
 const https = require('https');
+const { SUPPORTED_LANGUAGE_MAPPINGS, LANGUAGE_NAMES } = require('../utils/language-mappings');
 
 class BatchReplacementPanel {
   constructor(context) {
@@ -181,15 +182,21 @@ class BatchReplacementPanel {
   /**
    * 获取WebView内容
    */
-  getWebviewContent(scanPatterns, replacements, localesPaths) {
-    const hasLocaleFiles = localesPaths && localesPaths.length > 0;
-    
-    // 替换项渲染
-    const replacementsHtml = replacements.map((item, index) => `
-      <div class="replacement-item" data-index="${index}">
+// ... 现有代码保持不变 ...
+
+/**
+ * 获取WebView内容
+ */
+getWebviewContent(scanPatterns, replacements, localesPaths) {
+  const hasLocaleFiles = localesPaths && localesPaths.length > 0;
+
+  // 替换项渲染
+  const replacementsHtml = replacements.map((item, index) => `
+      <div class="replacement-item ${item.i18nKey ? 'has-key' : ''}" data-index="${index}">
         <div class="replacement-header">
           <label class="select-item">
             <input type="checkbox" class="item-checkbox" ${item.i18nKey ? 'checked' : ''}>
+            <span class="checkmark"></span>
           </label>
           <div class="replacement-text">${this.escapeHtml(item.text)}</div>
         </div>
@@ -197,26 +204,211 @@ class BatchReplacementPanel {
           <div class="i18n-key-input">
             <input type="text" class="key-input" placeholder="输入国际化键" 
               value="${item.i18nKey || ''}" data-index="${index}">
-            <button class="translate-btn" title="翻译并生成键" data-index="${index}">翻译</button>
+            <button class="translate-btn" title="翻译并生成键" data-index="${index}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+              翻译
+            </button>
           </div>
           ${item.i18nFile ? `<div class="found-key">找到于: <span class="key-file">${item.i18nFile}</span></div>` : ''}
         </div>
       </div>
     `).join('');
 
-    const scriptSection = `
+  const scriptSection = `
       <script>
-        (function() {
-          const vscode = acquireVsCodeApi();
-          
-          // 翻译按钮点击事件
-          document.addEventListener('DOMContentLoaded', function() {
-            document.querySelectorAll('.translate-btn').forEach(btn => {
-              btn.addEventListener('click', function(e) {
-                e.preventDefault();
-                const index = parseInt(this.dataset.index);
-                const keyInput = document.querySelector('.key-input[data-index="' + index + '"]');
+ (function () {
+     // 获取VS Code API实例
+     const vscode = acquireVsCodeApi();
+
+     // 确保在DOM完全加载后绑定事件
+     document.addEventListener('DOMContentLoaded', function () {
+           console.log('DOM加载完成，开始绑定事件');
+
+           // ---------- 扫描模式相关事件 ----------
+
+           // 添加模式按钮
+           const addPatternBtn = document.getElementById('add-pattern-btn');
+           if (addPatternBtn) {
+             addPatternBtn.addEventListener('click', function () {
+               const newPatternInput = document.getElementById('new-pattern');
+               const pattern = newPatternInput ? newPatternInput.value.trim() : '';
+
+               if (pattern) {
+                 console.log('添加扫描模式:', pattern);
+                 vscode.postMessage({
+                   command: 'addPattern',
+                   pattern: pattern
+                 });
+
+                 // 清空输入框
+                 if (newPatternInput) {
+                   newPatternInput.value = '';
+                 }
+               }
+             });
+           }
+
+           // 删除模式按钮
+           document.querySelectorAll('.pattern-remove-btn').forEach(btn => {
+             btn.addEventListener('click', function () {
+               const pattern = this.getAttribute('data-pattern');
+               if (pattern) {
+                 console.log('删除扫描模式:', pattern);
+                 vscode.postMessage({
+                   command: 'removePattern',
+                   pattern: pattern
+                 });
+               }
+             });
+           });
+
+           // ---------- 控制按钮事件 ----------
+
+           // 全选按钮
+           const selectAllBtn = document.getElementById('select-all');
+           if (selectAllBtn) {
+             selectAllBtn.addEventListener('click', function () {
+               console.log('点击全选按钮');
+               vscode.postMessage({
+                 command: 'selectAll'
+               });
+
+               // 更新UI显示
+               document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+                 checkbox.checked = true;
+               });
+             });
+           }
+
+           // 取消全选按钮
+           const deselectAllBtn = document.getElementById('deselect-all');
+           if (deselectAllBtn) {
+             deselectAllBtn.addEventListener('click', function () {
+               console.log('点击取消全选按钮');
+               vscode.postMessage({
+                 command: 'deselectAll'
+               });
+
+               // 更新UI显示
+               document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+                 checkbox.checked = false;
+               });
+             });
+           }
+
+           // 替换选中项按钮
+           const replaceSelectedBtn = document.getElementById('replace-selected');
+           if (replaceSelectedBtn) {
+             replaceSelectedBtn.addEventListener('click', function () {
+               console.log('点击替换选中项按钮');
+
+               // 获取选中的索引
+               const selectedIndexes = [];
+               document.querySelectorAll('.item-checkbox').forEach((checkbox, index) => {
+                 if (checkbox.checked) {
+                   selectedIndexes.push(index);
+                 }
+               });
+
+               if (selectedIndexes.length === 0) {
+                 alert('请先选择要替换的项');
+                 return;
+               }
+
+               vscode.postMessage({
+                 command: 'batchReplace',
+                 selectedIndexes: selectedIndexes
+               });
+             });
+           }
+
+           // 关闭面板按钮
+           const closeBtn = document.getElementById('close-panel');
+           if (closeBtn) {
+             closeBtn.addEventListener('click', function () {
+               console.log('点击关闭面板按钮');
+               vscode.postMessage({
+                 command: 'closePanel'
+               });
+             });
+           }
+
+           // 刷新扫描按钮
+           const refreshBtn = document.getElementById('refresh-scan');
+           if (refreshBtn) {
+             refreshBtn.addEventListener('click', function () {
+               console.log('点击刷新扫描按钮');
+               vscode.postMessage({
+                 command: 'refreshScan'
+               });
+             });
+           }
+
+           // 选择国际化文件按钮
+           const selectLocalesBtn = document.getElementById('select-locales-btn');
+           if (selectLocalesBtn) {
+             selectLocalesBtn.addEventListener('click', function () {
+               console.log('点击选择国际化文件按钮');
+               vscode.postMessage({
+                 command: 'selectLocalesFiles'
+               });
+             });
+           }
+
+           // API翻译配置按钮
+           const apiTranslationBtn = document.getElementById('open-api-translation');
+           if (apiTranslationBtn) {
+             apiTranslationBtn.addEventListener('click', function () {
+               console.log('点击API翻译配置按钮');
+               vscode.postMessage({
+                 command: 'openApiTranslation'
+               });
+             });
+           }
+
+           // ---------- 替换项相关事件 ----------
+
+           // 复选框更新选择状态
+           document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+             checkbox.addEventListener('change', function () {
+               const selectedIndexes = [];
+               document.querySelectorAll('.item-checkbox').forEach((cb, index) => {
+                 if (cb.checked) {
+                   selectedIndexes.push(index);
+                 }
+               });
+
+               vscode.postMessage({
+                 command: 'updateSelection',
+                 selectedIndexes: selectedIndexes
+               });
+             });
+           });
+
+           // 键名输入框
+           document.querySelectorAll('.key-input').forEach(input => {
+             input.addEventListener('change', function () {
+               const index = parseInt(this.getAttribute('data-index'));
+               vscode.postMessage({
+                 command: 'updateI18nKey',
+                 index: index,
+                 key: this.value.trim()
+               });
+             });
+           });
+
+           // 翻译按钮
+           document.querySelectorAll('.translate-btn').forEach(btn => {
+                 btn.addEventListener('click', function () {
+                       console.log('点击翻译按钮');
+                       const index = parseInt(this.getAttribute('data-index'));
+                       console.log('获取的索引:', index);
+
+                       const keyInput = document.querySelector(\`.key-input[data-index="\${index}"]\`);
+                console.log('找到的输入框:', keyInput);
+                
                 const key = keyInput ? keyInput.value.trim() : '';
+                console.log('准备翻译，使用键:', key);
                 
                 vscode.postMessage({
                   command: 'translateItem',
@@ -226,88 +418,48 @@ class BatchReplacementPanel {
               });
             });
             
-            // 初始化选中状态跟踪
-            const selectedItems = new Set();
+            // 搜索过滤
+            const filterInput = document.getElementById('filter-input');
+            if (filterInput) {
+              filterInput.addEventListener('input', function() {
+                const searchText = this.value.toLowerCase();
+                document.querySelectorAll('.replacement-item').forEach(item => {
+                  const text = item.querySelector('.replacement-text').textContent.toLowerCase();
+                  if (text.includes(searchText)) {
+                    item.style.display = '';
+                  } else {
+                    item.style.display = 'none';
+                  }
+                });
+              });
+            }
             
-            // 绑定复选框事件
-            document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-              const index = parseInt(checkbox.closest('.replacement-item').dataset.index);
-              if (checkbox.checked) {
-                selectedItems.add(index);
-              }
-              
-              checkbox.addEventListener('change', (e) => {
-                const index = parseInt(e.target.closest('.replacement-item').dataset.index);
-                if (e.target.checked) {
-                  selectedItems.add(index);
-                } else {
-                  selectedItems.delete(index);
-                }
+            console.log('所有事件绑定完成');
+          });
+          
+          // 处理来自扩展的消息
+          window.addEventListener('message', event => {
+            const message = event.data;
+            
+            switch (message.command) {
+              case 'updateSelectionInUI':
+                console.log('收到更新UI选择状态消息:', message);
+                document.querySelectorAll('.item-checkbox').forEach((checkbox, index) => {
+                  checkbox.checked = message.selectedIndexes.includes(index);
+                });
+                break;
                 
-                vscode.postMessage({
-                  command: 'updateSelection',
-                  selectedIndexes: Array.from(selectedItems)
-                });
-              });
-            });
-            
-            // 绑定批量替换按钮事件
-            const batchReplaceBtn = document.getElementById('batch-replace');
-            if (batchReplaceBtn) {
-              batchReplaceBtn.addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'batchReplace',
-                  selectedIndexes: Array.from(selectedItems)
-                });
-              });
-            }
-            
-            // 绑定刷新扫描按钮事件
-            const refreshBtn = document.getElementById('refresh-scan');
-            if (refreshBtn) {
-              refreshBtn.addEventListener('click', () => {
-                console.log('点击刷新按钮');
-                vscode.postMessage({
-                  command: 'refreshScan'
-                });
-              });
-            }
-            
-            // 绑定选择国际化文件按钮事件
-            const selectLocalesBtn = document.getElementById('select-locales');
-            if (selectLocalesBtn) {
-              selectLocalesBtn.addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'selectLocalesFiles'
-                });
-              });
-            }
-            
-            // 绑定API翻译配置按钮事件
-            const apiTranslationBtn = document.getElementById('open-api-translation');
-            if (apiTranslationBtn) {
-              apiTranslationBtn.addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'openApiTranslation'
-                });
-              });
-            }
-            
-            // 绑定关闭按钮事件
-            const closeBtn = document.getElementById('close-panel');
-            if (closeBtn) {
-              closeBtn.addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'closePanel'
-                });
-              });
+              case 'refreshPanel':
+                console.log('收到刷新面板消息');
+                window.location.reload();
+                break;
             }
           });
         })();
       </script>
     `;
 
-    return `
+  return `
       <!DOCTYPE html>
       <html lang="zh-CN">
       <head>
@@ -316,330 +468,590 @@ class BatchReplacementPanel {
         <title>批量替换国际化</title>
         <style>
           :root {
-            --primary-color: #4285f4;
-            --secondary-color: #34a853;
-            --danger-color: #ea4335;
-            --gray-100: #f8f9fa;
-            --gray-200: #e9ecef;
-            --gray-300: #dee2e6;
-            --gray-600: #6c757d;
-            --gray-800: #343a40;
-            --shadow: 0 2px 5px rgba(0,0,0,0.1);
-          }
-          body { 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif; 
-            margin: 0; 
-            padding: 0; 
-            color: var(--gray-800);
-            background-color: var(--gray-100);
-          }
-          .main-container { 
-            display: flex; 
-            flex-direction: column; 
-            height: 100vh;
-            background-color: white;
-            border-radius: 8px;
-            overflow: hidden;
-            box-shadow: var(--shadow);
-          }
-          .container { 
-            display: flex; 
-            flex: 1; 
-            overflow: hidden; 
-          }
-          .left-panel { 
-            width: 300px; 
-            padding: 16px; 
-            border-right: 1px solid var(--gray-300); 
-            overflow-y: auto;
-            background-color: white;
-          }
-          .right-panel { 
-            flex: 1; 
-            padding: 16px; 
-            overflow-y: auto;
-            background-color: white;
-          }
-          h2 {
-            margin-top: 0;
-            color: var(--gray-800);
-            border-bottom: 2px solid var(--primary-color);
-            padding-bottom: 8px;
-          }
-          .pattern-list { 
-            margin-top: 16px; 
-          }
-          .pattern-item { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 8px; 
-            padding: 8px 12px; 
-            border: 1px solid var(--gray-300); 
-            border-radius: 4px;
-            background-color: var(--gray-100);
-          }
-          .pattern-remove-btn { 
-            background: var(--danger-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 4px 10px; 
-            cursor: pointer;
-            transition: background-color 0.2s;
-          }
-          .pattern-remove-btn:hover {
-            background-color: #d32f2f;
-          }
-          .pattern-add { 
-            display: flex; 
-            margin-top: 16px; 
-          }
-          #new-pattern { 
-            flex: 1; 
-            padding: 8px 12px; 
-            margin-right: 8px;
-            border: 1px solid var(--gray-300);
-            border-radius: 4px;
-          }
-          #add-pattern-btn { 
-            background: var(--secondary-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 8px 16px; 
-            cursor: pointer;
-            transition: background-color 0.2s;
-          }
-          #add-pattern-btn:hover {
-            background-color: #2e7d32;
-          }
-          .refresh-btn { 
-            background: var(--primary-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 10px 16px; 
-            cursor: pointer; 
-            margin-top: 16px; 
-            width: 100%;
-            transition: background-color 0.2s;
-            font-weight: 500;
-          }
-          .refresh-btn:hover {
-            background-color: #1a73e8;
-          }
-          .locale-settings { 
-            margin-top: 24px; 
-          }
-          .replacement-item { 
-            border: 1px solid var(--gray-300); 
-            padding: 12px 16px; 
-            margin-bottom: 12px;
-            border-radius: 6px;
-            background-color: var(--gray-100);
-            transition: box-shadow 0.2s;
-          }
-          .replacement-item:hover {
-            box-shadow: var(--shadow);
-          }
-          .replacement-header { 
-            display: flex; 
-            justify-content: space-between; 
-            align-items: center; 
-            margin-bottom: 10px; 
-          }
-          .replacement-text { 
-            font-weight: 500; 
-            color: var(--gray-800);
-          }
-          .replacement-source { 
-            color: var(--gray-600); 
-            font-size: 12px; 
-            padding: 2px 6px;
-            background-color: var(--gray-200);
-            border-radius: 12px;
-          }
-          .replacement-i18n { 
-            margin-top: 10px; 
-            padding-top: 10px;
-            border-top: 1px dashed var(--gray-300);
-          }
-          .replacement-i18n input { 
-            width: 100%; 
-            padding: 8px 12px; 
-            box-sizing: border-box; 
-            margin-top: 5px;
-            border: 1px solid var(--gray-300);
-            border-radius: 4px;
-          }
-          .checkbox-wrapper { 
-            display: flex; 
-            align-items: center; 
-          }
-          .checkbox-wrapper input { 
-            margin-right: 8px;
-            cursor: pointer;
-            width: 18px;
-            height: 18px;
-          }
-          .button-panel { 
-            padding: 12px 16px; 
-            display: flex; 
-            justify-content: space-between; 
-            border-top: 1px solid var(--gray-300);
-            background-color: var(--gray-100);
-          }
-          .confirm-btn { 
-            background: var(--secondary-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 10px 18px; 
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-          }
-          .confirm-btn:hover {
-            background-color: #2e7d32;
-          }
-          .cancel-btn { 
-            background: var(--danger-color); 
-            color: white; 
-            border: none; 
-            border-radius: 4px; 
-            padding: 10px 18px; 
-            cursor: pointer;
-            font-weight: 500;
-            transition: background-color 0.2s;
-          }
-          .cancel-btn:hover {
-            background-color: #d32f2f;
-          }
-          .status-bar { 
-            padding: 12px 16px; 
-            background-color: var(--gray-800);
-            color: white;
-            display: flex; 
-            justify-content: space-between;
-            font-size: 13px;
-          }
-          .disabled { 
-            opacity: 0.5; 
-            cursor: not-allowed !important; 
-            pointer-events: none;
-          }
-          .filter-container { 
-            margin-bottom: 16px;
-            position: relative;
-          }
-          .filter-container:before {
-            content: "🔍";
-            position: absolute;
-            left: 10px;
-            top: 9px;
-            color: var(--gray-600);
-          }
-          #filter-input { 
-            width: 100%; 
-            padding: 8px 12px 8px 32px; 
-            box-sizing: border-box;
-            border: 1px solid var(--gray-300);
-            border-radius: 4px;
-          }
-          .btn-group {
-            display: flex;
-            gap: 8px;
-          }
-          .found-key {
-            color: var(--secondary-color);
-            font-weight: 500;
-          }
-          .key-file {
-            font-size: 12px;
-            color: var(--gray-600);
-            margin-left: 4px;
-          }
-          /* 添加国际化文件列表样式 */
-          .locale-files {
-            margin-top: 12px;
-            max-height: 200px;
-            overflow-y: auto;
-          }
-          .locale-file-item {
-            padding: 8px 12px;
-            background-color: var(--gray-100);
-            border: 1px solid var(--gray-300);
-            border-radius: 4px;
-            margin-bottom: 6px;
-            font-size: 13px;
-            word-break: break-all;
-          }
-          .no-files-warning {
-            color: var(--danger-color);
-            padding: 10px;
-            text-align: center;
-            border: 1px dashed var(--danger-color);
-            border-radius: 4px;
-            margin-top: 10px;
-          }
-          .disabled-panel {
-            opacity: 0.6;
-            pointer-events: none;
-          }
-          /* 翻译按钮样式 */
-          .translate-btn {
-            background-color: #4dabf7;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
-            font-size: 12px;
-            cursor: pointer;
-            margin-left: 8px;
-            transition: background-color 0.2s;
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --success-color: #10b981;
+            --success-hover: #059669;
+            --danger-color: #ef4444;
+            --danger-hover: #dc2626;
+            --neutral-color: #6b7280;
+            --neutral-hover: #4b5563;
+            --bg-color: #f9fafb;
+            --card-bg: #ffffff;
+            --border-color: #e5e7eb;
+            --text-primary: #111827;
+            --text-secondary: #4b5563;
+            --text-muted: #9ca3af;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --radius-sm: 0.25rem;
+            --radius: 0.375rem;
+            --radius-md: 0.5rem;
           }
           
-          .translate-btn:hover {
-            background-color: #339af0;
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            padding: 0;
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            line-height: 1.5;
+          }
+          
+          /* 容器样式 */
+          .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 100%;
+            margin: 0 auto;
+            overflow: hidden;
+          }
+          
+          /* 主内容区域 */
+          .main-content {
+            display: flex;
+            gap: 1rem;
+            flex: 1;
+            overflow: hidden;
+            padding: 1rem;
+          }
+          
+          /* 左侧面板 */
+          .left-panel {
+            width: 280px;
+            border-radius: var(--radius);
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow);
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+          }
+          
+          .panel-section {
+            padding: 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+          }
+          
+          .panel-section:last-child {
+            border-bottom: none;
+          }
+          
+          .panel-section h2 {
+            margin-top: 0;
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+          }
+          
+          /* 扫描模式列表 */
+          .pattern-list {
+            margin-bottom: 1rem;
+          }
+          
+          .pattern-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.5rem;
+            background-color: var(--bg-color);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            font-size: 0.875rem;
+          }
+          
+          .pattern-remove-btn {
+            background-color: transparent;
+            border: none;
+            color: var(--danger-color);
+            cursor: pointer;
+            font-size: 0.75rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+          }
+          
+          .pattern-remove-btn:hover {
+            background-color: #fee2e2;
+          }
+          
+          /* 添加模式 */
+          .pattern-add {
+            display: flex;
+            margin-bottom: 1rem;
+          }
+          
+          .pattern-add input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+            font-size: 0.875rem;
+            outline: none;
+            transition: border-color 0.2s;
+          }
+          
+          .pattern-add input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 1px var(--primary-color);
+          }
+          
+          .pattern-add button {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+                white-space: nowrap;
+          }
+          
+          .pattern-add button:hover {
+            background-color: var(--primary-hover);
+          }
+          
+          /* 国际化文件设置 */
+          .locale-settings {
+            margin-bottom: 1rem;
+          }
+          
+          .locale-files {
+            margin-bottom: 1rem;
+          }
+          
+          .locale-file-item {
+            padding: 0.5rem 0.75rem;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
+            font-size: 0.75rem;
+            word-break: break-all;
+          }
+          
+          .no-files-warning {
+            color: #b45309;
+            padding: 0.75rem;
+            background-color: #fffbeb;
+            border-radius: var(--radius-sm);
+            margin-bottom: 1rem;
+            font-size: 0.875rem;
+            border-left: 3px solid #f59e0b;
+          }
+          
+          /* 按钮样式 */
+          .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+            width: 100%;
+          }
+          
+          .btn-primary {
+            background-color: var(--primary-color);
+            color: white;
+          }
+          
+          .btn-primary:hover {
+            background-color: var(--primary-hover);
+          }
+          
+          .btn-success {
+            background-color: var(--success-color);
+            color: white;
+          }
+          
+          .btn-success:hover {
+            background-color: var(--success-hover);
+          }
+          
+          .btn-danger {
+            background-color: var(--danger-color);
+            color: white;
+          }
+          
+          .btn-danger:hover {
+            background-color: var(--danger-hover);
+          }
+          
+          .btn-neutral {
+            background-color: var(--neutral-color);
+            color: white;
+          }
+          
+          .btn-neutral:hover {
+            background-color: var(--neutral-hover);
+          }
+          
+          .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          
+          .btn svg {
+            margin-right: 0.5rem;
+            width: 1rem;
+            height: 1rem;
+          }
+          
+          /* 右侧面板 */
+          .right-panel {
+            flex: 1;
+            border-radius: var(--radius);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow);
+          }
+          
+          .disabled-panel {
+            opacity: 0.7;
+            pointer-events: none;
+          }
+          
+          .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+          }
+          
+          .panel-header h2 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+          }
+          
+          .panel-header h2 .count-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--primary-color);
+            color: white;
+            border-radius: 9999px;
+            padding: 0.125rem 0.5rem;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+          }
+          
+          .tool-btn {
+            display: flex;
+            align-items: center;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            transition: all 0.2s;
+          }
+          
+          .tool-btn:hover {
+            background-color: #f3f4f6;
+            border-color: #d1d5db;
+          }
+          
+          .tool-icon {
+            margin-right: 0.5rem;
+          }
+          
+          /* 过滤器 */
+          .filter-container {
+            padding: 0.75rem 1.25rem;
+            border-bottom: 1px solid var(--border-color);
+            background-color: var(--card-bg);
+          }
+          
+          .filter-input-wrapper {
+            position: relative;
+          }
+          
+          .filter-input-wrapper svg {
+            position: absolute;
+            left: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+            width: 1rem;
+            height: 1rem;
+          }
+          
+          .filter-container input {
+            width: 100%;
+            padding: 0.625rem 0.75rem 0.625rem 2.25rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            background-color: var(--bg-color);
+            box-sizing: border-box;
+            outline: none;
+            transition: all 0.2s;
+          }
+          
+          .filter-container input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 1px var(--primary-color);
+          }
+          
+          /* 替换项列表 */
+          #replacements-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: var(--bg-color);
+          }
+          
+          .replacement-item {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            margin-bottom: 1rem;
+            background-color: var(--card-bg);
+            box-shadow: var(--shadow-sm);
+            transition: all 0.2s;
+            overflow: hidden;
+          }
+          
+          .replacement-item:hover {
+            box-shadow: var(--shadow-md);
+          }
+          
+          .replacement-item.has-key {
+            border-left: 3px solid var(--success-color);
+          }
+          
+          .replacement-header {
+            display: flex;
+            align-items: center;
+    justify-content: center;
+            padding: 0.75rem 1rem;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+          }
+          
+          .select-item {
+            margin-right: 0.75rem;
+            align-self: flex-start;
+            position: relative;
+            display: inline-block;
+            cursor: pointer;
+            user-select: none;
+          }
+          
+          .select-item input {
+            position: absolute;
+            opacity: 0;
+            cursor: pointer;
+            height: 0;
+            width: 0;
+          }
+          
+          .checkmark {
+            position: relative;
+            display: inline-block;
+            height: 1.125rem;
+            width: 1.125rem;
+            background-color: var(--bg-color);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            transition: all 0.2s;
+          }
+          
+          .select-item:hover .checkmark {
+            background-color: #f3f4f6;
+          }
+          
+          .select-item input:checked ~ .checkmark {
+            background-color: var(--primary-color);
+            border-color: var(--primary-color);
+          }
+          
+          .checkmark:after {
+            content: "";
+            position: absolute;
+            display: none;
+          }
+          
+          .select-item input:checked ~ .checkmark:after {
+            display: block;
+          }
+          
+          .select-item .checkmark:after {
+            left: 0.375rem;
+            top: 0.125rem;
+            width: 0.25rem;
+            height: 0.5rem;
+            border: solid white;
+            border-width: 0 2px 2px 0;
+            transform: rotate(45deg);
+          }
+          
+          .replacement-text {
+            flex: 1;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+            font-size: 0.875rem;
+            line-height: 1.5;
+            color: var(--text-primary);
+          }
+          
+          .replacement-footer {
+            padding: 0.75rem 1rem;
+            background-color: #f9fafb;
           }
           
           .i18n-key-input {
             display: flex;
-            align-items: center;
-            flex-grow: 1;
+            gap: 0.5rem;
           }
           
-          .key-input {
-            flex-grow: 1;
-            padding: 4px 8px;
-            border: 1px solid var(--gray-300);
-            border-radius: 4px;
-            font-size: 13px;
+          .i18n-key-input input {
+            flex: 1;
+            padding: 0.5rem 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
+            background-color: white;
+            outline: none;
+            transition: all 0.2s;
+          }
+          
+          .i18n-key-input input:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 1px var(--primary-color);
+          }
+          
+          .translate-btn {
+            display: inline-flex;
+            align-items: center;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: background-color 0.2s;
+          }
+          
+          .translate-btn:hover {
+            background-color: var(--primary-hover);
+          }
+          
+          .translate-btn svg {
+            margin-right: 0.375rem;
+            width: 1rem;
+            height: 1rem;
+          }
+          
+          .found-key {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-top: 0.5rem;
+            display: flex;
+            align-items: center;
+          }
+          
+          .found-key:before {
+            content: "";
+            display: inline-block;
+            width: 0.5rem;
+            height: 0.5rem;
+            background-color: var(--success-color);
+            border-radius: 50%;
+            margin-right: 0.375rem;
+          }
+          
+          .key-file {
+            color: var(--primary-color);
+            font-weight: 500;
+          }
+          
+          /* 按钮面板 */
+          .button-panel {
+            display: flex;
+            justify-content: space-between;
+            padding: 1rem;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+          }
+            .button-panel button{
+              white-space: nowrap;
+            }
+          
+          .btn-group {
+            display: flex;
+            gap: 0.5rem;
+          }
+          
+          /* 状态栏 */
+          .status-bar {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            padding: 0.75rem 1rem;
+            background-color: var(--card-bg);
+            border-top: 1px solid var(--border-color);
+          }
+          
+          /* 响应式调整 */
+          @media (max-width: 768px) {
+            .main-content {
+              flex-direction: column;
+            }
+            
+            .left-panel {
+              width: 100%;
+              margin-bottom: 1rem;
+            }
           }
         </style>
       </head>
       <body>
-        <div class="main-container">
-          <div class="container">
+        <div class="container">
+          <div class="main-content">
             <div class="left-panel">
-              <h2>扫描字段配置</h2>
-              <div class="pattern-list">
-                ${scanPatterns.map(pattern => `
-                  <div class="pattern-item">
-                    <span>${pattern}</span>
-                    <button class="pattern-remove-btn" data-pattern="${pattern}">删除</button>
-                  </div>
-                `).join('')}
+              <div class="panel-section">
+                <h2>扫描配置</h2>
+                <div class="pattern-list">
+                  ${scanPatterns.map(pattern => `
+                    <div class="pattern-item">
+                      <span>${pattern}</span>
+                      <button class="pattern-remove-btn" data-pattern="${pattern}">删除</button>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="pattern-add">
+                  <input type="text" id="new-pattern" placeholder="新增扫描字段">
+                  <button id="add-pattern-btn">添加</button>
+                </div>
               </div>
-              <div class="pattern-add">
-                <input type="text" id="new-pattern" placeholder="新增扫描字段">
-                <button id="add-pattern-btn">添加</button>
-              </div>
-              <div class="locale-settings">
-                <h2>国际化文件</h2>
-                <button id="select-locales-btn" class="refresh-btn">选择国际化文件</button>
-                
+              
+              <div class="panel-section">
+                <h2>国际化字库文件</h2>
                 ${hasLocaleFiles ? `
                   <div class="locale-files">
                     ${localesPaths.map(file => `
@@ -648,47 +1060,91 @@ class BatchReplacementPanel {
                   </div>
                 ` : `
                   <div class="no-files-warning">
-                    未配置国际化文件，请先选择文件
+                    未配置国际化字库，请先选择文件
                   </div>
                 `}
-              </div>
-              <button id="refresh-scan" class="refresh-btn" ${!hasLocaleFiles ? 'disabled' : ''}>刷新扫描</button>
-            </div>
-            <div class="right-panel ${!hasLocaleFiles ? 'disabled-panel' : ''}">
-              <div class="panel-header">
-                <h2>扫描找到的文本 (${replacements.length})</h2>
-                <button id="open-api-translation" class="tool-btn" title="配置API自动翻译">
-                  <span class="tool-icon">🌐</span>
-                  <span>API翻译配置</span>
+                <button id="select-locales-btn" class="btn btn-primary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  选择国际化文件
                 </button>
               </div>
-              <div class="filter-container">
-                <input type="text" id="filter-input" placeholder="输入关键词筛选文本">
+              
+              <div class="panel-section">
+                <button id="refresh-scan" class="btn btn-success" ${!hasLocaleFiles ? 'disabled' : ''}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg>
+                  刷新扫描
+                </button>
               </div>
+            </div>
+            
+            <div class="right-panel ${!hasLocaleFiles ? 'disabled-panel' : ''}">
+              <div class="panel-header">
+                <h2>
+                  扫描找到的文本
+                  <span class="count-badge">${replacements.length}</span>
+                </h2>
+                <button id="open-api-translation" class="tool-btn" title="配置API自动翻译">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m16.2 7.8-2 6.3-6.4 2.1 2-6.3z"/></svg>
+                  API翻译配置
+                </button>
+              </div>
+              
+              <div class="filter-container">
+                <div class="filter-input-wrapper">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                  <input type="text" id="filter-input" placeholder="输入关键词筛选文本">
+                </div>
+              </div>
+              
               <div id="replacements-list">
                 ${replacementsHtml}
               </div>
+              
+              <div class="button-panel">
+                <div class="btn-group">
+                  <button id="select-all" class="btn btn-primary" ${!hasLocaleFiles ? 'disabled' : ''}>
+                     全选
+                  </button>
+                  <button id="deselect-all" class="btn btn-neutral" ${!hasLocaleFiles ? 'disabled' : ''}>
+                    取消全选
+                  </button>
+                </div>
+                <div class="btn-group">
+                  <button id="replace-selected" class="btn btn-success" ${(replacements.length === 0 || !hasLocaleFiles) ? 'disabled' : ''}>
+                    替换选中项 (${replacements.length})
+                  </button>
+                  <button id="close-panel" class="btn btn-danger">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                    关闭面板
+                  </button>
+                </div>
+              </div>
+              
+              <div class="status-bar">
+                <div>${hasLocaleFiles ? `匹配到国际化键: ${replacements.length}` : '请先选择国际化文件'}</div>
+                <div>${hasLocaleFiles ? '未匹配到的需要手动填写键名' : ''}</div>
+              </div>
             </div>
-          </div>
-          <div class="button-panel">
-            <div class="btn-group">
-              <button id="select-all" class="confirm-btn" ${!hasLocaleFiles ? 'disabled' : ''}>全选</button>
-              <button id="deselect-all" class="cancel-btn" ${!hasLocaleFiles ? 'disabled' : ''}>取消全选</button>
-            </div>
-            <div class="btn-group">
-              <button id="replace-selected" class="confirm-btn" ${(replacements.length === 0 || !hasLocaleFiles) ? 'disabled' : ''}>替换选中项 (${replacements.length})</button>
-              <button id="close-panel" class="cancel-btn">关闭面板</button>
-            </div>
-          </div>
-          <div class="status-bar">
-            <div>${hasLocaleFiles ? `匹配到国际化键: ${replacements.length}` : '请先选择国际化文件'}</div>
-            <div>${hasLocaleFiles ? '未匹配到的需要手动填写键名' : ''}</div>
           </div>
         </div>
         ${scriptSection}
       </body>
       </html>
     `;
+}
+
+// ... 其余代码保持不变 ...
+  /**
+   * 转义HTML特殊字符
+   */
+  escapeHtml(text) {
+    if (!text) return '';
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   /**
@@ -785,73 +1241,330 @@ class BatchReplacementPanel {
   }
 
   /**
+   * 选择或取消选择所有项
+   * @param {boolean} select 是否选择
+   */
+  selectAllItems(select) {
+    console.log(`${select ? '选择' : '取消选择'}所有项`);
+    
+    if (!this.panel) return;
+    
+    try {
+      // 更新所有项的选中状态
+      this.selectedIndexes = select 
+        ? Array.from({ length: this.replacements.length }, (_, i) => i)
+        : [];
+      
+      // 更新UI中的选中状态
+      this.panel.webview.postMessage({
+        command: 'updateSelectionInUI',
+        selectedIndexes: this.selectedIndexes,
+        selectAll: select
+      });
+      
+      console.log(`已${select ? '选择' : '取消选择'}所有项，共 ${this.selectedIndexes.length} 项`);
+    } catch (error) {
+      console.error(`选择所有项失败:`, error);
+    }
+  }
+
+  /**
    * 添加扫描模式
-   * @param {string} pattern 模式
+   * @param {string} pattern 模式字符串
    */
   async addPattern(pattern) {
-    // ... 实现添加模式的代码 ...
+    if (!pattern) return;
+    
+    console.log(`添加扫描模式: ${pattern}`);
+    
+    try {
+      // 获取当前配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      let scanPatterns = config.get('scanPatterns', []);
+      
+      // 检查是否已存在
+      if (scanPatterns.includes(pattern)) {
+        vscode.window.showInformationMessage(`扫描模式 "${pattern}" 已存在`);
+        return;
+      }
+      
+      // 添加新模式
+      scanPatterns.push(pattern);
+      
+      // 更新配置
+      await config.update('scanPatterns', scanPatterns, vscode.ConfigurationTarget.Workspace);
+      
+      // 刷新分析
+      await this.analyzeAndLoadPanel();
+      
+      vscode.window.showInformationMessage(`已添加扫描模式: ${pattern}`);
+    } catch (error) {
+      console.error(`添加扫描模式失败:`, error);
+      vscode.window.showErrorMessage(`添加扫描模式失败: ${error.message}`);
+    }
   }
 
   /**
    * 移除扫描模式
-   * @param {string} pattern 模式
+   * @param {string} pattern 模式字符串
    */
   async removePattern(pattern) {
-    // ... 实现移除模式的代码 ...
-  }
-
-  /**
-   * 刷新扫描
-   */
-  async refreshScan() {
-    await this.analyzeAndLoadPanel();
+    if (!pattern) return;
+    
+    console.log(`移除扫描模式: ${pattern}`);
+    
+    try {
+      // 获取当前配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      let scanPatterns = config.get('scanPatterns', []);
+      
+      // 移除模式
+      scanPatterns = scanPatterns.filter(p => p !== pattern);
+      
+      // 更新配置
+      await config.update('scanPatterns', scanPatterns, vscode.ConfigurationTarget.Workspace);
+      
+      // 刷新分析
+      await this.analyzeAndLoadPanel();
+      
+      vscode.window.showInformationMessage(`已移除扫描模式: ${pattern}`);
+    } catch (error) {
+      console.error(`移除扫描模式失败:`, error);
+      vscode.window.showErrorMessage(`移除扫描模式失败: ${error.message}`);
+    }
   }
 
   /**
    * 选择国际化文件
    */
   async selectLocalesFiles() {
-    // 调用设置国际化文件路径命令
-    await vscode.commands.executeCommand('i18n-swapper.setLocalesPaths');
+    try {
+      const options = {
+        canSelectMany: true,
+        filters: {
+          '国际化文件': ['js', 'json']
+        },
+        openLabel: '选择国际化文件'
+      };
+
+      const fileUris = await vscode.window.showOpenDialog(options);
+      if (!fileUris || fileUris.length === 0) {
+        return;
+      }
+
+      // 转换为相对路径
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        vscode.window.showErrorMessage('未找到工作区文件夹');
+        return;
+      }
+      const rootPath = workspaceFolders[0].uri.fsPath;
+
+      // 更新配置
+      const relativePaths = fileUris.map(uri => {
+        const fullPath = uri.fsPath;
+        const relativePath = path.relative(rootPath, fullPath);
+        // 确保使用 / 分隔符
+        return relativePath.replace(/\\/g, '/');
+      });
+
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      await config.update('localesPaths', relativePaths, vscode.ConfigurationTarget.Workspace);
+
+      // 询问是否要添加更多语言文件
+      const createMoreLangs = await vscode.window.showInformationMessage(
+        '已添加国际化文件。是否要快速创建更多语言文件？',
+        '创建',
+        '取消'
+      );
+
+      if (createMoreLangs === '创建') {
+        await this.showLanguageSelector();
+      }
+
+      // 刷新分析
+      await this.analyzeAndLoadPanel();
+    } catch (error) {
+      console.error('选择国际化文件出错:', error);
+      vscode.window.showErrorMessage(`选择国际化文件失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 显示语言选择器对话框
+   */
+  async showLanguageSelector() {
+    try {
+      // 获取源语言
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const sourceLanguage = await vscode.window.showQuickPick(
+        Object.keys(SUPPORTED_LANGUAGE_MAPPINGS).map(code => ({
+          label: LANGUAGE_NAMES[code] || code,
+          description: code,
+          code: code
+        })),
+        {
+          title: '选择源语言',
+          placeHolder: '请选择源语言'
+        }
+      );
+
+      if (!sourceLanguage) return;
+
+      // 获取可用的目标语言
+      const availableTargets = SUPPORTED_LANGUAGE_MAPPINGS[sourceLanguage.code] || [];
+      
+      // 如果没有可用的目标语言
+      if (availableTargets.length === 0) {
+        vscode.window.showInformationMessage(`${sourceLanguage.label} 没有可翻译的目标语言`);
+        return;
+      }
+
+      // 显示多选对话框
+      const selectedTargets = await vscode.window.showQuickPick(
+        availableTargets.map(code => ({
+          label: LANGUAGE_NAMES[code] || code,
+          description: code,
+          code: code,
+          picked: true
+        })),
+        {
+          title: `为 ${sourceLanguage.label} 选择目标语言`,
+          placeHolder: '选择要创建的目标语言文件',
+          canPickMany: true
+        }
+      );
+
+      if (!selectedTargets || selectedTargets.length === 0) return;
+
+      // 选择文件夹来保存国际化文件
+      const folderUri = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: '选择保存国际化文件的文件夹'
+      });
+
+      if (!folderUri || folderUri.length === 0) return;
+
+      const baseFolderPath = folderUri[0].fsPath;
+      
+      // 选择文件格式
+      const fileFormat = await vscode.window.showQuickPick(
+        ['JSON (.json)', 'JavaScript (.js)'],
+        {
+          title: '选择文件格式',
+          placeHolder: '请选择国际化文件格式'
+        }
+      );
+
+      if (!fileFormat) return;
+      
+      const extension = fileFormat.includes('JSON') ? '.json' : '.js';
+      
+      // 创建文件
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        vscode.window.showErrorMessage('未找到工作区文件夹');
+        return;
+      }
+      const rootPath = workspaceFolders[0].uri.fsPath;
+      
+      // 创建文件并添加到配置
+      const createdPaths = [];
+      const relativePaths = [];
+      
+      // 创建源语言文件
+      const sourceFileName = `${sourceLanguage.code}${extension}`;
+      const sourceFilePath = path.join(baseFolderPath, sourceFileName);
+      
+      if (!fs.existsSync(sourceFilePath)) {
+        // 创建空对象
+        if (extension === '.json') {
+          fs.writeFileSync(sourceFilePath, '{}', 'utf8');
+        } else {
+          fs.writeFileSync(sourceFilePath, 'module.exports = {};', 'utf8');
+        }
+        createdPaths.push(sourceFilePath);
+        
+        const relativeSourcePath = path.relative(rootPath, sourceFilePath).replace(/\\/g, '/');
+        relativePaths.push(relativeSourcePath);
+      }
+      
+      // 创建目标语言文件
+      for (const target of selectedTargets) {
+        const fileName = `${target.code}${extension}`;
+        const filePath = path.join(baseFolderPath, fileName);
+        
+        if (!fs.existsSync(filePath)) {
+          // 创建空对象
+          if (extension === '.json') {
+            fs.writeFileSync(filePath, '{}', 'utf8');
+          } else {
+            fs.writeFileSync(filePath, 'module.exports = {};', 'utf8');
+          }
+          createdPaths.push(filePath);
+        }
+        
+        const relativePath = path.relative(rootPath, filePath).replace(/\\/g, '/');
+        relativePaths.push(relativePath);
+      }
+      
+      // 更新配置
+      const localesPaths = config.get('localesPaths', []);
+      // 合并并去重
+      const updatedPaths = [...new Set([...localesPaths, ...relativePaths])];
+      await config.update('localesPaths', updatedPaths, vscode.ConfigurationTarget.Workspace);
+      
+      // 创建语言映射
+      const languageMap = {};
+      languageMap[sourceLanguage.code] = relativePaths.find(p => p.includes(sourceLanguage.code));
+      
+      for (const target of selectedTargets) {
+        const targetPath = relativePaths.find(p => p.includes(target.code));
+        if (targetPath) {
+          languageMap[target.code] = targetPath;
+        }
+      }
+      
+      await config.update('languages', languageMap, vscode.ConfigurationTarget.Workspace);
+      
+      vscode.window.showInformationMessage(
+        `已创建 ${createdPaths.length} 个语言文件并更新配置`
+      );
+      
+      // 刷新分析
+      await this.analyzeAndLoadPanel();
+    } catch (error) {
+      console.error('创建语言文件出错:', error);
+      vscode.window.showErrorMessage(`创建语言文件失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 执行选中项的替换
+   */
+  async performSelectedReplacements() {
+    console.log('执行选中项的替换');
     
-    // 设置完成后，刷新分析和面板
-    await this.analyzeAndLoadPanel();
-  }
-
-  /**
-   * 执行替换
-   */
-  async performReplacements(replacements) {
-    // ... 实现执行替换的代码 ...
-  }
-
-  /**
-   * 转义HTML特殊字符
-   * @param {string} text 原始文本
-   * @returns {string} 转义后的文本
-   */
-  escapeHtml(text) {
-    if (typeof text !== 'string') return '';
-    return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+    if (!this.selectedIndexes || this.selectedIndexes.length === 0) {
+      vscode.window.showInformationMessage('请先选择要替换的项');
+      return;
+    }
+    
+    await this.doBatchReplace(this.selectedIndexes);
   }
 
   /**
    * 更新项的国际化键
+   * @param {number} index 项索引
+   * @param {string} key 国际化键
    */
   updateI18nKey(index, key) {
-    if (index >= 0 && index < this.replacements.length) {
-      this.replacements[index].i18nKey = key;
-      this.updatePanelContent(
-        vscode.workspace.getConfiguration('i18n-swapper').get('scanPatterns', []),
-        this.replacements,
-        vscode.workspace.getConfiguration('i18n-swapper').get('localesPaths', [])
-      );
-    }
+    if (index < 0 || index >= this.replacements.length) return;
+    
+    console.log(`更新项 ${index} 的键为: ${key}`);
+    this.replacements[index].i18nKey = key;
   }
 
   /**
@@ -864,75 +1577,60 @@ class BatchReplacementPanel {
   }
 
   /**
-   * 选择或取消选择所有项
+   * 执行批量替换
+   * @param {number[]} indexes 选中的索引数组
    */
-  selectAllItems(selected) {
-    for (const item of this.replacements) {
-      item.selected = selected;
+  async doBatchReplace(indexes) {
+    if (!indexes || !Array.isArray(indexes) || indexes.length === 0) {
+      vscode.window.showInformationMessage('没有选中任何项');
+      return;
     }
-    this.updatePanelContent(
-      vscode.workspace.getConfiguration('i18n-swapper').get('scanPatterns', []),
-      this.replacements,
-      vscode.workspace.getConfiguration('i18n-swapper').get('localesPaths', [])
-    );
-  }
-
-  /**
-   * 执行选中项的替换
-   */
-  async performSelectedReplacements() {
-    const selectedItems = this.replacements.filter(item => item.selected && item.i18nKey);
     
-    if (selectedItems.length === 0) {
-      vscode.window.showInformationMessage('没有选中任何有效的替换项');
+    console.log('执行批量替换，选中的索引:', indexes);
+    
+    // 筛选有效的替换项
+    const validItems = indexes
+      .map(index => this.replacements[index])
+      .filter(item => item && item.i18nKey);
+    
+    if (validItems.length === 0) {
+      vscode.window.showInformationMessage('选中的项目没有可用的国际化键');
       return;
     }
     
     try {
-      // 获取配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const configQuoteType = config.get('quoteType', 'single');
-      const functionName = config.get('functionName', 't');
-      const codeQuote = configQuoteType === 'single' ? "'" : '"';
-      
-      // 创建工作区编辑
-      const workspaceEdit = new vscode.WorkspaceEdit();
-      
-      // 处理所有选中项
-      for (const item of selectedItems) {
-        // 查找文本周围的引号
-        const { hasQuotes, range } = utils.findQuotesAround(this.document, item);
-        
-        // 生成替换文本
-        let replacement;
-        if (hasQuotes) {
-          // 如果有引号，则替换文本不需要再带引号
-          replacement = `${functionName}(${codeQuote}${item.i18nKey}${codeQuote})`;
-        } else {
-          // 根据上下文生成替换文本
-          replacement = utils.generateReplacementText(
-            item.text, 
-            item.i18nKey, 
-            functionName, 
-            codeQuote, 
-            this.document, 
-            this.document.positionAt(item.start)
-          );
-        }
-        
-        workspaceEdit.replace(this.document.uri, range, replacement);
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document !== this.document) {
+        vscode.window.showWarningMessage('编辑器已更改，请重新打开批量替换面板');
+        return;
       }
       
-      // 应用所有编辑
-      await vscode.workspace.applyEdit(workspaceEdit);
+      // 执行替换
+      await editor.edit(editBuilder => {
+        for (const item of validItems) {
+          if (item.range && item.i18nKey) {
+            // 确保范围有效
+            const range = new vscode.Range(
+              this.document.positionAt(item.range.start),
+              this.document.positionAt(item.range.end)
+            );
+            
+            // 根据文件类型生成替换代码
+            const replacement = utils.generateReplacement(
+              item.i18nKey,
+              this.document.fileName
+            );
+            
+            // 执行替换
+            editBuilder.replace(range, replacement);
+          }
+        }
+      });
       
-      vscode.window.showInformationMessage(`已替换 ${selectedItems.length} 处文本`);
-      
-      // 刷新面板
-      await this.analyzeAndLoadPanel();
+      vscode.window.showInformationMessage(`成功替换了 ${validItems.length} 处文本`);
     } catch (error) {
-      console.error('执行替换时出错:', error);
-      vscode.window.showErrorMessage(`替换出错: ${error.message}`);
+      console.error('批量替换出错:', error);
+      vscode.window.showErrorMessage(`批量替换失败: ${error.message}`);
     }
   }
 
@@ -1289,76 +1987,7 @@ class BatchReplacementPanel {
    * 获取语言名称
    */
   getLanguageName(code) {
-    const languages = {
-      'zh': '中文',
-      'en': '英文',
-      'ja': '日文',
-      'ko': '韩文',
-      'fr': '法文',
-      'de': '德文',
-      'es': '西班牙文',
-      'ru': '俄文'
-    };
-    
-    return languages[code] || code;
-  }
-
-  /**
-   * 执行批量替换
-   * @param {number[]} indexes 选中的索引数组
-   */
-  async doBatchReplace(indexes) {
-    if (!indexes || !Array.isArray(indexes) || indexes.length === 0) {
-      vscode.window.showInformationMessage('没有选中任何项');
-      return;
-    }
-    
-    console.log('执行批量替换，选中的索引:', indexes);
-    
-    // 筛选有效的替换项
-    const validItems = indexes
-      .map(index => this.replacements[index])
-      .filter(item => item && item.i18nKey);
-    
-    if (validItems.length === 0) {
-      vscode.window.showInformationMessage('选中的项目没有可用的国际化键');
-      return;
-    }
-    
-    try {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document !== this.document) {
-        vscode.window.showWarningMessage('编辑器已更改，请重新打开批量替换面板');
-        return;
-      }
-      
-      // 执行替换
-      await editor.edit(editBuilder => {
-        for (const item of validItems) {
-          if (item.range && item.i18nKey) {
-            // 确保范围有效
-            const range = new vscode.Range(
-              this.document.positionAt(item.range.start),
-              this.document.positionAt(item.range.end)
-            );
-            
-            // 根据文件类型生成替换代码
-            const replacement = utils.generateReplacement(
-              item.i18nKey,
-              this.document.fileName
-            );
-            
-            // 执行替换
-            editBuilder.replace(range, replacement);
-          }
-        }
-      });
-      
-      vscode.window.showInformationMessage(`成功替换了 ${validItems.length} 处文本`);
-    } catch (error) {
-      console.error('批量替换出错:', error);
-      vscode.window.showErrorMessage(`批量替换失败: ${error.message}`);
-    }
+    return LANGUAGE_NAMES[code] || code;
   }
 }
 
