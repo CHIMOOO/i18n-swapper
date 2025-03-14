@@ -1,24 +1,45 @@
-# i18n-swapper
+# i18n-swapper 国际化文本替换工具
 
 <p align="center">
   <img src="images/name.jpg" alt="chimoo's logo" width="128">
 </p>
 
-> 一个高效的 VSCode 国际化文本替换工具 / An efficient i18n text replacement tool for VSCode
+> 一个高效的 VSCode 国际化文本替换工具
 
-## 中文说明
+## 功能介绍
 
 i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替换国际化文本。它可以自动在国际化资源文件中查找选中文本对应的键，并替换为国际化函数调用。
 
-### 特性
+### 主要特性
 
 - 🔍 **智能文本查找**：自动在国际化文件中查找选中文本对应的键
 - 📂 **多文件支持**：可配置多个国际化文件路径，同时支持 JSON 和 JS 格式
 - 🔤 **智能引号处理**：自动识别和处理选中文本中的引号，无需担心选择精度问题
 - ⚙️ **灵活配置**：支持自定义国际化函数名称和引号样式
+- 🚀 **批量替换能力**：支持一键扫描当前文件中所有需要国际化的文本并批量替换
 
+### 翻译方式
 
-### 安装
+#### 1. 单体翻译功能
+
+选中需要翻译的文本，右键菜单选择"替换为国际化调用"或使用快捷键 `Ctrl+Alt+I`（Windows/Linux）/ `Cmd+Alt+I`（Mac），插件会:
+- 自动在国际化文件中查找选中文本对应的键
+- 如果找不到，会提示输入新的键名
+- 智能处理文本周围的引号和括号
+- 替换为国际化函数调用，如 `t('key')`
+
+#### 2. 批量翻译功能
+
+提供两种批量翻译方式:
+
+- **快速批量替换**: 一键扫描当前文件中所有需要国际化的文本，对已在国际化文件中存在的文本自动替换
+- **批量替换面板**: 打开可视化界面，展示所有可替换文本，支持手动设置国际化键，选择性批量替换
+
+#### 3. 自定义字段扫描
+
+可以配置要扫描的属性字段模式（如 label、placeholder、title 等），插件会优先识别这些字段中的文本进行替换，提高批量替换的准确性。
+
+## 安装
 
 可以通过以下几种方式安装：
 
@@ -27,88 +48,82 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
    ext install chimoo.i18n-swapper
    ```
 
-2. 或者从 [VSCode 插件市场](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 直接下载安装
+2. 或直接从 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 下载
 
-3. 从 [GitHub 仓库](https://github.com/CHIMOOO/i18n-swapper) 下载源码自行构建
+## 使用方法
 
-### 使用方法
+### 基础配置
 
-1. 在代码中选中需要国际化的文本（可以带引号也可以不带）
+首先，设置国际化文件路径。您可以通过以下方式之一：
+
+1. 命令面板执行 `i18n-swapper: 设置国际化文件路径`
+2. 右键菜单选择 `设置国际化文件路径`
+3. 在设置中手动配置 `i18n-swapper.localesPaths`
+
+### 单体替换
+
+1. 选中需要国际化的文本（可带可不带引号）
 2. 按快捷键 `Ctrl+Alt+I`（Windows/Linux）或 `Cmd+Alt+I`（Mac）
-3. 或右键菜单选择 "替换为国际化调用"
-4. 插件会自动查找对应的国际化键并替换为函数调用
+3. 或右键选择"替换为国际化调用"
 
-#### 支持的选择方式
+### 批量替换
 
-- 直接选择文本："你好世界"
-- 选择带引号的文本：`"你好世界"` 或 `'你好世界'`
-- 只选择引号内的文本，插件会智能识别并扩展选择范围
+1. 打开需要处理的文件
+2. 右键菜单选择 `批量替换国际化` 或 `快速批量替换`
+3. 在批量替换面板中，可以查看所有找到的文本，设置国际化键，选择性替换
 
-### 配置选项
+## 配置选项
 
 在 `.vscode/settings.json` 中添加以下配置：
 
 ```json
-{
-  "i18n-swapper.localesPaths": [
-    "src/locales/zh-CN.json",
-    "src/i18n/messages.js",
-    "src/translations/cn.json"
-  ],
-  "i18n-swapper.quoteType": "single", 
-  "i18n-swapper.functionName": "t"
-}
+ {
+      "i18n-swapper.localesPaths": [
+        "src/locales/zh-CN.json",
+        "src/i18n/messages.js"
+      ],
+      "i18n-swapper.quoteType": "single",
+      "i18n-swapper.functionName": "t",
+      "i18n-swapper.scanPatterns": [
+        "value",
+        "label",
+        "placeholder",
+        "message",
+        "title",
+        "text"
+      ]
+    }
 ```
 
-| 配置项 | 说明 | 默认值 |
+| 选项 | 说明 | 默认值 |
 | ----- | ---- | ----- |
-| `localesPaths` | 国际化文件路径列表 | `["src/locales/zh-CN.json"]` |
-| `quoteType` | 生成的代码中使用的引号类型（`single` 或 `double`） | `single` |
+| `localesPaths` | 国际化文件路径列表 | `[]` |
+| `quoteType` | 生成代码中使用的引号类型 (`single` 或 `double`) | `single` |
 | `functionName` | 国际化函数名称 | `t` |
+| `scanPatterns` | 要扫描的属性模式列表（用于批量替换） | `[]` |
 
-### 使用场景
+## 项目结构
 
-#### 场景一：Vue 组件中使用
+i18n-swapper/
+├── extension.js # 插件入口文件，注册命令和激活插件
+├── src/ # 源代码目录
+│ ├── commands/ # 命令模块目录
+│ │ ├── index.js # 命令导出文件
+│ │ ├── replaceWithI18n.js # 单体替换命令实现
+│ │ ├── batchReplaceWithI18n.js # 批量替换命令实现
+│ │ ├── quickBatchReplace.js # 快速批量替换命令实现
+│ │ └── setLocalesPaths.js # 设置国际化文件路径命令实现
+│ ├── panels/ # UI面板目录
+│ │ └── BatchReplacementPanel.js # 批量替换面板实现
+│ └── utils/ # 工具函数目录
+│ ├── index.js # 工具函数导出文件
+│ ├── i18n-helper.js # 国际化辅助工具
+│ ├── text-analyzer.js # 文本分析工具
+│ └── text-replacer.js # 文本替换工具
+├── package.json # 插件配置文件
+└── README.md # 说明文档
 
-原始代码：
-```vue
-<template>
-  <div class="welcome">
-    <h1>欢迎使用我们的应用</h1>
-    <p>这是一个很棒的应用程序</p>
-  </div>
-</template>
-```
-
-替换后：
-```vue
-<template>
-  <div class="welcome">
-    <h1>{{ t('welcome.title') }}</h1>
-    <p>{{ t('welcome.description') }}</p>
-  </div>
-</template>
-```
-
-#### 场景二：JavaScript/TypeScript 中使用
-
-原始代码：
-```javascript
-function showMessage() {
-  alert("欢迎使用我们的应用");
-  console.log("用户已登录系统");
-}
-```
-
-替换后：
-```javascript
-function showMessage() {
-  alert(t('welcome.message'));
-  console.log(t('user.loggedIn'));
-}
-```
-
-### 常见问题
+## 常见问题
 
 **Q: 为什么插件找不到我的国际化键？**
 
@@ -126,126 +141,7 @@ A: 通过 VSCode 的快捷键设置（`File > Preferences > Keyboard Shortcuts`�
 
 A: 可以通过 `i18n-swapper.functionName` 配置自定义函数名称，比如 `$t`、`i18n.t` 等。
 
-## English Description
-
-i18n-swapper is a VSCode extension that helps developers quickly find and replace internationalized text. It automatically searches for keys corresponding to selected text in internationalization resource files and replaces them with internationalization function calls.
-
-### Features
-
-- 🔍 **Smart text search**: Automatically finds keys in internationalization files that match selected text
-- 📂 **Multi-file support**: Configure multiple internationalization file paths, supporting both JSON and JS formats
-- 🔤 **Smart quote handling**: Automatically recognizes and processes quotes in selected text
-- ⚙️ **Flexible configuration**: Supports customizing the internationalization function name and quote style
-
-### Installation
-
-You can install it in several ways:
-
-1. In VSCode, press `Ctrl+P` to open the command palette, then type:
-   ```
-   ext install chimoo.i18n-swapper
-   ```
-
-2. Or download directly from the [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper)
-
-3. Build from source code downloaded from the [GitHub repository](https://github.com/CHIMOOO/i18n-swapper)
-
-### How to Use
-
-1. Select the text that needs to be internationalized in your code (with or without quotes)
-2. Press the shortcut key `Ctrl+Alt+I` (Windows/Linux) or `Cmd+Alt+I` (Mac)
-3. Or right-click and select "Replace with i18n Call" from the context menu
-4. The plugin will automatically find the corresponding internationalization key and replace it with a function call
-
-#### Supported selection methods
-
-- Direct text selection: "Hello World"
-- Selection with quotes: `"Hello World"` or `'Hello World'`
-- Selection of text inside quotes - the plugin will intelligently recognize and expand the selection range
-
-### Configuration Options
-
-Add the following configuration to `.vscode/settings.json`:
-
-```json
-{
-  "i18n-swapper.localesPaths": [
-    "src/locales/en-US.json",
-    "src/i18n/messages.js",
-    "src/translations/en.json"
-  ],
-  "i18n-swapper.quoteType": "single", 
-  "i18n-swapper.functionName": "t"
-}
-```
-
-| Option | Description | Default Value |
-| ----- | ---- | ----- |
-| `localesPaths` | List of internationalization file paths | `["src/locales/zh-CN.json"]` |
-| `quoteType` | Quote type used in generated code (`single` or `double`) | `single` |
-| `functionName` | Internationalization function name | `t` |
-
-### Use Cases
-
-#### Case 1: In Vue Components
-
-Original code:
-```vue
-<template>
-  <div class="welcome">
-    <h1>Welcome to our application</h1>
-    <p>This is an awesome application</p>
-  </div>
-</template>
-```
-
-After replacement:
-```vue
-<template>
-  <div class="welcome">
-    <h1>{{ t('welcome.title') }}</h1>
-    <p>{{ t('welcome.description') }}</p>
-  </div>
-</template>
-```
-
-#### Case 2: In JavaScript/TypeScript
-
-Original code:
-```javascript
-function showMessage() {
-  alert("Welcome to our application");
-  console.log("User has logged into the system");
-}
-```
-
-After replacement:
-```javascript
-function showMessage() {
-  alert(t('welcome.message'));
-  console.log(t('user.loggedIn'));
-}
-```
-
-### FAQ
-
-**Q: Why can't the plugin find my internationalization key?**
-
-A: Please ensure the configured internationalization file path is correct and that the file actually contains a value that exactly matches the selected text.
-
-**Q: Which file formats does the plugin support?**
-
-A: Currently, it supports JSON and JS files. JS files need to export an object.
-
-**Q: How do I change the shortcut key?**
-
-A: You can modify it through VSCode's keyboard shortcut settings (`File > Preferences > Keyboard Shortcuts`).
-
-**Q: My project doesn't use the `t()` function. What should I do?**
-
-A: You can customize the function name through the `i18n-swapper.functionName` configuration, such as `$t`, `i18n.t`, etc.
-
-## 许可证 / License
+## 许可证
 
 MIT
 
