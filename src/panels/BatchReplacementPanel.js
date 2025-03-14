@@ -1,6 +1,9 @@
 const vscode = require('vscode');
 const path = require('path');
 const utils = require('../utils');
+const fs = require('fs');
+const crypto = require('crypto');
+const https = require('https');
 
 class BatchReplacementPanel {
   constructor(context) {
@@ -8,15 +11,25 @@ class BatchReplacementPanel {
     this.panel = undefined;
     this.document = null;
     this.replacements = [];
+    this.selectedIndexes = [];
+    this.context = context;
   }
 
   /**
    * 创建或显示面板
    */
   createOrShow() {
-    // 如果已有面板，显示它
+    // 如果已有面板，重新获取当前编辑器文档
     if (this.panel) {
       this.panel.reveal();
+      
+      // 检查当前文档是否变化
+      const editor = vscode.window.activeTextEditor;
+      if (editor && (!this.document || this.document !== editor.document)) {
+        this.document = editor.document;
+        this.analyzeAndLoadPanel();
+      }
+      
       return;
     }
 
@@ -167,15 +180,133 @@ class BatchReplacementPanel {
 
   /**
    * 获取WebView内容
-   * @param {Array} scanPatterns 扫描模式
-   * @param {Array} replacements 替换项
-   * @param {string[]} localesPaths 国际化文件路径
-   * @returns {string} HTML内容
    */
   getWebviewContent(scanPatterns, replacements, localesPaths) {
-    const matchedCount = replacements.filter(item => item.i18nKey).length;
     const hasLocaleFiles = localesPaths && localesPaths.length > 0;
     
+    // 替换项渲染
+    const replacementsHtml = replacements.map((item, index) => `
+      <div class="replacement-item" data-index="${index}">
+        <div class="replacement-header">
+          <label class="select-item">
+            <input type="checkbox" class="item-checkbox" ${item.i18nKey ? 'checked' : ''}>
+          </label>
+          <div class="replacement-text">${this.escapeHtml(item.text)}</div>
+        </div>
+        <div class="replacement-footer">
+          <div class="i18n-key-input">
+            <input type="text" class="key-input" placeholder="输入国际化键" 
+              value="${item.i18nKey || ''}" data-index="${index}">
+            <button class="translate-btn" title="翻译并生成键" data-index="${index}">翻译</button>
+          </div>
+          ${item.i18nFile ? `<div class="found-key">找到于: <span class="key-file">${item.i18nFile}</span></div>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    const scriptSection = `
+      <script>
+        (function() {
+          const vscode = acquireVsCodeApi();
+          
+          // 翻译按钮点击事件
+          document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.translate-btn').forEach(btn => {
+              btn.addEventListener('click', function(e) {
+                e.preventDefault();
+                const index = parseInt(this.dataset.index);
+                const keyInput = document.querySelector('.key-input[data-index="' + index + '"]');
+                const key = keyInput ? keyInput.value.trim() : '';
+                
+                vscode.postMessage({
+                  command: 'translateItem',
+                  index: index,
+                  key: key
+                });
+              });
+            });
+            
+            // 初始化选中状态跟踪
+            const selectedItems = new Set();
+            
+            // 绑定复选框事件
+            document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+              const index = parseInt(checkbox.closest('.replacement-item').dataset.index);
+              if (checkbox.checked) {
+                selectedItems.add(index);
+              }
+              
+              checkbox.addEventListener('change', (e) => {
+                const index = parseInt(e.target.closest('.replacement-item').dataset.index);
+                if (e.target.checked) {
+                  selectedItems.add(index);
+                } else {
+                  selectedItems.delete(index);
+                }
+                
+                vscode.postMessage({
+                  command: 'updateSelection',
+                  selectedIndexes: Array.from(selectedItems)
+                });
+              });
+            });
+            
+            // 绑定批量替换按钮事件
+            const batchReplaceBtn = document.getElementById('batch-replace');
+            if (batchReplaceBtn) {
+              batchReplaceBtn.addEventListener('click', () => {
+                vscode.postMessage({
+                  command: 'batchReplace',
+                  selectedIndexes: Array.from(selectedItems)
+                });
+              });
+            }
+            
+            // 绑定刷新扫描按钮事件
+            const refreshBtn = document.getElementById('refresh-scan');
+            if (refreshBtn) {
+              refreshBtn.addEventListener('click', () => {
+                console.log('点击刷新按钮');
+                vscode.postMessage({
+                  command: 'refreshScan'
+                });
+              });
+            }
+            
+            // 绑定选择国际化文件按钮事件
+            const selectLocalesBtn = document.getElementById('select-locales');
+            if (selectLocalesBtn) {
+              selectLocalesBtn.addEventListener('click', () => {
+                vscode.postMessage({
+                  command: 'selectLocalesFiles'
+                });
+              });
+            }
+            
+            // 绑定API翻译配置按钮事件
+            const apiTranslationBtn = document.getElementById('open-api-translation');
+            if (apiTranslationBtn) {
+              apiTranslationBtn.addEventListener('click', () => {
+                vscode.postMessage({
+                  command: 'openApiTranslation'
+                });
+              });
+            }
+            
+            // 绑定关闭按钮事件
+            const closeBtn = document.getElementById('close-panel');
+            if (closeBtn) {
+              closeBtn.addEventListener('click', () => {
+                vscode.postMessage({
+                  command: 'closePanel'
+                });
+              });
+            }
+          });
+        })();
+      </script>
+    `;
+
     return `
       <!DOCTYPE html>
       <html lang="zh-CN">
@@ -456,6 +587,36 @@ class BatchReplacementPanel {
             opacity: 0.6;
             pointer-events: none;
           }
+          /* 翻译按钮样式 */
+          .translate-btn {
+            background-color: #4dabf7;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 8px;
+            transition: background-color 0.2s;
+          }
+          
+          .translate-btn:hover {
+            background-color: #339af0;
+          }
+          
+          .i18n-key-input {
+            display: flex;
+            align-items: center;
+            flex-grow: 1;
+          }
+          
+          .key-input {
+            flex-grow: 1;
+            padding: 4px 8px;
+            border: 1px solid var(--gray-300);
+            border-radius: 4px;
+            font-size: 13px;
+          }
         </style>
       </head>
       <body>
@@ -494,28 +655,18 @@ class BatchReplacementPanel {
               <button id="refresh-scan" class="refresh-btn" ${!hasLocaleFiles ? 'disabled' : ''}>刷新扫描</button>
             </div>
             <div class="right-panel ${!hasLocaleFiles ? 'disabled-panel' : ''}">
-              <h2>扫描找到的文本 (${replacements.length})</h2>
+              <div class="panel-header">
+                <h2>扫描找到的文本 (${replacements.length})</h2>
+                <button id="open-api-translation" class="tool-btn" title="配置API自动翻译">
+                  <span class="tool-icon">🌐</span>
+                  <span>API翻译配置</span>
+                </button>
+              </div>
               <div class="filter-container">
                 <input type="text" id="filter-input" placeholder="输入关键词筛选文本">
               </div>
               <div id="replacements-list">
-                ${replacements.map((item, index) => `
-                  <div class="replacement-item" data-index="${index}">
-                    <div class="replacement-header">
-                      <div class="checkbox-wrapper">
-                        <input type="checkbox" id="check-${index}" ${item.selected ? 'checked' : ''}>
-                        <span class="replacement-text">${this.escapeHtml(item.text)}</span>
-                      </div>
-                      <span class="replacement-source">${item.source}</span>
-                    </div>
-                    <div class="replacement-i18n">
-                      ${item.i18nKey ? 
-                        `<div>国际化键: <span class="found-key">${item.i18nKey}</span> <span class="key-file">(从 ${item.i18nFile || '文件'} 找到)</span></div>` : 
-                        `<div>国际化键: <input type="text" class="i18n-key-input" id="key-${index}" placeholder="输入新的国际化键"></div>`
-                      }
-                    </div>
-                  </div>
-                `).join('')}
+                ${replacementsHtml}
               </div>
             </div>
           </div>
@@ -525,126 +676,16 @@ class BatchReplacementPanel {
               <button id="deselect-all" class="cancel-btn" ${!hasLocaleFiles ? 'disabled' : ''}>取消全选</button>
             </div>
             <div class="btn-group">
-              <button id="replace-selected" class="confirm-btn" ${(matchedCount === 0 || !hasLocaleFiles) ? 'disabled' : ''}>替换选中项 (${matchedCount})</button>
+              <button id="replace-selected" class="confirm-btn" ${(replacements.length === 0 || !hasLocaleFiles) ? 'disabled' : ''}>替换选中项 (${replacements.length})</button>
               <button id="close-panel" class="cancel-btn">关闭面板</button>
             </div>
           </div>
           <div class="status-bar">
-            <div>${hasLocaleFiles ? `匹配到国际化键: ${matchedCount} / ${replacements.length}` : '请先选择国际化文件'}</div>
+            <div>${hasLocaleFiles ? `匹配到国际化键: ${replacements.length}` : '请先选择国际化文件'}</div>
             <div>${hasLocaleFiles ? '未匹配到的需要手动填写键名' : ''}</div>
           </div>
         </div>
-        <script>
-          const vscode = acquireVsCodeApi();
-          
-          (function() {
-            // 选择国际化文件
-            document.getElementById('select-locales-btn').addEventListener('click', () => {
-              vscode.postMessage({
-                command: 'selectLocalesFiles'
-              });
-            });
-            
-            // 如果没有国际化文件，其他脚本事件可能不需要绑定
-            ${!hasLocaleFiles ? '' : `
-              // 添加扫描模式
-              document.getElementById('add-pattern-btn').addEventListener('click', () => {
-                const pattern = document.getElementById('new-pattern').value.trim();
-                if (pattern) {
-                  vscode.postMessage({
-                    command: 'addPattern',
-                    pattern: pattern
-                  });
-                  document.getElementById('new-pattern').value = '';
-                }
-              });
-              
-              // 删除扫描模式
-              document.querySelectorAll('.pattern-remove-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                  const pattern = btn.getAttribute('data-pattern');
-                  vscode.postMessage({
-                    command: 'removePattern',
-                    pattern: pattern
-                  });
-                });
-              });
-              
-              // 刷新扫描
-              document.getElementById('refresh-scan').addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'refreshScan'
-                });
-              });
-              
-              // 控制复选框
-              document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-                checkbox.addEventListener('change', () => {
-                  const index = checkbox.id.split('-')[1];
-                  vscode.postMessage({
-                    command: 'toggleSelection',
-                    index: parseInt(index),
-                    selected: checkbox.checked
-                  });
-                });
-              });
-              
-              // 更新国际化键
-              document.querySelectorAll('.i18n-key-input').forEach(input => {
-                input.addEventListener('input', () => {
-                  const index = input.id.split('-')[1];
-                  vscode.postMessage({
-                    command: 'updateI18nKey',
-                    index: parseInt(index),
-                    key: input.value.trim()
-                  });
-                });
-              });
-              
-              // 全选/取消全选
-              document.getElementById('select-all').addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'selectAll'
-                });
-              });
-              
-              document.getElementById('deselect-all').addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'deselectAll'
-                });
-              });
-              
-              // 替换选中项
-              document.getElementById('replace-selected').addEventListener('click', () => {
-                vscode.postMessage({
-                  command: 'replaceSelected'
-                });
-              });
-              
-              // 文本过滤
-              document.getElementById('filter-input').addEventListener('input', (e) => {
-                const filterText = e.target.value.toLowerCase();
-                const items = document.querySelectorAll('.replacement-item');
-                
-                items.forEach(item => {
-                  const text = item.querySelector('.replacement-text').textContent.toLowerCase();
-                  if (text.includes(filterText)) {
-                    item.style.display = 'block';
-                  } else {
-                    item.style.display = 'none';
-                  }
-                });
-              });
-            `}
-            
-            // 关闭面板
-            document.getElementById('close-panel').addEventListener('click', () => {
-              vscode.postMessage({
-                command: 'closePanel'
-              });
-            });
-          })();
-        </script>
+        ${scriptSection}
       </body>
       </html>
     `;
@@ -671,8 +712,11 @@ class BatchReplacementPanel {
         this.updateI18nKey(message.index, message.key);
         break;
       case 'closePanel':
+        console.log('关闭面板');
+        // 确保面板存在
         if (this.panel) {
           this.panel.dispose();
+          this.panel = undefined;
         }
         break;
       case 'addPattern':
@@ -682,10 +726,46 @@ class BatchReplacementPanel {
         await this.removePattern(message.pattern);
         break;
       case 'refreshScan':
-        await this.refreshScan();
+        console.log('收到刷新扫描请求');
+        // 重新分析当前文档
+        await this.analyzeAndLoadPanel();
         break;
       case 'selectLocalesFiles':
         await this.selectLocalesFiles();
+        break;
+      case 'openApiTranslation':
+        try {
+          // 使用 await 确保命令执行完成
+          await vscode.commands.executeCommand('i18n-swapper.openApiTranslationConfig', this.context);
+        } catch (error) {
+          console.error('打开 API 翻译配置失败:', error);
+          vscode.window.showErrorMessage(`无法打开 API 翻译配置: ${error.message}`);
+        }
+        break;
+      case 'translateItem':
+        try {
+          console.log(`[消息] 收到翻译请求，索引: ${message.index}, 键: ${message.key || '无'}`);
+          await this.translateItem(message.index, message.key);
+        } catch (error) {
+          console.error('翻译处理失败:', error);
+          vscode.window.showErrorMessage(`翻译处理失败: ${error.message}`);
+        }
+        break;
+      case 'updateSelection':
+        console.log('更新选中项:', message.selectedIndexes);
+        // 更新选中状态
+        if (message.selectedIndexes && Array.isArray(message.selectedIndexes)) {
+          this.selectedIndexes = message.selectedIndexes;
+        }
+        break;
+      case 'batchReplace':
+        console.log('执行批量替换:', message.selectedIndexes);
+        // 确保有选中项
+        if (!message.selectedIndexes || message.selectedIndexes.length === 0) {
+          vscode.window.showInformationMessage('请先选择要替换的项');
+          return;
+        }
+        await this.doBatchReplace(message.selectedIndexes);
         break;
     }
   }
@@ -853,6 +933,431 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('执行替换时出错:', error);
       vscode.window.showErrorMessage(`替换出错: ${error.message}`);
+    }
+  }
+
+  /**
+   * 翻译指定项并生成键
+   * @param {number} index 替换项索引
+   */
+  async translateItem(index, userInputKey = '') {
+    if (index < 0 || index >= this.replacements.length) return;
+    
+    const item = this.replacements[index];
+    if (!item || !item.text) return;
+    
+    try {
+      console.log(`[翻译开始] 索引: ${index}, 文本: "${item.text}"`);
+      
+      // 获取腾讯翻译API配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const apiKey = config.get('tencentTranslation.apiKey', '');
+      const apiSecret = config.get('tencentTranslation.apiSecret', '');
+      const region = config.get('tencentTranslation.region', 'ap-guangzhou');
+      const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
+      
+      // 使用参数传入的键名或生成一个新的
+      let suggestedKey = userInputKey || '';
+      
+      // 如果没有输入键名，则生成一个
+      if (!suggestedKey) {
+        suggestedKey = this.generateKeyFromText(item.text);
+      }
+      
+      // 更新键名
+      item.i18nKey = suggestedKey;
+      
+      console.log(`[翻译] 使用键名: ${suggestedKey}, 源语言: ${sourceLanguage}`);
+      
+      // 获取语言映射
+      const languageMappings = config.get('tencentTranslation.languageMappings', []);
+      console.log(`[翻译] 语言映射配置: ${JSON.stringify(languageMappings)}`);
+      
+      // 无法继续翻译
+      if (!languageMappings || languageMappings.length === 0) {
+        vscode.window.showWarningMessage('未配置语言映射，请先在API翻译配置中添加语言映射');
+        return;
+      }
+      
+      // 使用进度提示
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: "正在翻译...",
+        cancellable: false
+      }, async (progress) => {
+        // 获取工作区路径
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+          throw new Error('未找到工作区文件夹');
+        }
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        
+        // 遍历所有目标语言进行翻译
+        for (const mapping of languageMappings) {
+          try {
+            progress.report({ message: `翻译为 ${this.getLanguageName(mapping.languageCode)}...` });
+            
+            // 如果是源语言，直接使用原文
+            if (mapping.languageCode === sourceLanguage) {
+              await this.saveTranslationToFile(
+                path.join(rootPath, mapping.filePath),
+                suggestedKey,
+                item.text
+              );
+              continue;
+            }
+            
+            // 调用翻译API
+            const translatedText = await this.translateText(
+              item.text,
+              sourceLanguage,
+              mapping.languageCode,
+              apiKey,
+              apiSecret,
+              region
+            );
+            
+            console.log(`[翻译结果] ${mapping.languageCode}: "${translatedText}"`);
+            
+            // 保存翻译结果
+            await this.saveTranslationToFile(
+              path.join(rootPath, mapping.filePath),
+              suggestedKey,
+              translatedText
+            );
+          } catch (error) {
+            console.error(`翻译到 ${mapping.languageCode} 失败:`, error);
+            vscode.window.showErrorMessage(`翻译到 ${this.getLanguageName(mapping.languageCode)} 失败: ${error.message}`);
+          }
+        }
+        
+        vscode.window.showInformationMessage(`已生成键名 "${suggestedKey}" 并保存翻译`);
+      });
+    } catch (error) {
+      console.error('[翻译严重错误]:', error);
+      vscode.window.showErrorMessage(`翻译失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 调用腾讯云翻译API
+   */
+  async translateText(text, sourceLanguage, targetLanguage, secretId, secretKey, region) {
+    return new Promise((resolve, reject) => {
+      try {
+        const endpoint = 'tmt.tencentcloudapi.com';
+        const service = 'tmt';
+        const action = 'TextTranslate';
+        const version = '2018-03-21';
+        const timestamp = Math.round(new Date().getTime() / 1000);
+        
+        // 请求参数
+        const requestParams = {
+          SourceText: text,
+          Source: sourceLanguage,
+          Target: targetLanguage,
+          ProjectId: 0
+        };
+        
+        console.log(`[API请求] 参数:`, requestParams);
+        
+        // 参数签名
+        const requestParamString = JSON.stringify(requestParams);
+        
+        // 生成签名所需参数
+        const hashedRequestPayload = crypto
+          .createHash('sha256')
+          .update(requestParamString)
+          .digest('hex');
+        
+        const canonicalRequest = [
+          'POST',
+          '/',
+          '',
+          'content-type:application/json; charset=utf-8',
+          'host:' + endpoint,
+          '',
+          'content-type;host',
+          hashedRequestPayload
+        ].join('\n');
+        
+        const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+        const stringToSign = [
+          'TC3-HMAC-SHA256',
+          timestamp,
+          `${date}/${service}/tc3_request`,
+          crypto
+            .createHash('sha256')
+            .update(canonicalRequest)
+            .digest('hex')
+        ].join('\n');
+        
+        // 计算签名
+        const secretDate = crypto
+          .createHmac('sha256', 'TC3' + secretKey)
+          .update(date)
+          .digest();
+        
+        const secretService = crypto
+          .createHmac('sha256', secretDate)
+          .update(service)
+          .digest();
+        
+        const secretSigning = crypto
+          .createHmac('sha256', secretService)
+          .update('tc3_request')
+          .digest();
+        
+        const signature = crypto
+          .createHmac('sha256', secretSigning)
+          .update(stringToSign)
+          .digest('hex');
+        
+        // 构造授权信息 - 修复授权头格式
+        const authorization = 
+          'TC3-HMAC-SHA256 ' +
+          `Credential=${secretId}/${date}/${service}/tc3_request, ` +
+          'SignedHeaders=content-type;host, ' +
+          `Signature=${signature}`;
+        
+        // 配置请求头
+        const headers = {
+          'Authorization': authorization,
+          'Content-Type': 'application/json; charset=utf-8',
+          'Host': endpoint,
+          'X-TC-Action': action,
+          'X-TC-Timestamp': timestamp.toString(),
+          'X-TC-Version': version,
+          'X-TC-Region': region
+        };
+        
+        console.log(`[API请求] Authorization: ${authorization}`);
+        console.log(`[API请求] 发送请求到: ${endpoint}`);
+        
+        // 发送请求
+        const req = https.request({
+          hostname: endpoint,
+          method: 'POST',
+          headers: headers,
+          protocol: 'https:'
+        }, (res) => {
+          const chunks = [];
+          
+          res.on('data', (chunk) => chunks.push(chunk));
+          
+          res.on('end', () => {
+            try {
+              const responseBody = Buffer.concat(chunks).toString();
+              console.log(`[API响应] ${responseBody}`);
+              
+              const response = JSON.parse(responseBody);
+              if (response.Response && response.Response.Error) {
+                reject(new Error(`${response.Response.Error.Code}: ${response.Response.Error.Message}`));
+              } else if (response.Response && response.Response.TargetText) {
+                resolve(response.Response.TargetText);
+              } else {
+                reject(new Error('无效的API响应'));
+              }
+            } catch (error) {
+              reject(error);
+            }
+          });
+        });
+        
+        req.on('error', (error) => {
+          console.error('[API错误]', error);
+          reject(error);
+        });
+        
+        req.write(requestParamString);
+        req.end();
+        
+      } catch (error) {
+        console.error('[API调用错误]', error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * 根据文本生成键名
+   * @param {string} text 原文
+   * @returns {string} 生成的键名
+   */
+  generateKeyFromText(text) {
+    // 清理文本
+    let cleanText = text
+      .replace(/['"]/g, '') // 移除引号
+      .trim()
+      .toLowerCase();
+    
+    // 截取前20个字符
+    if (cleanText.length > 20) {
+      cleanText = cleanText.substring(0, 20);
+    }
+    
+    // 将中文转为拼音或使用其他替代方案
+    // 这里使用简单替换，实际项目中可能需要更复杂的转换
+    const timestamp = Date.now().toString().substring(8); // 使用时间戳后5位作为唯一标识
+    
+    return `common.text.${timestamp}`;
+  }
+
+  /**
+   * 将翻译保存到文件
+   * @param {string} filePath 文件路径
+   * @param {string} key 国际化键
+   * @param {string} value 翻译值
+   */
+  async saveTranslationToFile(filePath, key, value) {
+    try {
+      console.log(`[文件] 开始保存翻译到: ${filePath}`);
+      
+      // 确保路径存在
+      const dirPath = path.dirname(filePath);
+      if (!fs.existsSync(dirPath)) {
+        console.log(`[文件] 创建目录: ${dirPath}`);
+        fs.mkdirSync(dirPath, { recursive: true });
+      }
+      
+      // 加载现有文件或创建新对象
+      let localeData = {};
+      if (fs.existsSync(filePath)) {
+        console.log(`[文件] 加载现有文件: ${filePath}`);
+        
+        try {
+          // 使用 utils.loadLocaleFile，它已经增强了错误处理
+          localeData = utils.loadLocaleFile(filePath);
+          
+          // 确保返回的是一个有效对象
+          if (!localeData || typeof localeData !== 'object') {
+            console.log(`[文件] 加载结果无效，使用空对象`);
+            localeData = {};
+          }
+        } catch (loadError) {
+          console.error(`[文件] 加载失败，使用空对象: ${loadError.message}`);
+          localeData = {};
+        }
+      } else {
+        console.log(`[文件] 文件不存在，将创建新文件: ${filePath}`);
+      }
+      
+      // 设置键值
+      console.log(`[文件] 设置键值: ${key} = "${value}"`);
+      utils.setValueByPath(localeData, key, value);
+      
+      // 在写入前验证对象是否可以正确序列化
+      try {
+        JSON.stringify(localeData);
+      } catch (jsonError) {
+        console.error(`[文件] 无法序列化对象: ${jsonError.message}`);
+        throw new Error(`无法序列化国际化数据: ${jsonError.message}`);
+      }
+      
+      // 保存文件
+      if (filePath.endsWith('.json')) {
+        // 保存前先创建一个备份
+        if (fs.existsSync(filePath)) {
+          const backupPath = `${filePath}.bak`;
+          fs.copyFileSync(filePath, backupPath);
+        }
+        
+        console.log(`[文件] 保存JSON文件: ${filePath}`);
+        fs.writeFileSync(filePath, JSON.stringify(localeData, null, 2), 'utf8');
+      } else if (filePath.endsWith('.js')) {
+        // 保存前先创建一个备份
+        if (fs.existsSync(filePath)) {
+          const backupPath = `${filePath}.bak`;
+          fs.copyFileSync(filePath, backupPath);
+        }
+        
+        console.log(`[文件] 保存JS文件: ${filePath}`);
+        const jsContent = `module.exports = ${JSON.stringify(localeData, null, 2)};`;
+        fs.writeFileSync(filePath, jsContent, 'utf8');
+      }
+      
+      console.log(`[文件] 保存成功: ${filePath}`);
+      return true;
+    } catch (error) {
+      console.error(`[文件] 保存翻译到文件出错: ${error.message}`);
+      vscode.window.showErrorMessage(`保存翻译失败: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 获取语言名称
+   */
+  getLanguageName(code) {
+    const languages = {
+      'zh': '中文',
+      'en': '英文',
+      'ja': '日文',
+      'ko': '韩文',
+      'fr': '法文',
+      'de': '德文',
+      'es': '西班牙文',
+      'ru': '俄文'
+    };
+    
+    return languages[code] || code;
+  }
+
+  /**
+   * 执行批量替换
+   * @param {number[]} indexes 选中的索引数组
+   */
+  async doBatchReplace(indexes) {
+    if (!indexes || !Array.isArray(indexes) || indexes.length === 0) {
+      vscode.window.showInformationMessage('没有选中任何项');
+      return;
+    }
+    
+    console.log('执行批量替换，选中的索引:', indexes);
+    
+    // 筛选有效的替换项
+    const validItems = indexes
+      .map(index => this.replacements[index])
+      .filter(item => item && item.i18nKey);
+    
+    if (validItems.length === 0) {
+      vscode.window.showInformationMessage('选中的项目没有可用的国际化键');
+      return;
+    }
+    
+    try {
+      const editor = vscode.window.activeTextEditor;
+      if (!editor || editor.document !== this.document) {
+        vscode.window.showWarningMessage('编辑器已更改，请重新打开批量替换面板');
+        return;
+      }
+      
+      // 执行替换
+      await editor.edit(editBuilder => {
+        for (const item of validItems) {
+          if (item.range && item.i18nKey) {
+            // 确保范围有效
+            const range = new vscode.Range(
+              this.document.positionAt(item.range.start),
+              this.document.positionAt(item.range.end)
+            );
+            
+            // 根据文件类型生成替换代码
+            const replacement = utils.generateReplacement(
+              item.i18nKey,
+              this.document.fileName
+            );
+            
+            // 执行替换
+            editBuilder.replace(range, replacement);
+          }
+        }
+      });
+      
+      vscode.window.showInformationMessage(`成功替换了 ${validItems.length} 处文本`);
+    } catch (error) {
+      console.error('批量替换出错:', error);
+      vscode.window.showErrorMessage(`批量替换失败: ${error.message}`);
     }
   }
 }

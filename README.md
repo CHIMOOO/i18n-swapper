@@ -103,7 +103,7 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 | `scanPatterns` | 要扫描的属性模式列表（用于批量替换） | `[]` |
 
 ## 项目结构
-
+```
 i18n-swapper/
 ├── extension.js # 插件入口文件，注册命令和激活插件
 ├── src/ # 源代码目录
@@ -122,7 +122,7 @@ i18n-swapper/
 │ └── text-replacer.js # 文本替换工具
 ├── package.json # 插件配置文件
 └── README.md # 说明文档
-
+```
 ## 常见问题
 
 **Q: 为什么插件找不到我的国际化键？**

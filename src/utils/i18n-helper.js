@@ -38,24 +38,34 @@ function loadLocaleFile(filePath) {
     
     if (filePath.endsWith('.json')) {
       // 加载JSON文件
-      const content = fs.readFileSync(filePath, 'utf8');
-      return JSON.parse(content);
+      try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        // 检查文件内容是否为空
+        if (!content || content.trim() === '') {
+          console.log(`[警告] 文件为空: ${filePath}`);
+          return {};
+        }
+        return JSON.parse(content);
+      } catch (parseError) {
+        console.error(`[错误] JSON解析失败: ${filePath}, 错误: ${parseError.message}`);
+        // 文件格式错误时，返回一个空对象而不是null
+        return {};
+      }
     } else if (filePath.endsWith('.js')) {
-      // 加载JS文件
       try {
         // 清除require缓存，确保获取最新内容
         delete require.cache[require.resolve(filePath)];
         return require(filePath);
       } catch (e) {
-        console.error(`加载JS文件失败: ${e.message}`);
-        return null;
+        console.error(`[错误] 加载JS文件失败: ${filePath}, 错误: ${e.message}`);
+        return {};
       }
     }
     
     return null;
   } catch (error) {
-    console.error(`加载文件失败: ${error.message}`);
-    return null;
+    console.error(`[错误] 加载文件失败: ${filePath}, 错误: ${error.message}`);
+    return {};
   }
 }
 

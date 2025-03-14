@@ -25,6 +25,10 @@ function activate(context) {
     vscode.commands.registerCommand(
       'i18n-swapper.setLocalesPaths', 
       commands.setLocalesPaths
+    ),
+    vscode.commands.registerCommand(
+      'i18n-swapper.openApiTranslationConfig', 
+      () => commands.openApiTranslationConfig(context)
     )
   );
 
