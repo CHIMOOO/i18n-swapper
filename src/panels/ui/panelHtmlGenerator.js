@@ -13,6 +13,9 @@ function escapeHtml(text) {
     .replace(/'/g, '&#039;');
 }
 
+// 导入LANGUAGE_NAMES
+const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
+
 /**
  * 生成面板HTML内容
  * @param {Array} scanPatterns 扫描模式列表
@@ -20,8 +23,9 @@ function escapeHtml(text) {
  * @param {Array} localesPaths 本地化文件路径列表
  * @param {Object} context 上下文对象，包含decorationStyle等配置
  * @param {boolean} isConfigExpanded 配置部分是否展开
+ * @param {Array} languageMappings 语言映射配置
  */
-function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false) {
+function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = []) {
   // 根据展开状态设置类和样式
   const configSectionClass = isConfigExpanded ? 'collapsible-section active' : 'collapsible-section';
   const configContentStyle = isConfigExpanded ? 'display: block;' : 'display: none;';
@@ -138,6 +142,90 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           justify-content: space-between;
           border-top: 1px solid var(--vscode-panel-border);
         }
+        
+        /* 语言映射状态样式 */
+        .i18n-status-row {
+          background-color: var(--vscode-editor-inactiveSelectionBackground);
+          font-size: 0.85em;
+        }
+        .i18n-status-row td {
+          padding: 3px 8px;
+          border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .i18n-status-container {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+        }
+        .i18n-status-tag {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 6px;
+          border-radius: 3px;
+          cursor: pointer;
+          position: relative;
+          transition: opacity 0.2s;
+        }
+        
+        .i18n-status-exists {
+          background-color: var(--vscode-gitDecoration-addedResourceForeground);
+          color: white;
+          font-size: 12px;
+          padding: 2px 10px;
+        }
+        .i18n-status-missing {
+          background-color: #f66e70;
+          color: white;
+          font-size: 12px;
+          padding: 2px 10px;
+        }
+        .i18n-status-error {
+          background-color: var(--vscode-gitDecoration-deletedResourceForeground);
+          color: var(--vscode-editor-background);
+        }
+        .i18n-status-tooltip {
+          position: relative;
+        }
+        .i18n-status-tooltip .tooltip-text {
+          visibility: hidden;
+          position: absolute;
+          z-index: 100;
+          bottom: 125%;
+          left: 50%;
+          transform: translateX(-50%);
+          min-width: 200px;
+          max-width: 300px;
+          background-color: var(--vscode-editorHoverWidget-background);
+          color: var(--vscode-editorHoverWidget-foreground);
+          text-align: left;
+          padding: 6px 10px;
+          border-radius: 4px;
+          border: 1px solid var(--vscode-editorHoverWidget-border);
+          box-shadow: 0px -8px 10px 6px rgb(0 0 0 / 50%);
+          white-space: pre-wrap;
+          word-break: break-all;
+          overflow: hidden;
+          opacity: 1;
+          pointer-events: none; /* 修改为允许鼠标事件 */
+          transition: visibility 0.2s, opacity 0.2s;
+        }
+        /* 修复提示框定位问题 */
+        .i18n-status-tag:first-child .tooltip-text {
+          left: 0;
+          transform: translateX(0);
+        }
+        .i18n-status-tag:last-child .tooltip-text {
+          left: auto;
+          right: 0;
+          transform: translateX(0);
+        }
+        .i18n-status-tooltip:hover .tooltip-text {
+          visibility: visible;
+          opacity: 1;
+          pointer-events: auto; /* 允许鼠标事件 */
+        }
+        
+        /* 原有样式继续保留 */
         .config-section {
           margin-top: 20px;
           padding: 10px;
@@ -306,27 +394,78 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               </tr>
             </thead>
             <tbody>
-              ${replacements.map((item, index) => `
-                <tr>
-                  <td class="checkbox-cell">
-                    <input type="checkbox" class="item-checkbox" data-index="${index}" ${item.selected ? 'checked' : ''}>
-                  </td>
-                  <td>${index + 1}</td>
-                  <td class="text-cell ${item.i18nKey ? 'has-key' : ''}" title="${escapeHtml(item.text)}">
-                    ${escapeHtml(item.text)}
-                  </td>
-                  <td>
-                    <input type="text" class="i18n-key-input" data-index="${index}" 
-                      value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
-                    <button class="translate-btn" data-index="${index}" title="翻译并保存到所有语言文件">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-                      翻译
-                    </button>
-                  </td>
-                  <td>${escapeHtml(item.source || '文本')}</td>
-                  <td>${item.i18nFile ? `来自: ${escapeHtml(item.i18nFile)}` : ''}</td>
-                </tr>
-              `).join('')}
+              ${replacements.map((item, index) => {
+                // 生成每一项的表格行，包括数据行和状态行
+                const dataRow = `
+                  <tr>
+                    <td class="checkbox-cell">
+                      <input type="checkbox" class="item-checkbox" data-index="${index}" ${item.selected ? 'checked' : ''}>
+                    </td>
+                    <td>${index + 1}</td>
+                    <td class="text-cell ${item.i18nKey ? 'has-key' : ''}" title="${escapeHtml(item.text)}">
+                      ${escapeHtml(item.text)}
+                    </td>
+                    <td>
+                      <input type="text" class="i18n-key-input" data-index="${index}" 
+                        value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
+                      <button class="translate-btn" data-index="${index}" title="翻译并保存到所有语言文件">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
+                        翻译
+                      </button>
+                    </td>
+                    <td>${escapeHtml(item.source || '文本')}</td>
+                    <td>${item.i18nFile ? `来自: ${escapeHtml(item.i18nFile)}` : ''}</td>
+                  </tr>`;
+                
+                // 只有当项有i18nKey且languageMappings存在时才添加状态行
+                let statusRow = '';
+                if (item.i18nKey && languageMappings && languageMappings.length > 0) {
+                  statusRow = `
+                    <tr class="i18n-status-row" data-index="${index}">
+                      <td colspan="6">
+                        <div class="i18n-status-container">
+                          ${languageMappings.map(mapping => {
+                            // 获取此语言的状态
+                            const status = item.i18nStatus && item.i18nStatus[mapping.languageCode];
+                            const exists = status && status.exists;
+                            const error = status && status.error;
+                            const value = status && status.value;
+                            
+                            // 根据状态设置不同的样式和提示
+                            let statusClass = exists ? 'i18n-status-exists' : 'i18n-status-missing';
+                            let tooltip = '';
+                            
+                            // 获取语言名称，格式为"语言名称[语言代码]"
+                            const langName = LANGUAGE_NAMES[mapping.languageCode] || '';
+                            let displayText = langName ? `${langName}[${mapping.languageCode}]` : mapping.languageCode;
+                            
+                            if (error) {
+                              statusClass = 'i18n-status-error';
+                              tooltip = '错误: ' + error;
+                            } else if (exists && value) {
+                              tooltip = value;
+                            } else {
+                              tooltip = '未找到翻译';
+                            }
+                            
+                            return `
+                              <div class="i18n-status-tag ${statusClass} i18n-status-tooltip" 
+                                   data-language="${mapping.languageCode}" 
+                                   data-filepath="${escapeHtml(mapping.filePath)}"
+                                   data-key="${escapeHtml(item.i18nKey)}">
+                                ${displayText}
+                                <span class="tooltip-text">${escapeHtml(tooltip)}</span>
+                              </div>
+                            `;
+                          }).join('')}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }
+                
+                return dataRow + statusRow;
+              }).join('')}
             </tbody>
           </table>
         </div>
@@ -470,6 +609,12 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         // 使用acquireVsCodeApi获取vscode实例
         const vscode = acquireVsCodeApi();
         
+        // 存储语言映射数据
+        window.languageMappings = ${JSON.stringify(languageMappings)};
+        
+        // 语言名称映射
+        window.LANGUAGE_NAMES = ${JSON.stringify(LANGUAGE_NAMES)};
+        
         // 折叠面板功能
         const configHeader = document.getElementById('config-section-header');
         if (configHeader) {
@@ -526,8 +671,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         });
         
-        // 国际化键输入框
+        // 国际化键输入框 - 修改为实时检查
         document.querySelectorAll('.i18n-key-input').forEach(input => {
+          // 之前的change事件保留，用于更新键值
           input.addEventListener('change', function() {
             const index = parseInt(this.getAttribute('data-index'));
             vscode.postMessage({
@@ -538,7 +684,34 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               }
             });
           });
+          
+          // 添加input事件，用于实时检查键状态
+          input.addEventListener('input', debounce(function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            const key = this.value.trim();
+            
+            if (key) {
+              vscode.postMessage({
+                command: 'checkI18nKeyStatus',
+                data: {
+                  index,
+                  key
+                }
+              });
+            }
+          }, 500)); // 500ms防抖，避免频繁请求
         });
+        
+        // 简单的防抖函数
+        function debounce(func, wait) {
+          let timeout;
+          return function() {
+            const context = this;
+            const args = arguments;
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(context, args), wait);
+          };
+        }
         
         // 替换选中按钮
         document.getElementById('replace-selected').addEventListener('click', function() {
@@ -754,6 +927,97 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               const index = parseInt(checkbox.getAttribute('data-index'));
               checkbox.checked = selectedIndexes.includes(index);
             });
+          } else if (message.command === 'updateI18nKeyStatus') {
+            // 更新国际化键的状态
+            updateI18nKeyStatusInUI(message.data);
+          }
+        });
+        
+        // 在UI中更新国际化键状态
+        function updateI18nKeyStatusInUI(data) {
+          const { index, status, key } = data;
+          
+          // 查找对应的状态行 - 使用字符串连接而不是嵌套模板字符串
+          const statusRow = document.querySelector('.i18n-status-row[data-index="' + index + '"]');
+          if (!statusRow) return;
+          
+          const container = statusRow.querySelector('.i18n-status-container');
+          if (!container) return;
+          
+          // 清空现有状态
+          container.innerHTML = '';
+          
+          // 获取语言映射配置
+          const languageMappings = window.languageMappings || [];
+          
+          // 遍历所有语言，添加状态标签
+          for (const [langCode, langStatus] of Object.entries(status)) {
+            const exists = langStatus.exists;
+            const error = langStatus.error;
+            const value = langStatus.value;
+            
+            // 查找对应的语言映射，以获取文件路径
+            const mapping = languageMappings.find(m => m.languageCode === langCode);
+            const filePath = mapping ? mapping.filePath : '';
+            
+            let statusClass = exists ? 'i18n-status-exists' : 'i18n-status-missing';
+            let tooltip = '';
+            
+            // 获取语言名称
+            const langName = LANGUAGE_NAMES[langCode] || '';
+            let displayText = langName ? langName + '[' + langCode + ']' : langCode;
+            
+            if (error) {
+              statusClass = 'i18n-status-error';
+              tooltip = '错误: ' + error;
+            } else if (exists && value) {
+              tooltip = value;
+            } else {
+              tooltip = '未找到翻译';
+            }
+            
+            const tagElement = document.createElement('div');
+            tagElement.className = 'i18n-status-tag ' + statusClass + ' i18n-status-tooltip';
+            tagElement.textContent = displayText;
+            
+            // 添加数据属性用于点击事件
+            tagElement.setAttribute('data-language', langCode);
+            tagElement.setAttribute('data-filepath', filePath);
+            tagElement.setAttribute('data-key', key);
+            
+            const tooltipElement = document.createElement('span');
+            tooltipElement.className = 'tooltip-text';
+            tooltipElement.textContent = tooltip;
+            
+            tagElement.appendChild(tooltipElement);
+            container.appendChild(tagElement);
+          }
+        }
+
+        // 在初始化脚本中添加
+        document.addEventListener('click', function(event) {
+          // 查找点击的是否是语言标签
+          let target = event.target;
+          while (target && !target.matches('.i18n-status-tag')) {
+            if (target === document.body) return;
+            target = target.parentElement;
+          }
+          
+          if (target) {
+            const languageCode = target.getAttribute('data-language');
+            const filePath = target.getAttribute('data-filepath');
+            const key = target.getAttribute('data-key');
+            
+            if (filePath && key) {
+              vscode.postMessage({
+                command: 'openLanguageFile',
+                data: {
+                  filePath,
+                  languageCode,
+                  key
+                }
+              });
+            }
           }
         });
       </script>
