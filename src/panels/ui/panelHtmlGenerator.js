@@ -15,17 +15,19 @@ function escapeHtml(text) {
 
 /**
  * 生成面板HTML内容
- * @param {string[]} scanPatterns 扫描模式
- * @param {Array} replacements 替换项
- * @param {string[]} localesPaths 国际化文件路径
- * @param {vscode.ExtensionContext} context 扩展上下文
- * @param {boolean} isConfigExpanded 配置面板是否展开
- * @returns {string} HTML内容
+ * @param {Array} scanPatterns 扫描模式列表
+ * @param {Array} replacements 替换项列表
+ * @param {Array} localesPaths 本地化文件路径列表
+ * @param {Object} context 上下文对象，包含decorationStyle等配置
+ * @param {boolean} isConfigExpanded 配置部分是否展开
  */
-function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfigExpanded = false) {
+function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false) {
   // 根据展开状态设置类和样式
   const configSectionClass = isConfigExpanded ? 'collapsible-section active' : 'collapsible-section';
   const configContentStyle = isConfigExpanded ? 'display: block;' : 'display: none;';
+  
+  // 从传入的context中获取装饰风格设置
+  const decorationStyle = context.decorationStyle || 'suffix';
   
   return `
     <!DOCTYPE html>
@@ -315,225 +317,243 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
             </ul>
             <button id="select-locale-file">添加文件</button>
           </div>
+          
+          <!-- 添加装饰风格选择区域 -->
+          <div class="config-row">
+            <h4>装饰显示风格</h4>
+            <div class="config-item">
+              <select id="decoration-style" class="form-control">
+                <option value="suffix" ${decorationStyle === 'suffix' ? 'selected' : ''}>t('key')(译文)</option>
+                <option value="inline" ${decorationStyle === 'inline' ? 'selected' : ''}>t(译文)</option>
+              </select>
+              <span class="help-text">选择i18n函数调用的显示风格</span>
+            </div>
+          </div>
         </div>
       </div>
       
       <script>
-        (function() {
-          const vscode = acquireVsCodeApi();
-          
-          // 折叠面板功能
-          const configHeader = document.getElementById('config-section-header');
-          if (configHeader) {
-            configHeader.addEventListener('click', function(event) {
-              this.classList.toggle('active');
-              const content = document.getElementById('config-section-content');
-              const isExpanded = content.style.display === 'block';
-              
-              if (isExpanded) {
-                content.style.display = 'none';
-              } else {
-                content.style.display = 'block';
-              }
-              
-              // 通知扩展面板状态变化
-              vscode.postMessage({
-                command: 'toggleConfigSection',
-                data: {
-                  expanded: !isExpanded
-                }
-              });
-            });
-          }
-          
-          // 全选复选框
-          const selectAllCheckbox = document.getElementById('select-all');
-          selectAllCheckbox.addEventListener('change', function() {
-            const isChecked = this.checked;
-            document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-              checkbox.checked = isChecked;
-              
-              // 向VSCode发送消息
-              const index = parseInt(checkbox.getAttribute('data-index'));
-              vscode.postMessage({
-                command: 'toggleSelection',
-                data: {
-                  index,
-                  selected: isChecked
-                }
-              });
+        // 使用acquireVsCodeApi获取vscode实例
+        const vscode = acquireVsCodeApi();
+        
+        // 折叠面板功能
+        const configHeader = document.getElementById('config-section-header');
+        if (configHeader) {
+          configHeader.addEventListener('click', function(event) {
+            this.classList.toggle('active');
+            const content = document.getElementById('config-section-content');
+            const isExpanded = content.style.display === 'block';
+            
+            if (isExpanded) {
+              content.style.display = 'none';
+            } else {
+              content.style.display = 'block';
+            }
+            
+            // 发送配置面板展开状态给扩展
+            vscode.postMessage({
+              command: 'toggleConfigSection',
+              data: { expanded: !isExpanded }
             });
           });
-          
-          // 单项复选框
+        }
+        
+        // 全选复选框
+        const selectAllCheckbox = document.getElementById('select-all');
+        selectAllCheckbox.addEventListener('change', function() {
+          const isChecked = this.checked;
           document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-              const index = parseInt(this.getAttribute('data-index'));
-              console.log('选中状态改变:', index, this.checked);
-              vscode.postMessage({
-                command: 'toggleSelection',
-                data: {
-                  index,
-                  selected: this.checked
-                }
-              });
-            });
-          });
-          
-          // 国际化键输入框
-          document.querySelectorAll('.i18n-key-input').forEach(input => {
-            input.addEventListener('change', function() {
-              const index = parseInt(this.getAttribute('data-index'));
-              vscode.postMessage({
-                command: 'updateKey',
-                data: {
-                  index,
-                  key: this.value
-                }
-              });
-            });
-          });
-          
-          // 替换选中按钮
-          document.getElementById('replace-selected').addEventListener('click', function() {
+            checkbox.checked = isChecked;
+            
+            // 向VSCode发送消息
+            const index = parseInt(checkbox.getAttribute('data-index'));
             vscode.postMessage({
-              command: 'replaceSelected'
-            });
-          });
-          
-          // 替换所有按钮
-          document.getElementById('replace-all').addEventListener('click', function() {
-            vscode.postMessage({
-              command: 'replaceAll'
-            });
-          });
-          
-          // 刷新按钮
-          document.getElementById('refresh-panel').addEventListener('click', function() {
-            vscode.postMessage({
-              command: 'refreshPanel'
-            });
-          });
-          
-          // 创建语言文件按钮
-          document.getElementById('create-language-files').addEventListener('click', function() {
-            vscode.postMessage({
-              command: 'createLanguageFiles'
-            });
-          });
-          
-          // 添加扫描模式
-          const addPatternBtn = document.getElementById('add-pattern');
-          if (addPatternBtn) {
-            addPatternBtn.addEventListener('click', function(event) {
-              // 阻止事件冒泡
-              event.stopPropagation();
-              
-              const input = document.getElementById('new-pattern');
-              const pattern = input.value.trim();
-              
-              if (pattern) {
-                vscode.postMessage({
-                  command: 'addScanPattern',
-                  data: { pattern }
-                });
-                
-                input.value = '';
+              command: 'toggleSelection',
+              data: {
+                index,
+                selected: isChecked
               }
             });
-          }
-          
-          // 删除扫描模式
-          document.querySelectorAll('.remove-pattern').forEach(btn => {
-            btn.addEventListener('click', function(event) {
-              // 阻止事件冒泡
-              event.stopPropagation();
-              
-              const pattern = this.getAttribute('data-pattern');
+          });
+        });
+        
+        // 单项复选框
+        document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+          checkbox.addEventListener('change', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            console.log('选中状态改变:', index, this.checked);
+            vscode.postMessage({
+              command: 'toggleSelection',
+              data: {
+                index,
+                selected: this.checked
+              }
+            });
+          });
+        });
+        
+        // 国际化键输入框
+        document.querySelectorAll('.i18n-key-input').forEach(input => {
+          input.addEventListener('change', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            vscode.postMessage({
+              command: 'updateKey',
+              data: {
+                index,
+                key: this.value
+              }
+            });
+          });
+        });
+        
+        // 替换选中按钮
+        document.getElementById('replace-selected').addEventListener('click', function() {
+          vscode.postMessage({
+            command: 'replaceSelected'
+          });
+        });
+        
+        // 替换所有按钮
+        document.getElementById('replace-all').addEventListener('click', function() {
+          vscode.postMessage({
+            command: 'replaceAll'
+          });
+        });
+        
+        // 刷新按钮
+        document.getElementById('refresh-panel').addEventListener('click', function() {
+          vscode.postMessage({
+            command: 'refreshPanel'
+          });
+        });
+        
+        // 创建语言文件按钮
+        document.getElementById('create-language-files').addEventListener('click', function() {
+          vscode.postMessage({
+            command: 'createLanguageFiles'
+          });
+        });
+        
+        // 添加扫描模式
+        const addPatternBtn = document.getElementById('add-pattern');
+        if (addPatternBtn) {
+          addPatternBtn.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
+            
+            const input = document.getElementById('new-pattern');
+            const pattern = input.value.trim();
+            
+            if (pattern) {
               vscode.postMessage({
-                command: 'removeScanPattern',
+                command: 'addScanPattern',
                 data: { pattern }
               });
-            });
-          });
-          
-          // 选择国际化文件
-          const selectFileBtn = document.getElementById('select-locale-file');
-          if (selectFileBtn) {
-            selectFileBtn.addEventListener('click', function(event) {
-              // 阻止事件冒泡
-              event.stopPropagation();
               
-              vscode.postMessage({
-                command: 'selectLocaleFile'
-              });
-            });
-          }
-          
-          // 移除国际化文件路径
-          document.querySelectorAll('.remove-locale-path').forEach(btn => {
-            btn.addEventListener('click', function(event) {
-              // 阻止事件冒泡
-              event.stopPropagation();
-              
-              const path = this.getAttribute('data-path');
-              vscode.postMessage({
-                command: 'removeLocalePath',
-                data: { path }
-              });
-            });
-          });
-          
-          // 翻译按钮
-          document.querySelectorAll('.translate-btn').forEach(btn => {
-            btn.addEventListener('click', function() {
-              const index = parseInt(this.getAttribute('data-index'));
-              const inputElement = document.querySelector('.i18n-key-input[data-index="' + index + '"]');
-              const key = inputElement ? inputElement.value : '';
-              
-              vscode.postMessage({
-                command: 'translateItem',
-                data: {
-                  index,
-                  key
-                }
-              });
-            });
-          });
-          
-          // API翻译配置按钮
-          const apiConfigBtn = document.getElementById('open-api-translation');
-          if (apiConfigBtn) {
-            apiConfigBtn.addEventListener('click', function() {
-              vscode.postMessage({
-                command: 'openApiTranslation'
-              });
-            });
-          }
-          
-          // 接收来自扩展的消息
-          window.addEventListener('message', event => {
-            const message = event.data;
-            
-            if (message.command === 'updateSelection') {
-              const { selectedIndexes } = message.data;
-              
-              // 更新全选复选框状态
-              const allItems = document.querySelectorAll('.item-checkbox');
-              const selectAll = selectedIndexes.length === allItems.length;
-              
-              if (selectAllCheckbox) {
-                selectAllCheckbox.checked = selectAll;
-              }
-              
-              // 更新所有项的选中状态
-              document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-                const index = parseInt(checkbox.getAttribute('data-index'));
-                checkbox.checked = selectedIndexes.includes(index);
-              });
+              input.value = '';
             }
           });
-        })();
+        }
+        
+        // 删除扫描模式
+        document.querySelectorAll('.remove-pattern').forEach(btn => {
+          btn.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
+            
+            const pattern = this.getAttribute('data-pattern');
+            vscode.postMessage({
+              command: 'removeScanPattern',
+              data: { pattern }
+            });
+          });
+        });
+        
+        // 选择国际化文件
+        const selectFileBtn = document.getElementById('select-locale-file');
+        if (selectFileBtn) {
+          selectFileBtn.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
+            
+            vscode.postMessage({
+              command: 'selectLocaleFile'
+            });
+          });
+        }
+        
+        // 移除国际化文件路径
+        document.querySelectorAll('.remove-locale-path').forEach(btn => {
+          btn.addEventListener('click', function(event) {
+            // 阻止事件冒泡
+            event.stopPropagation();
+            
+            const path = this.getAttribute('data-path');
+            vscode.postMessage({
+              command: 'removeLocalePath',
+              data: { path }
+            });
+          });
+        });
+        
+        // 翻译按钮
+        document.querySelectorAll('.translate-btn').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const index = parseInt(this.getAttribute('data-index'));
+            const inputElement = document.querySelector('.i18n-key-input[data-index="' + index + '"]');
+            const key = inputElement ? inputElement.value : '';
+            
+            vscode.postMessage({
+              command: 'translateItem',
+              data: {
+                index,
+                key
+              }
+            });
+          });
+        });
+        
+        // API翻译配置按钮
+        const apiConfigBtn = document.getElementById('open-api-translation');
+        if (apiConfigBtn) {
+          apiConfigBtn.addEventListener('click', function() {
+            vscode.postMessage({
+              command: 'openApiTranslation'
+            });
+          });
+        }
+        
+        // 添加装饰风格切换处理
+        document.getElementById('decoration-style').addEventListener('change', function() {
+          const value = this.value;
+          vscode.postMessage({
+            command: 'updateDecorationStyle',
+            data: { style: value }  // 使用与处理程序匹配的消息结构
+          });
+        });
+        
+        // 接收来自扩展的消息
+        window.addEventListener('message', event => {
+          const message = event.data;
+          
+          if (message.command === 'updateSelection') {
+            const { selectedIndexes } = message.data;
+            
+            // 更新全选复选框状态
+            const allItems = document.querySelectorAll('.item-checkbox');
+            const selectAll = selectedIndexes.length === allItems.length;
+            
+            if (selectAllCheckbox) {
+              selectAllCheckbox.checked = selectAll;
+            }
+            
+            // 更新所有项的选中状态
+            document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+              const index = parseInt(checkbox.getAttribute('data-index'));
+              checkbox.checked = selectedIndexes.includes(index);
+            });
+          }
+        });
       </script>
     </body>
     </html>

@@ -31,14 +31,7 @@ function activate(context) {
     vscode.commands.registerCommand(
       'i18n-swapper.openApiTranslationConfig', 
       () => commands.openApiTranslationConfig(context)
-    ),
-    vscode.commands.registerCommand('i18n-swapper.refreshI18nDecorations', () => {
-      if (i18nDecorator) {
-        i18nDecorator.loadLocaleData();
-        i18nDecorator.updateDecorations();
-        vscode.window.showInformationMessage('已刷新i18n装饰');
-      }
-    })
+    )
   );
 
   // 检查并设置默认配置

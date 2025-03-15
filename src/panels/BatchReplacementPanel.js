@@ -160,6 +160,9 @@ class BatchReplacementPanel {
         case 'toggleConfigSection':
           this.isConfigExpanded = data.expanded;
           break;
+        case 'updateDecorationStyle':
+          await this._updateDecorationStyle(data.style);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -270,35 +273,81 @@ class BatchReplacementPanel {
         progress.report({ message: "更新面板..." });
 
         // 更新面板
-        this.updatePanelContent(scanPatterns, this.replacements, localesPaths);
+        await this.updatePanelContent();
       });
     } catch (error) {
       console.error('分析文档出错:', error);
       vscode.window.showErrorMessage(`分析文档失败: ${error.message}`);
       
       // 即使出错也要显示面板
-      this.updatePanelContent([], [], []);
+      this.updatePanelContent();
     }
   }
 
   /**
    * 更新面板内容
    */
-  updatePanelContent(scanPatterns, replacements, localesPaths) {
+  async updatePanelContent() {
     if (!this.panel) return;
-
-    // 使用当前的配置面板展开状态生成面板HTML
-    const html = getPanelHtml(scanPatterns, replacements, localesPaths, this.context, this.isConfigExpanded);
     
-    // 更新面板内容
-    this.panel.webview.html = html;
+    try {
+      // 获取当前配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const scanPatterns = config.get('scanPatterns', []);
+      const localesPaths = config.get('localesPaths', []);
+      const decorationStyle = config.get('decorationStyle', 'suffix');
+      
+      // 创建context对象
+      const context = {
+        decorationStyle
+      };
+      
+      // 生成面板HTML
+      const html = getPanelHtml(
+        scanPatterns || [], 
+        this.replacements || [], 
+        localesPaths || [],
+        context,
+        this.isConfigExpanded
+      );
+      
+      // 更新面板内容
+      this.panel.webview.html = html;
+    } catch (error) {
+      console.error('更新面板内容时出错:', error);
+      vscode.window.showErrorMessage(`更新面板内容失败: ${error.message}`);
+    }
   }
 
   /**
    * 刷新面板
    */
   async refreshPanel() {
-    await this.analyzeAndLoadPanel();
+    if (!this.panel) return;
+    
+    try {
+      // 获取配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const scanPatterns = config.get('scanPatterns', []);
+      const localesPaths = config.get('localesPaths', []);
+      
+      // 重新分析文档
+      if (this.document) {
+        const text = this.document.getText();
+        const fileExtension = path.extname(this.document.fileName).toLowerCase();
+        
+        // 分析文档内容
+        this.replacements = await analyzeDocument(
+          text, fileExtension, scanPatterns, localesPaths, this.document
+        );
+      }
+      
+      // 更新面板
+      this.updatePanelContent();
+    } catch (error) {
+      console.error('刷新面板时出错:', error);
+      vscode.window.showErrorMessage(`刷新面板失败: ${error.message}`);
+    }
   }
 
   /**
@@ -781,6 +830,30 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('移除国际化文件路径出错:', error);
       throw error;
+    }
+  }
+
+  /**
+   * 更新装饰风格设置
+   */
+  async _updateDecorationStyle(style) {
+    try {
+      // 更新配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      await config.update('decorationStyle', style, vscode.ConfigurationTarget.Global);
+      
+      // 通知用户
+      const styleNames = {
+        'suffix': "t('key')(译文)",
+        'inline': "t(译文)"
+      };
+      vscode.window.showInformationMessage(`已将i18n装饰显示风格设置为: ${styleNames[style]}`);
+      
+      // 发送命令刷新装饰
+      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+    } catch (error) {
+      console.error('更新装饰风格设置时出错:', error);
+      vscode.window.showErrorMessage(`更新装饰风格出错: ${error.message}`);
     }
   }
 }

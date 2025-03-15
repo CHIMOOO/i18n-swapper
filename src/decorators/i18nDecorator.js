@@ -22,8 +22,18 @@ class I18nDecorator {
         this.inlineDecorationType = vscode.window.createTextEditorDecorationType({
             before: {
                 contentText: '',
+                color:'red'
             },
-            textDecoration: 'none; opacity: 0;', // 隐藏原始文本
+            textDecoration: 'none; opacity: 0;display: none;', // 隐藏原始文本
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+        });
+        
+        // 添加用于临时显示原始键名的装饰器
+        this.editModeDecorationType = vscode.window.createTextEditorDecorationType({
+            before: {
+                contentText: '',
+            },
+            textDecoration: 'none;',
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
         });
         
@@ -35,6 +45,11 @@ class I18nDecorator {
         this.localesPaths = [];
         this.defaultLocale = 'zh-CN'; // 默认语言
         this.decorationStyle = 'suffix'; // 默认装饰样式
+        
+        // 跟踪当前编辑状态
+        this.isInEditMode = false;
+        this.editModeRange = null;
+        this.editModeOriginalKey = null;
     }
 
     /**
@@ -103,6 +118,13 @@ class I18nDecorator {
                 this.updateDecorations();
             }
         }, null, this.context.subscriptions);
+
+        // 添加鼠标点击事件，用于切换编辑模式
+        vscode.window.onDidChangeTextEditorSelection(e => {
+            if (this.activeEditor && e.textEditor === this.activeEditor) {
+                this.handleSelectionChange(e);
+            }
+        }, null, this.context.subscriptions);
     }
 
     /**
@@ -169,10 +191,11 @@ class I18nDecorator {
 
         const document = this.activeEditor.document;
         const text = document.getText();
-        const decorations = [];
-        const inlineDecorations = []; // 用于内联模式的装饰
+        const suffixDecorations = [];
+        const inlineDecorations = [];
+        this.currentInlineDecorations = []; // 重置当前内联装饰数组
 
-        // 正则表达式模式
+        // 正则表达式模式，匹配各种i18n函数调用格式
         const regexPatterns = [
             /t\(\s*['"]([^'"]+)['"]\s*\)/g,       // t('key')
             /\$t\(\s*['"]([^'"]+)['"]\s*\)/g,      // $t('key')
@@ -180,7 +203,7 @@ class I18nDecorator {
             /this\.\$t\(\s*['"]([^'"]+)['"]\s*\)/g // this.$t('key')
         ];
 
-        // 对每种模式进行匹配
+        // 匹配每个i18n函数调用
         for (const pattern of regexPatterns) {
             let match;
             while ((match = pattern.exec(text)) !== null) {
@@ -188,68 +211,79 @@ class I18nDecorator {
                 let translatedText = this.localeData[key];
                 
                 if (!translatedText) {
+                    // 尝试解析嵌套键
                     translatedText = this.getNestedValue(key);
                 }
 
                 if (translatedText) {
                     const fullMatch = match[0]; // 例如: t('key')
+                    
+                    // 找到开始和结束位置
                     const startPos = document.positionAt(match.index);
                     const endPos = document.positionAt(match.index + fullMatch.length);
                     
-                    if (this.decorationStyle === 'suffix') {
-                        // 后缀样式: t('key')(译文)
-                        const decoration = {
-                            range: new vscode.Range(startPos, endPos),
-                            renderOptions: {
-                                after: {
-                                    contentText: `(${translatedText})`,
-                                }
+                    // 创建后缀样式的装饰
+                    const suffixDecoration = {
+                        range: new vscode.Range(startPos, endPos),
+                        renderOptions: {
+                            after: {
+                                contentText: `(${translatedText})`,
+                                margin: '0 0 0 3px'
                             }
-                        };
-                        decorations.push(decoration);
-                    } else {
-                        // 内联样式: t(译文)
-                        const funcNameEndIndex = fullMatch.indexOf('(');
-                        const funcName = fullMatch.substring(0, funcNameEndIndex);
+                        }
+                    };
+                    suffixDecorations.push(suffixDecoration);
+                    
+                    // 为内联样式找到括号内的内容位置
+                    // 修复：精确定位引号内的内容，而非整个括号内容
+                    const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
+                    const quoteEndIndex = fullMatch.lastIndexOf("'");
+                    
+                    if (quoteStartIndex !== -1 && quoteEndIndex !== -1 && quoteStartIndex < quoteEndIndex) {
+                        // 精确定位键名所在位置（引号之间的内容）
+                        const keyStartPos = document.positionAt(match.index + quoteStartIndex + 1);
+                        const keyEndPos = document.positionAt(match.index + quoteEndIndex);
                         
-                        // 函数名称的装饰
-                        const funcDecoration = {
-                            range: new vscode.Range(
-                                startPos,
-                                document.positionAt(match.index + funcNameEndIndex + 1)
-                            ),
-                            renderOptions: {
-                                after: {
-                                    contentText: '',
-                                }
-                            }
-                        };
+                        // 存储装饰范围和原始键用于点击功能
+                        this.currentInlineDecorations.push({
+                            range: new vscode.Range(keyStartPos, keyEndPos),
+                            originalKey: key
+                        });
                         
-                        // 整个函数调用的隐藏与重建
-                        const replaceDecoration = {
-                            range: new vscode.Range(startPos, endPos),
+                        // 创建内联样式装饰，仅替换引号内的内容
+                        const inlineDecoration = {
+                            range: new vscode.Range(keyStartPos, keyEndPos),
                             renderOptions: {
                                 before: {
-                                    contentText: `${funcName}(${translatedText})`,
+                                    contentText: translatedText,
+                                    margin: '0' // 确保没有额外边距
                                 },
-                                textDecoration: 'none; opacity: 0;', // 隐藏原始文本
+                                textDecoration: 'none; display: none;' // 隐藏原始键名
                             },
                             hoverMessage: `原始键: '${key}'`
                         };
-                        
-                        inlineDecorations.push(replaceDecoration);
+                        inlineDecorations.push(inlineDecoration);
                     }
                 }
             }
         }
 
-        // 应用装饰
-        if (this.decorationStyle === 'suffix') {
-            this.activeEditor.setDecorations(this.suffixDecorationType, decorations);
-            this.activeEditor.setDecorations(this.inlineDecorationType, []); // 清除另一种装饰
+        // 根据当前设置和编辑模式应用装饰
+        if (this.isInEditMode) {
+            // 编辑模式下保持当前状态
         } else {
-            this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
-            this.activeEditor.setDecorations(this.suffixDecorationType, []); // 清除另一种装饰
+            // 正常显示模式
+            if (this.decorationStyle === 'suffix') {
+                // 后缀模式: t('key')(译文)
+                this.activeEditor.setDecorations(this.suffixDecorationType, suffixDecorations);
+                this.activeEditor.setDecorations(this.inlineDecorationType, []);
+                this.activeEditor.setDecorations(this.editModeDecorationType, []);
+            } else {
+                // 内联模式: t(译文)
+                this.activeEditor.setDecorations(this.suffixDecorationType, []);
+                this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
+                this.activeEditor.setDecorations(this.editModeDecorationType, []);
+            }
         }
     }
 
@@ -349,6 +383,7 @@ class I18nDecorator {
     dispose() {
         this.suffixDecorationType.dispose();
         this.inlineDecorationType.dispose();
+        this.editModeDecorationType.dispose();
     }
 
     /**
@@ -401,6 +436,76 @@ class I18nDecorator {
             return false;
         }
         return true;
+    }
+
+    /**
+     * 处理选择变化事件
+     */
+    handleSelectionChange(e) {
+        // 仅当处于内联模式且有点击事件时处理
+        if (this.decorationStyle !== 'inline' || e.selections.length !== 1) {
+            return;
+        }
+        
+        const selection = e.selections[0];
+        
+        // 检查是否点击了装饰文本区域
+        if (this.isInEditMode) {
+            // 如果已经在编辑模式，检查是否点击了其他区域
+            if (!selection.isEmpty || !this.editModeRange.contains(selection.active)) {
+                // 用户点击了其他区域，退出编辑模式
+                this.exitEditMode();
+            }
+        } else {
+            // 检查是否点击了装饰文本
+            for (const decoration of this.currentInlineDecorations) {
+                if (decoration.range.contains(selection.active)) {
+                    // 找到了点击的装饰，进入编辑模式
+                    this.enterEditMode(decoration.range, decoration.originalKey);
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * 进入编辑模式，暂时停用所有装饰
+     */
+    enterEditMode(range, originalKey) {
+        // 标记为编辑模式
+        this.isInEditMode = true;
+        this.editModeRange = range;
+        
+        // 暂时禁用所有装饰
+        this.activeEditor.setDecorations(this.suffixDecorationType, []);
+        this.activeEditor.setDecorations(this.inlineDecorationType, []);
+        this.activeEditor.setDecorations(this.editModeDecorationType, []);
+        
+        // 显示提示
+        vscode.window.setStatusBarMessage(`编辑键: ${originalKey}`, 2000);
+    }
+
+    /**
+     * 退出编辑模式，恢复翻译显示
+     */
+    exitEditMode() {
+        if (!this.isInEditMode) return;
+        
+        // 清除标记
+        this.isInEditMode = false;
+        this.editModeRange = null;
+        this.editModeOriginalKey = null;
+        
+        // 清除所有装饰，然后重新应用正常装饰
+        this.activeEditor.setDecorations(this.editModeDecorationType, []);
+        this.activeEditor.setDecorations(this.inlineDecorationType, []);
+        this.activeEditor.setDecorations(this.suffixDecorationType, []);
+        
+        // 重新应用装饰
+        this.updateDecorations();
+        
+        // 显示提示
+        vscode.window.setStatusBarMessage('已恢复翻译显示', 2000);
     }
 }
 
