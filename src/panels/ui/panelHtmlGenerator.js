@@ -26,8 +26,10 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
   const configSectionClass = isConfigExpanded ? 'collapsible-section active' : 'collapsible-section';
   const configContentStyle = isConfigExpanded ? 'display: block;' : 'display: none;';
   
-  // 从传入的context中获取装饰风格设置
+  // 从传入的context中获取装饰风格设置和样式设置
   const decorationStyle = context.decorationStyle || 'suffix';
+  const suffixStyle = context.suffixStyle || { color: '#6A9955', fontSize: '1em', fontWeight: 'normal' };
+  const inlineStyle = context.inlineStyle || { color: '#CE9178', fontSize: '1em', fontWeight: 'normal' };
   
   return `
     <!DOCTYPE html>
@@ -215,6 +217,44 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         .pattern-item, .locale-path-item, .new-pattern-input {
           pointer-events: all;
         }
+        .style-config-container {
+          background: var(--vscode-editor-background);
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 4px;
+          padding: 10px;
+          margin-top: 10px;
+        }
+        .style-config-group {
+          margin-bottom: 15px;
+        }
+        .color-picker {
+          width: 40px;
+          height: 24px;
+          vertical-align: middle;
+          margin-right: 5px;
+        }
+        .color-text {
+          width: 80px;
+          vertical-align: middle;
+        }
+        .number-input {
+          width: 40px;
+        }
+        .unit {
+          margin-left: 5px;
+        }
+          #suffix-style-config,#inline-style-config{
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+          }
+             #suffix-style-config .config-item,#inline-style-config .config-item{
+             margin-right:35px;
+              margin-bottom:8px;
+             }
+           #suffix-style-config   .help-text,#inline-style-config .help-text    {
+           width:80px;
+           }
       </style>
     </head>
     <body>
@@ -327,6 +367,74 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 <option value="inline" ${decorationStyle === 'inline' ? 'selected' : ''}>t(译文)</option>
               </select>
               <span class="help-text">选择i18n函数调用的显示风格</span>
+            </div>
+          </div>
+          
+          <!-- 添加样式配置部分 -->
+          <div class="config-row">
+            <h4>装饰样式配置</h4>
+            <div class="style-config-container">
+              <!-- 后缀模式样式配置 -->
+              <div id="suffix-style-config" class="style-config-group" ${decorationStyle === 'suffix' ? '' : 'style="display: none;"'}>
+                <div class="config-item">
+                  <label>文本颜色：</label>
+                  <input type="color" id="suffix-color" value="${suffixStyle.color || '#6A9955'}" class="color-picker">
+                  <input type="text" id="suffix-color-text" value="${suffixStyle.color || '#6A9955'}" class="color-text">
+                </div>
+                <div class="config-item">
+                  <label>字体大小(px)：</label>
+                  <input type="number" id="suffix-font-size" value="${parseInt(suffixStyle.fontSize) || 14}" min="8" max="32" class="number-input">
+                  <span class="unit">px</span>
+                </div>
+                <div class="config-item">
+                  <label>字体粗细：</label>
+                  <input type="number" id="suffix-font-weight" value="${suffixStyle.fontWeight || 400}" min="100" max="900" step="100" class="number-input">
+                </div>
+                <div class="config-item">
+                  <label>字体样式：</label>
+                  <select id="suffix-font-style" class="form-control">
+                    <option value="normal" ${suffixStyle.fontStyle === 'normal' ? 'selected' : ''}>正常</option>
+                    <option value="italic" ${suffixStyle.fontStyle === 'italic' ? 'selected' : ''}>斜体</option>
+                    <option value="oblique" ${suffixStyle.fontStyle === 'oblique' ? 'selected' : ''}>倾斜</option>
+                  </select>
+                </div>
+                <div class="config-item">
+                  <label>文字间距：</label>
+                  <input type="text" id="suffix-margin" value="${suffixStyle.margin || '0 0 0 3px'}" class="margin-input" placeholder="上 右 下 左 (例如: 0 0 0 3px)">
+                  <span class="help-text small">格式: 上 右 下 左 (例如: 0 0 0 3px)</span>
+                </div>
+              </div>
+              
+              <!-- 内联模式样式配置 -->
+              <div id="inline-style-config" class="style-config-group" ${decorationStyle === 'inline' ? '' : 'style="display: none;"'}>
+                <div class="config-item">
+                  <label>文本颜色：</label>
+                  <input type="color" id="inline-color" value="${inlineStyle.color || '#CE9178'}" class="color-picker">
+                  <input type="text" id="inline-color-text" value="${inlineStyle.color || '#CE9178'}" class="color-text">
+                </div>
+                <div class="config-item">
+                  <label>字体大小(px)：</label>
+                  <input type="number" id="inline-font-size" value="${parseInt(inlineStyle.fontSize) || 14}" min="8" max="32" class="number-input">
+                  <span class="unit">px</span>
+                </div>
+                <div class="config-item">
+                  <label>字体粗细：</label>
+                  <input type="number" id="inline-font-weight" value="${inlineStyle.fontWeight || 400}" min="100" max="900" step="100" class="number-input">
+                </div>
+                <div class="config-item">
+                  <label>字体样式：</label>
+                  <select id="inline-font-style" class="form-control">
+                    <option value="normal" ${inlineStyle.fontStyle === 'normal' ? 'selected' : ''}>正常</option>
+                    <option value="italic" ${inlineStyle.fontStyle === 'italic' ? 'selected' : ''}>斜体</option>
+                    <option value="oblique" ${inlineStyle.fontStyle === 'oblique' ? 'selected' : ''}>倾斜</option>
+                  </select>
+                </div>
+                <div class="config-item">
+                  <label>文字间距：</label>
+                  <input type="text" id="inline-margin" value="${inlineStyle.margin || '0'}" class="margin-input" placeholder="上 右 下 左">
+                </div>
+              </div>
+              <button id="apply-style-changes" class="primary-button">应用样式更改</button>
             </div>
           </div>
         </div>
@@ -523,12 +631,70 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         }
         
-        // 添加装饰风格切换处理
+        // 装饰风格切换时显示对应的样式配置
         document.getElementById('decoration-style').addEventListener('change', function() {
-          const value = this.value;
+          const style = this.value;
+          if (style === 'suffix') {
+            document.getElementById('suffix-style-config').style.display = 'flex';
+            document.getElementById('inline-style-config').style.display = 'none';
+          } else {
+            document.getElementById('suffix-style-config').style.display = 'none';
+            document.getElementById('inline-style-config').style.display = 'flex';
+          }
+          
+          // 发送风格切换消息
           vscode.postMessage({
             command: 'updateDecorationStyle',
-            data: { style: value }  // 使用与处理程序匹配的消息结构
+            data: { style: style }
+          });
+        });
+        
+        // 同步颜色选择器和文本输入
+        document.getElementById('suffix-color').addEventListener('input', function() {
+          document.getElementById('suffix-color-text').value = this.value;
+        });
+        
+        document.getElementById('suffix-color-text').addEventListener('input', function() {
+          document.getElementById('suffix-color').value = this.value;
+        });
+        
+        document.getElementById('inline-color').addEventListener('input', function() {
+          document.getElementById('inline-color-text').value = this.value;
+        });
+        
+        document.getElementById('inline-color-text').addEventListener('input', function() {
+          document.getElementById('inline-color-text').value = this.value;
+        });
+        
+        // 应用样式更改按钮点击事件
+        document.getElementById('apply-style-changes').addEventListener('click', function() {
+          const decorationStyle = document.getElementById('decoration-style').value;
+          
+          // 收集样式配置 - 更新为使用数值
+          const suffixStyle = {
+            color: document.getElementById('suffix-color-text').value,
+            fontSize: document.getElementById('suffix-font-size').value + 'px', // 添加px单位
+            fontWeight: document.getElementById('suffix-font-weight').value, // 直接使用数值
+            fontStyle: document.getElementById('suffix-font-style').value,
+            margin: document.getElementById('suffix-margin').value
+          };
+          
+          const inlineStyle = {
+            color: document.getElementById('inline-color-text').value,
+            fontSize: document.getElementById('inline-font-size').value + 'px', // 添加px单位
+            fontWeight: document.getElementById('inline-font-weight').value, // 直接使用数值
+            fontStyle: document.getElementById('inline-font-style').value,
+            margin: document.getElementById('inline-margin').value
+          };
+          
+          // 发送更新样式的消息
+          vscode.postMessage({
+            command: 'updateDecorationStyles',
+            data: {
+              decorationStyle,
+              suffixStyle,
+              inlineStyle
+            }
           });
         });
         

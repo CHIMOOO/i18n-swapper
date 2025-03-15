@@ -85,10 +85,75 @@ class I18nDecorator {
         this.defaultLocale = config.get('defaultLocale', 'zh-CN');
         this.decorationStyle = config.get('decorationStyle', 'suffix');
         
+        // 加载样式配置
+        this.suffixStyle = config.get('suffixStyle', {
+            color: '#6A9955',
+            fontSize: '1em',
+            fontWeight: 'normal'
+        });
+        
+        this.inlineStyle = config.get('inlineStyle', {
+            color: '#CE9178',
+            fontSize: '1em',
+            fontWeight: 'normal'
+        });
+        
+        // 更新装饰器类型
+        this.updateDecoratorTypes();
+        
         // 根据配置选择装饰器类型
         this.decorationType = (this.decorationStyle === 'inline') 
             ? this.inlineDecorationType 
             : this.suffixDecorationType;
+    }
+
+    /**
+     * 根据样式配置更新装饰器类型
+     */
+    updateDecoratorTypes() {
+        // 释放旧装饰器
+        if (this.suffixDecorationType) {
+            this.suffixDecorationType.dispose();
+        }
+        if (this.inlineDecorationType) {
+            this.inlineDecorationType.dispose();
+        }
+        
+        // 处理字体大小 - 确保有单位
+        let suffixFontSize = this.suffixStyle.fontSize;
+        if (typeof suffixFontSize === 'number' || !suffixFontSize.includes('px')) {
+            suffixFontSize = `${suffixFontSize}px`;
+        }
+        
+        let inlineFontSize = this.inlineStyle.fontSize;
+        if (typeof inlineFontSize === 'number' || !inlineFontSize.includes('px')) {
+            inlineFontSize = `${inlineFontSize}px`;
+        }
+        
+        // 后缀模式的装饰器
+        this.suffixDecorationType = vscode.window.createTextEditorDecorationType({
+            after: {
+                margin: this.suffixStyle.margin || '0 0 0 3px',
+                color: this.suffixStyle.color,
+                fontStyle: this.suffixStyle.fontStyle || 'italic',
+                fontSize: suffixFontSize,
+                fontWeight: String(this.suffixStyle.fontWeight)
+            }
+        });
+        
+        // 内联模式的装饰器
+        this.inlineDecorationType = vscode.window.createTextEditorDecorationType({
+            before: {
+                contentText: '',
+                color: this.inlineStyle.color,
+                fontSize: inlineFontSize,
+                fontWeight: String(this.inlineStyle.fontWeight),
+                fontStyle: this.inlineStyle.fontStyle || 'normal',
+                margin: this.inlineStyle.margin || '0'
+            },
+            textDecoration: 'none; opacity: 0; display: none;', // 隐藏原始文本
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+        });
     }
 
     /**
@@ -222,13 +287,32 @@ class I18nDecorator {
                     const startPos = document.positionAt(match.index);
                     const endPos = document.positionAt(match.index + fullMatch.length);
                     
+                    // 处理字体大小和间距
+                    let suffixFontSize = this.suffixStyle.fontSize;
+                    if (typeof suffixFontSize === 'number' || !suffixFontSize.includes('px')) {
+                        suffixFontSize = `${suffixFontSize}px`;
+                    }
+                    
+                    let inlineFontSize = this.inlineStyle.fontSize;
+                    if (typeof inlineFontSize === 'number' || !inlineFontSize.includes('px')) {
+                        inlineFontSize = `${inlineFontSize}px`;
+                    }
+                    
+                    // 使用配置的margin值，而不是硬编码的值
+                    const suffixMargin = this.suffixStyle.margin || '0 0 0 3px';
+                    const inlineMargin = this.inlineStyle.margin || '0';
+                    
                     // 创建后缀样式的装饰
                     const suffixDecoration = {
                         range: new vscode.Range(startPos, endPos),
                         renderOptions: {
                             after: {
                                 contentText: `(${translatedText})`,
-                                margin: '0 0 0 3px'
+                                margin: suffixMargin, // 使用配置的间距
+                                color: this.suffixStyle.color,
+                                fontSize: suffixFontSize,
+                                fontWeight: String(this.suffixStyle.fontWeight),
+                                fontStyle: this.suffixStyle.fontStyle || 'italic'
                             }
                         }
                     };
@@ -256,7 +340,11 @@ class I18nDecorator {
                             renderOptions: {
                                 before: {
                                     contentText: translatedText,
-                                    margin: '0' // 确保没有额外边距
+                                    margin: inlineMargin, // 使用配置的间距
+                                    color: this.inlineStyle.color,
+                                    fontSize: inlineFontSize,
+                                    fontWeight: String(this.inlineStyle.fontWeight),
+                                    fontStyle: this.inlineStyle.fontStyle || 'normal'
                                 },
                                 textDecoration: 'none; display: none;' // 隐藏原始键名
                             },

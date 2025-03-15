@@ -163,12 +163,15 @@ class BatchReplacementPanel {
         case 'updateDecorationStyle':
           await this._updateDecorationStyle(data.style);
           break;
+        case 'updateDecorationStyles':
+          await this.updateDecorationStyles(data);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
     } catch (error) {
-      console.error(`处理面板消息 '${command}' 出错:`, error);
-      vscode.window.showErrorMessage(`执行操作失败: ${error.message}`);
+      console.error('处理面板消息时出错:', error);
+      vscode.window.showErrorMessage(`处理面板操作失败: ${error.message}`);
     }
   }
 
@@ -296,10 +299,22 @@ class BatchReplacementPanel {
       const scanPatterns = config.get('scanPatterns', []);
       const localesPaths = config.get('localesPaths', []);
       const decorationStyle = config.get('decorationStyle', 'suffix');
+      const suffixStyle = config.get('suffixStyle', {
+        color: '#6A9955',
+        fontSize: '1em',
+        fontWeight: 'normal'
+      });
+      const inlineStyle = config.get('inlineStyle', {
+        color: '#CE9178',
+        fontSize: '1em',
+        fontWeight: 'normal'
+      });
       
-      // 创建context对象
+      // 构建传递给面板的上下文
       const context = {
-        decorationStyle
+        decorationStyle,
+        suffixStyle,
+        inlineStyle
       };
       
       // 生成面板HTML
@@ -854,6 +869,30 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('更新装饰风格设置时出错:', error);
       vscode.window.showErrorMessage(`更新装饰风格出错: ${error.message}`);
+    }
+  }
+
+  /**
+   * 更新装饰样式设置
+   */
+  async updateDecorationStyles(data) {
+    try {
+      const { decorationStyle, suffixStyle, inlineStyle } = data;
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      
+      // 更新所有样式配置
+      await config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Global);
+      await config.update('suffixStyle', suffixStyle, vscode.ConfigurationTarget.Global);
+      await config.update('inlineStyle', inlineStyle, vscode.ConfigurationTarget.Global);
+      
+      // 应用新的样式
+      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+      
+      // 提示用户
+      vscode.window.showInformationMessage('已更新装饰样式设置');
+    } catch (error) {
+      console.error('更新装饰样式设置时出错:', error);
+      vscode.window.showErrorMessage(`更新样式设置失败: ${error.message}`);
     }
   }
 }
