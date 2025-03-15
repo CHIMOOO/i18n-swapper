@@ -104,8 +104,8 @@ class ApiTranslationPanel {
             // 使用VSCode API更新配置（首选方法）
 
             const config = vscode.workspace.getConfiguration('i18n-swapper');
-
             
+
 
             // 先更新到内存配置
 
@@ -118,14 +118,14 @@ class ApiTranslationPanel {
             await config.update('tencentTranslation.sourceLanguage', this.state.sourceLanguage, vscode.ConfigurationTarget.Workspace);
 
             await config.update('tencentTranslation.languageMappings', this.state.languageMappings, vscode.ConfigurationTarget.Workspace);
-
             
+
 
             // 提示用户
 
             vscode.window.showInformationMessage('翻译API配置已保存到工作区');
-
             
+
 
             return true;
 
@@ -621,7 +621,14 @@ class ApiTranslationPanel {
                 transition: opacity 0.3s, transform 0.3s;
                 z-index: 1000;
             }
-            
+            .card-icon2{
+                width: 8px;
+                height: 18px;
+                background: #6366f1;
+                margin: auto 4px auto 0;
+                border-radius: 4px;
+
+            }
             .toast.error {
                 background-color: var(--error-color);
             }
@@ -687,16 +694,29 @@ class ApiTranslationPanel {
                     <h2 class="card-title">语言映射设置</h2>
                 </div>
                 <div class="card-body">
+                <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
+                        指定每种语言对应的文件路径，用于翻译时，实现一键翻译写入多个语言库数据。
+                    </p>
+                 <h3 style="margin-top: 32px; font-size: 16px;display: flex;"><div class="card-icon2"></div>手动创建多语言配置</h3>
                     <div class="form-group">
                         <label for="sourceLanguage" style="width: 150px;">您的源语言</label>
                         <select id="sourceLanguage">
                             ${languageOptions}
                         </select>
                     </div>
+                     <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
+                        源语言将提供给翻译服务，使用源语言翻译成其他语言。
+                    </p>
                     
                     <h3 style="margin-top: 24px; font-size: 16px;">语言映射</h3>
                     <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
-                        配置每种语言对应的国际化文件路径。文件路径应相对于工作区根目录。
+                        配置每种语言对应的国际化文件路径，文件路径应相对于工作区根目录。
+                    </p>
+                    <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
+                        翻译后会为以下配置好的语言映射，自动写入对应的翻译词条。
+                    </p>
+                    <p style="font-size: 14px; color: #ff0000; margin-top: 8px;">
+                       <span style="color: #ff0000;">！</span> 请注意，如果你的中文是zh-CN.json,那么请在下方中文映射路径输入对应的zh-CN.json路径
                     </p>
                     
                     <div id="mappings-container" class="mapping-container">
@@ -705,9 +725,11 @@ class ApiTranslationPanel {
                     
                     <div class="button-group">
                         <button id="add-mapping" class="secondary">添加语言映射</button>
+                        <button id="save-language-mappings">保存语言映射设置</button>
                     </div>
-                    
-                    <h3 style="margin-top: 32px; font-size: 16px;">快速创建多语言文件</h3>
+                  
+                    <h3 style="margin-top: 32px; font-size: 24px;">或者</h3>
+                    <h3 style="margin-top: 32px; font-size: 16px;display: flex;"><div class="card-icon2"></div>快速创建多语言配置</h3>
                     <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
                         选择源语言和目标语言，一键创建多语言文件和映射配置。
                     </p>
@@ -1018,6 +1040,30 @@ class ApiTranslationPanel {
                             break;
                     }
                 });
+                
+                // 绑定保存语言映射按钮事件
+                document.getElementById('save-language-mappings').addEventListener('click', function() {
+                    // 获取当前的源语言
+                    const sourceLanguage = document.getElementById('sourceLanguage').value;
+                    
+                    // 获取语言映射
+                    const mappingsContainer = document.getElementById('mappings-container');
+                    const mappingItems = mappingsContainer.querySelectorAll('.mapping-item');
+                    
+                    const languageMappings = Array.from(mappingItems).map(item => {
+                        return {
+                            languageCode: item.querySelector('.language-code').value,
+                            filePath: item.querySelector('.file-path').value
+                        };
+                    }).filter(mapping => mapping.languageCode && mapping.filePath);
+                    
+                    // 发送到扩展
+                    vscode.postMessage({
+                        command: 'saveLanguageMappings',
+                        sourceLanguage: sourceLanguage,
+                        languageMappings: languageMappings
+                    });
+                });
             })();
         </script>
     </body>
@@ -1230,6 +1276,20 @@ class ApiTranslationPanel {
                         message.targetLanguages,
 
                         message.folder
+
+                    );
+
+                    break;
+
+
+
+                case 'saveLanguageMappings':
+
+                    await this.saveLanguageMappings(
+
+                        message.sourceLanguage,
+
+                        message.languageMappings
 
                     );
 
@@ -2950,6 +3010,57 @@ class ApiTranslationPanel {
             console.error('解析文件路径出错:', error);
 
             return null;
+
+        }
+
+    }
+
+
+
+    /**
+
+     * 保存语言映射
+
+     */
+
+    async saveLanguageMappings(sourceLanguage, languageMappings) {
+
+        try {
+
+            // 更新状态
+
+            this.state.sourceLanguage = sourceLanguage;
+
+            this.state.languageMappings = JSON.parse(JSON.stringify(languageMappings));
+
+
+
+            // 保存配置
+
+            await this.saveConfiguration();
+
+
+
+            // 显示成功消息
+
+            this.panel.webview.postMessage({
+
+                command: 'showMessage',
+
+                text: '语言映射设置已保存',
+
+                type: 'success'
+
+            });
+            
+
+            vscode.window.showInformationMessage('语言映射设置已保存');
+
+        } catch (error) {
+
+            console.error('保存语言映射设置时出错:', error);
+
+            vscode.window.showErrorMessage(`保存语言映射设置失败: ${error.message}`);
 
         }
 

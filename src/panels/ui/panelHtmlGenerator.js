@@ -317,7 +317,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                   </td>
                   <td>
                     <input type="text" class="i18n-key-input" data-index="${index}" 
-                      value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键">
+                      value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
                     <button class="translate-btn" data-index="${index}" title="翻译并保存到所有语言文件">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
                       翻译
