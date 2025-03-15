@@ -304,7 +304,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
           
           <!-- 国际化文件配置 -->
           <div class="config-row">
-            <h4>2、扫描已配置的国际化文本列表（根据文件内已有的值进行扫描）</h4>
+            <h4>2、配置源文件的国际化字库列表（将根据文件内已有的值进行扫描）</h4>
             <ul class="locale-paths-list">
               ${localesPaths.map(path => `
                 <li class="locale-path-item">

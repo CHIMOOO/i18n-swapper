@@ -1,5 +1,7 @@
 const vscode = require('vscode');
 const commands = require('./src/commands');
+const I18nDecorator = require('./src/decorators/i18nDecorator');
+const registerRefreshI18nDecorations = require('./src/commands/refreshI18nDecorations');
 
 /**
  * 激活扩展
@@ -29,7 +31,14 @@ function activate(context) {
     vscode.commands.registerCommand(
       'i18n-swapper.openApiTranslationConfig', 
       () => commands.openApiTranslationConfig(context)
-    )
+    ),
+    vscode.commands.registerCommand('i18n-swapper.refreshI18nDecorations', () => {
+      if (i18nDecorator) {
+        i18nDecorator.loadLocaleData();
+        i18nDecorator.updateDecorations();
+        vscode.window.showInformationMessage('已刷新i18n装饰');
+      }
+    })
   );
 
   // 检查并设置默认配置
@@ -47,6 +56,20 @@ function activate(context) {
       "text"
     ], vscode.ConfigurationTarget.Workspace);
   }
+
+  // 初始化i18n装饰器
+  const i18nDecorator = new I18nDecorator(context);
+  i18nDecorator.initialize();
+  
+  // 注册刷新i18n装饰命令
+  registerRefreshI18nDecorations(context, i18nDecorator);
+  
+  // 注册销毁函数
+  context.subscriptions.push({
+    dispose: () => {
+      i18nDecorator.dispose();
+    }
+  });
 }
 
 function deactivate() {}

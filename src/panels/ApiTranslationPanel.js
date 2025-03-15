@@ -676,7 +676,7 @@ class ApiTranslationPanel {
                 </div>
                 <div class="card-body">
                     <div class="form-group">
-                        <label for="sourceLanguage">您的源语言</label>
+                        <label for="sourceLanguage" style="width: 150px;">您的源语言</label>
                         <select id="sourceLanguage">
                             ${languageOptions}
                         </select>

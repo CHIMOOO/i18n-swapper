@@ -82,7 +82,7 @@ async function checkAndSelectLocaleFile() {
   if (!localesPaths || localesPaths.length === 0 || (localesPaths.length === 1 && !localesPaths[0])) {
     // 提示用户选择国际化文件
     const result = await vscode.window.showInformationMessage(
-      '未配置国际化文件词库路径，是否立即选择词库？（*.json 或 *.js）',
+      '未配置源语言文件国际化词库路径（将用于国际化函数预览、源语言的文本快捷替换国际化函数方法，默认可以选中文翻译库）（*.json 或 *.js）',
       { modal: true },
       '选择文件'
     );
