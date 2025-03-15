@@ -183,7 +183,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
           padding: 10px;
           background-color: var(--vscode-editor-background);
           border: 1px solid var(--vscode-panel-border);
-          margin-top: 20px;
           border-radius: 3px;
           display: flex;
           align-items: center;
@@ -283,12 +282,12 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
         
         <!-- 配置面板（位于底部） -->
         <div class="${configSectionClass}" id="config-section-header">
-          <h3>🔧 配置设置（点击展开）</h3>
+          <h3>🔧 扫描配置设置（点击展开/关闭）</h3>
         </div>
         <div class="collapsible-section-content" id="config-section-content" style="${configContentStyle}">
           <!-- 扫描模式配置 -->
           <div class="config-row">
-            <h4>扫描属性配置</h4>
+            <h4>1、扫描属性配置</h4>
             <ul class="pattern-list">
               ${scanPatterns.map(pattern => `
                 <li class="pattern-item">
@@ -305,7 +304,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
           
           <!-- 国际化文件配置 -->
           <div class="config-row">
-            <h4>国际化文件配置</h4>
+            <h4>2、扫描已配置的国际化文本列表（根据文件内已有的值进行扫描）</h4>
             <ul class="locale-paths-list">
               ${localesPaths.map(path => `
                 <li class="locale-path-item">
@@ -314,7 +313,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context, isConfi
                 </li>
               `).join('')}
             </ul>
-            <button id="select-locale-file">选择文件</button>
+            <button id="select-locale-file">添加文件</button>
           </div>
         </div>
       </div>
