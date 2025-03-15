@@ -166,6 +166,9 @@ class BatchReplacementPanel {
         case 'updateDecorationStyles':
           await this.updateDecorationStyles(data);
           break;
+        case 'updateShowPreviewInEdit':
+          await this._updateShowPreviewInEdit(data.showPreview);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -310,11 +313,15 @@ class BatchReplacementPanel {
         fontWeight: 'normal'
       });
       
+      // 获取编辑模式预览配置
+      const showFullFormInEditMode = config.get('showFullFormInEditMode', true);
+      
       // 构建传递给面板的上下文
       const context = {
         decorationStyle,
         suffixStyle,
-        inlineStyle
+        inlineStyle,
+        showFullFormInEditMode
       };
       
       // 生成面板HTML
@@ -893,6 +900,28 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('更新装饰样式设置时出错:', error);
       vscode.window.showErrorMessage(`更新样式设置失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 更新内联模式编辑时显示译文预览设置
+   */
+  async _updateShowPreviewInEdit(showPreview) {
+    try {
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      await config.update('showFullFormInEditMode', showPreview, vscode.ConfigurationTarget.Global);
+      
+      // 刷新装饰
+      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+      
+      vscode.window.showInformationMessage(
+        showPreview 
+          ? '已启用内联模式编辑时显示译文预览' 
+          : '已禁用内联模式编辑时显示译文预览'
+      );
+    } catch (error) {
+      console.error('更新译文预览设置时出错:', error);
+      throw error;
     }
   }
 }

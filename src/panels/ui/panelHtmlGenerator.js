@@ -255,6 +255,24 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
            #suffix-style-config   .help-text,#inline-style-config .help-text    {
            width:80px;
            }
+        #inline-edit-options {
+          margin-top: 10px;
+          margin-bottom: 15px;
+          padding: 10px 0;
+          border-radius: 4px;
+        }
+        #inline-edit-options .config-item {
+          display: flex;
+          align-items: center;
+        }
+        #inline-edit-options label {
+          margin-left: 8px;
+          margin-right: 10px;
+        }
+        #inline-edit-options .help-text {
+          font-size: 12px;
+          color: #666;
+        }
       </style>
     </head>
     <body>
@@ -367,6 +385,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 <option value="inline" ${decorationStyle === 'inline' ? 'selected' : ''}>t(译文)</option>
               </select>
               <span class="help-text">选择i18n函数调用的显示风格</span>
+            </div>
+          </div>
+          
+          <div id="inline-edit-options" class="config-row" style="${decorationStyle === 'inline' ? '' : 'display: none;'}">
+
+            <div class="config-item">
+              <input type="checkbox" id="show-preview-in-edit" ${context.showFullFormInEditMode ? 'checked' : ''}>
+              <label for="show-preview-in-edit">编辑时显示译文预览</label>
             </div>
           </div>
           
@@ -631,15 +657,17 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         }
         
-        // 装饰风格切换时显示对应的样式配置
+        // 装饰风格切换时显示/隐藏内联模式编辑选项
         document.getElementById('decoration-style').addEventListener('change', function() {
           const style = this.value;
           if (style === 'suffix') {
             document.getElementById('suffix-style-config').style.display = 'flex';
             document.getElementById('inline-style-config').style.display = 'none';
+            document.getElementById('inline-edit-options').style.display = 'none'; // 隐藏内联编辑选项
           } else {
             document.getElementById('suffix-style-config').style.display = 'none';
             document.getElementById('inline-style-config').style.display = 'flex';
+            document.getElementById('inline-edit-options').style.display = 'block'; // 显示内联编辑选项
           }
           
           // 发送风格切换消息
@@ -695,6 +723,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               suffixStyle,
               inlineStyle
             }
+          });
+        });
+        
+        // 添加显示译文预览选项的变更处理（自动保存）
+        document.getElementById('show-preview-in-edit').addEventListener('change', function() {
+          vscode.postMessage({
+            command: 'updateShowPreviewInEdit',
+            data: { showPreview: this.checked }
           });
         });
         
