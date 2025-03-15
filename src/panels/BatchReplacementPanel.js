@@ -239,8 +239,16 @@ class BatchReplacementPanel {
 
         // 获取配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
-        const scanPatterns = config.get('scanPatterns', []);
+        const scanPatterns = config.get('scanPatterns', [
+          "中文内容",
+          "Chinese content",
+          "错误提示",
+          "标题",
+          "按钮"
+        ]);
         let localesPaths = config.get('localesPaths', []);
+        const functionName = config.get('functionName', 't');
+        const quoteType = config.get('quoteType', 'single');
 
         // 尝试检查并选择国际化文件
         if (!localesPaths || localesPaths.length === 0) {
@@ -885,12 +893,12 @@ class BatchReplacementPanel {
   async updateDecorationStyles(data) {
     try {
       const { decorationStyle, suffixStyle, inlineStyle } = data;
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
       
-      // 更新所有样式配置
-      await config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Global);
-      await config.update('suffixStyle', suffixStyle, vscode.ConfigurationTarget.Global);
-      await config.update('inlineStyle', inlineStyle, vscode.ConfigurationTarget.Global);
+      // 使用VSCode API更新配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      await config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Workspace);
+      await config.update('suffixStyle', suffixStyle, vscode.ConfigurationTarget.Workspace);
+      await config.update('inlineStyle', inlineStyle, vscode.ConfigurationTarget.Workspace);
       
       // 应用新的样式
       await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
@@ -908,20 +916,21 @@ class BatchReplacementPanel {
    */
   async _updateShowPreviewInEdit(showPreview) {
     try {
+      // 使用VSCode API更新配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      await config.update('showFullFormInEditMode', showPreview, vscode.ConfigurationTarget.Global);
+      await config.update('showFullFormInEditMode', showPreview, vscode.ConfigurationTarget.Workspace);
       
       // 刷新装饰
       await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
       
       vscode.window.showInformationMessage(
         showPreview 
-          ? '已启用内联模式编辑时显示译文预览' 
-          : '已禁用内联模式编辑时显示译文预览'
+        ? '已启用内联模式编辑时显示译文预览' 
+        : '已禁用内联模式编辑时显示译文预览'
       );
     } catch (error) {
       console.error('更新译文预览设置时出错:', error);
-      throw error;
+      vscode.window.showErrorMessage(`更新译文预览设置失败: ${error.message}`);
     }
   }
 }

@@ -89,43 +89,55 @@ class ApiTranslationPanel {
 
     async saveConfiguration() {
 
-        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        try {
+
+            // 检查是否有工作区
+
+            if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0) {
+
+                throw new Error('未找到工作区，无法保存配置到工作区设置');
+
+            }
 
 
 
-        // 使用await确保每个配置项都完成更新
+            // 使用VSCode API更新配置（首选方法）
 
-        await config.update('tencentTranslation.apiKey', this.state.apiKey, vscode.ConfigurationTarget.Global);
+            const config = vscode.workspace.getConfiguration('i18n-swapper');
 
-        await config.update('tencentTranslation.apiSecret', this.state.apiSecret, vscode.ConfigurationTarget.Global);
+            
 
-        await config.update('tencentTranslation.region', this.state.region, vscode.ConfigurationTarget.Global);
+            // 先更新到内存配置
 
-        await config.update('tencentTranslation.sourceLanguage', this.state.sourceLanguage, vscode.ConfigurationTarget.Workspace);
+            await config.update('tencentTranslation.apiKey', this.state.apiKey, vscode.ConfigurationTarget.Workspace);
 
+            await config.update('tencentTranslation.apiSecret', this.state.apiSecret, vscode.ConfigurationTarget.Workspace);
 
+            await config.update('tencentTranslation.region', this.state.region, vscode.ConfigurationTarget.Workspace);
 
-        // 确保深度复制数组以避免引用问题
+            await config.update('tencentTranslation.sourceLanguage', this.state.sourceLanguage, vscode.ConfigurationTarget.Workspace);
 
-        const mappingsCopy = JSON.parse(JSON.stringify(this.state.languageMappings));
+            await config.update('tencentTranslation.languageMappings', this.state.languageMappings, vscode.ConfigurationTarget.Workspace);
 
+            
 
+            // 提示用户
 
-        // 过滤掉空的映射
+            vscode.window.showInformationMessage('翻译API配置已保存到工作区');
 
-        const filteredMappings = mappingsCopy.filter(mapping =>
+            
 
-            mapping.languageCode && mapping.languageCode.trim() &&
+            return true;
 
-            mapping.filePath && mapping.filePath.trim()
+        } catch (error) {
 
-        );
+            console.error('保存配置时出错:', error);
 
+            vscode.window.showErrorMessage(`保存配置失败: ${error.message}`);
 
+            return false;
 
-        // 保存有效的映射
-
-        await config.update('tencentTranslation.languageMappings', filteredMappings, vscode.ConfigurationTarget.Workspace);
+        }
 
     }
 
@@ -650,7 +662,7 @@ class ApiTranslationPanel {
                     </div>
                     <div class="form-group">
                         <label for="apiSecret">API Secret (SecretKey)</label>
-                        <input type="password" id="apiSecret" value="${this.escapeHtml(apiSecret)}" placeholder="请输入 SecretKey">
+                        <input type="text" id="apiSecret" value="${this.escapeHtml(apiSecret)}" placeholder="请输入 SecretKey">
                     </div>
                     <div class="form-group">
                         <label for="apiRegion">API 地区</label>

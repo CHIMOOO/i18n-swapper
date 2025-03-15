@@ -46,6 +46,8 @@ class I18nDecorator {
         this.defaultLocale = 'zh-CN'; // 默认语言
         this.decorationStyle = 'suffix'; // 默认装饰样式
         this.showFullFormInEditMode = false;
+        this.functionName = 't';
+        this.quoteType = 'single';
 
         // 跟踪当前编辑状态
         this.isInEditMode = false;
@@ -86,18 +88,24 @@ class I18nDecorator {
         this.defaultLocale = config.get('defaultLocale', 'zh-CN');
         this.decorationStyle = config.get('decorationStyle', 'suffix');
         this.showFullFormInEditMode = config.get('showFullFormInEditMode', false);
+        this.functionName = config.get('functionName', 't');
+        this.quoteType = config.get('quoteType', 'single');
 
         // 加载样式配置
         this.suffixStyle = config.get('suffixStyle', {
             color: '#6A9955',
             fontSize: '1em',
-            fontWeight: 'normal'
+            fontWeight: 'normal',
+            fontStyle: 'italic',
+            margin: '0 0 0 3px'
         });
 
         this.inlineStyle = config.get('inlineStyle', {
             color: '#CE9178',
             fontSize: '1em',
-            fontWeight: 'normal'
+            fontWeight: 'normal',
+            fontStyle: 'normal',
+            margin: '0'
         });
 
         // 更新装饰器类型
