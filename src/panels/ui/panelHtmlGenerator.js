@@ -133,7 +133,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           color: var(--vscode-input-foreground);
           border: 1px solid var(--vscode-input-border);
           padding: 3px 5px;
-          width: 200px;
+          width: 120px;
         }
         .translate-btn {
           margin-left: 5px;
@@ -245,14 +245,17 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         
         /* 原有样式继续保留 */
         .config-section {
-          margin-top: 20px;
-          padding: 10px;
+          margin-top: 0;
+          padding: 6px 10px;
           border: 1px solid var(--vscode-panel-border);
-          border-radius: 3px;
+          background: #6366f1;
+          color: white;
+          border-radius: 8px;
+          cursor: pointer;
         }
         .config-section h3 {
           margin-top: 0;
-          margin-bottom: 10px;
+          margin-bottom: 0;
         }
         .config-row {
           margin-bottom: 15px;
@@ -404,22 +407,17 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         /* 项目类型标记 */
         .item-type-tag {
           display: inline-block;
-          padding: 2px 6px;
           border-radius: 3px;
           font-size: 12px;
           margin-right: 5px;
         }
         
         .item-type-pending {
-          background-color: #e6f7ff;
           color: #1890ff;
-          border: 1px solid #91d5ff;
         }
         
         .item-type-translated {
-          background-color: #f6ffed;
-          color: #52c41a;
-          border: 1px solid #b7eb8f;
+          color: #fff;
         }
 
         /* 已转义项的操作按钮样式 */
@@ -452,10 +450,8 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         }
 
         .translation-preview {
-          color: var(--vscode-descriptionForeground);
-          font-style: italic;
+          color: #e5b95c;
           margin-left: 4px;
-          font-size: 0.9em;
         }
 
         /* 添加文本来源和文件路径的样式 */
@@ -473,26 +469,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           word-break: break-all;
         }
 
-        /* 调整表格列宽 */
-        .replacements-list th:nth-child(1),
-        .replacements-list td:nth-child(1) {
-          width: 30px;
-        }
-
-        .replacements-list th:nth-child(2),
-        .replacements-list td:nth-child(2) {
-          width: 50px;
-        }
-
-        .replacements-list th:nth-child(3),
-        .replacements-list td:nth-child(3) {
-          width: 40%;
-        }
-
-        .replacements-list th:nth-child(4),
-        .replacements-list td:nth-child(4) {
-          width: 40%;
-        }
+       
 
         /* 改进文本单元格样式 */
         .text-cell {
@@ -546,9 +523,10 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               <tr>
                 <th class="checkbox-cell"></th>
                 <th>序号</th>
-                ${scanMode === 'all' ? '<th>类型</th>' : ''}
-                <th>文本</th>
+                ${scanMode === 'all' ? '<th>类型</th>' : (scanMode === 'pending'?'<th>文本</th>':'')}
+                ${scanMode === 'translated' ? '<th>源语言值</th>' :(scanMode === 'all' ? '<th>文本</th>':'')}
                 <th>国际化键</th>
+                <th>来源</th>
               </tr>
             </thead>
             <tbody>
@@ -568,26 +546,11 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                       </td>
                     ` : ''}
                     <td class="text-cell ${item.i18nKey ? 'has-key' : ''}" title="${escapeHtml(item.text)}">
-                      ${escapeHtml(item.text)}
-                      ${item.translationValue ? `<span class="translation-preview">(${escapeHtml(item.translationValue)})</span>` : ''}
-                      <div class="text-source">${escapeHtml(item.source || '')}</div>
+                      
+                      ${item.translationValue ? `<span class="translation-preview">${escapeHtml(item.translationValue)}</span>` : `${escapeHtml(item.text)}`}
                     </td>
                     <td>
-                      ${item.itemType === 'translated' ? 
-                        `<span class="i18n-key">${escapeHtml(item.i18nKey || '')}</span>
-                         <div class="i18n-key-actions">
-                           <button class="copy-key-btn" data-index="${index}" title="复制国际化键">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-                           </button>
-                           ${item.i18nFile ? 
-                             `<button class="open-file-btn" data-index="${index}" title="打开国际化文件">
-                               <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
-                             </button>` : 
-                             ''
-                           }
-                           ${item.i18nFile ? `<div class="file-path">${escapeHtml(item.i18nFile)}</div>` : ''}
-                         </div>` :
-                        `<input type="text" class="i18n-key-input" data-index="${index}" 
+                      ${ `<input type="text" class="i18n-key-input" data-index="${index}" 
                           value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
                         <button class="translate-btn" data-index="${index}" title="翻译并保存到所有语言文件">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
@@ -595,6 +558,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                         </button>`
                       }
                     </td>
+                    <td>${escapeHtml(item.source || '文本')}</td>
                   </tr>`;
                 
                 // 只有当项有i18nKey且languageMappings存在时才添加状态行
@@ -602,7 +566,8 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 if (item.i18nKey && languageMappings && languageMappings.length > 0) {
                   statusRow = `
                     <tr class="i18n-status-row" data-index="${index}">
-                      <td colspan="${scanMode === 'all' ? '5' : '4'}">
+                      <td colspan="${scanMode === 'all' ? '6' : '5'}">
+                      
                         <div class="i18n-status-container">
                           ${languageMappings.map(mapping => {
                             // 获取此语言的状态
@@ -647,7 +612,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 return dataRow + statusRow;
               }).join('') : `
                 <tr>
-                  <td colspan="${scanMode === 'all' ? '5' : '4'}" class="no-data">
+                  <td colspan="${scanMode === 'all' ? '6' : '5'}" class="no-data">
                     ${scanMode === 'pending' ? '未找到需要国际化的文本' : 
                       scanMode === 'translated' ? '未找到已国际化的文本' : 
                       '未找到任何文本'}
@@ -1222,46 +1187,83 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         });
 
-        // 复制国际化键按钮
-        document.querySelectorAll('.copy-key-btn').forEach(button => {
-          button.addEventListener('click', () => {
-            const index = parseInt(button.getAttribute('data-index'));
-            if (!isNaN(index)) {
+       
+
+        // 使用事件委托
+        document.addEventListener('click', (event) => {
+          // 刷新扫描按钮
+          if (event.target.id === 'refresh-scan' || event.target.closest('#refresh-scan')) {
+            vscode.postMessage({
+              command: 'refreshScan',
+              data: {}
+            });
+          }
+          
+          // 全选/取消全选按钮
+          if (event.target.id === 'select-all' || event.target.closest('#select-all')) {
+            vscode.postMessage({
+              command: 'toggleSelectAll',
+              data: {}
+            });
+          }
+          
+          // 翻译选中项按钮
+          if (event.target.id === 'translate-selected' || event.target.closest('#translate-selected')) {
+            vscode.postMessage({
+              command: 'translateSelected',
+              data: {}
+            });
+          }
+        });
+
+        // 在脚本的最后添加一个函数来绑定所有事件
+        function bindAllEvents() {
+          // 模式切换按钮
+          document.querySelectorAll('.mode-button').forEach(button => {
+            button.addEventListener('click', () => {
+              const mode = button.getAttribute('data-mode');
+              if (mode) {
+                vscode.postMessage({
+                  command: 'switchScanMode',
+                  data: { mode: mode }
+                });
+              }
+            });
+          });
+
+          // 刷新扫描按钮
+          const refreshScanBtn = document.getElementById('refresh-scan');
+          if (refreshScanBtn) {
+            refreshScanBtn.addEventListener('click', () => {
               vscode.postMessage({
-                command: 'copyI18nKey',
-                data: { index: index }
+                command: 'refreshScan',
+                data: {}
               });
-            }
-          });
-        });
+            });
+          }
 
-        // 打开国际化文件按钮
-        document.querySelectorAll('.open-file-btn').forEach(button => {
-          button.addEventListener('click', () => {
-            const index = parseInt(button.getAttribute('data-index'));
-            if (!isNaN(index)) {
+          // 全选/取消全选按钮
+          const selectAllBtn = document.getElementById('select-all');
+          if (selectAllBtn) {
+            selectAllBtn.addEventListener('click', () => {
               vscode.postMessage({
-                command: 'openI18nFile',
-                data: { index: index }
+                command: 'toggleSelectAll',
+                data: {}
               });
-            }
-          });
-        });
+            });
+          }
+        }
 
-        // 刷新扫描按钮
-        document.getElementById('refresh-scan').addEventListener('click', () => {
-          vscode.postMessage({
-            command: 'refreshScan',
-            data: {}
-          });
-        });
+        // 调用绑定函数
+        bindAllEvents();
 
-        // 全选/取消全选按钮
-        document.getElementById('select-all').addEventListener('click', () => {
-          vscode.postMessage({
-            command: 'toggleSelectAll',
-            data: {}
-          });
+        // 如果有消息处理，可以在收到消息后重新绑定
+        window.addEventListener('message', (event) => {
+          const message = event.data;
+          if (message.command === 'updateContent') {
+            // 等待 DOM 更新
+            setTimeout(bindAllEvents, 0);
+          }
         });
       </script>
     </body>

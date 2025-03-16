@@ -501,9 +501,17 @@ class BatchReplacementPanel {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) return;
       const rootPath = workspaceFolders[0].uri.fsPath;
-
+      console.log(this.existingI18nCalls);
+      let searchKeys = [];
+      if (this.scanMode === 'translated') {
+        searchKeys = this.existingI18nCalls
+      } else if (this.scanMode === 'pending') {
+        searchKeys = this.replacements
+      } else if (this.scanMode === 'all') {
+        searchKeys = this.replacements.concat(this.existingI18nCalls);
+      }
       // 为每个替换项加载翻译状态
-      for (const item of this.replacements) {
+      for (const item of searchKeys) {
         if (!item.i18nKey) continue;
         
         // 如果不存在翻译状态对象，则创建一个
@@ -575,6 +583,7 @@ class BatchReplacementPanel {
               exists,
               value: exists ? value : null
             };
+            console.log(value);
           } catch (error) {
             console.error(`加载键 ${item.i18nKey} 的 ${mapping.languageCode} 翻译状态时出错:`, error);
             item.i18nStatus[mapping.languageCode] = {
