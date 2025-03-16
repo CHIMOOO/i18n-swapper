@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
+const defaultsConfig = require('../config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 
 /**
  * i18n装饰管理器，负责为编辑器中的i18n函数调用添加翻译预览
@@ -84,29 +85,16 @@ class I18nDecorator {
      */
     loadConfig() {
         const config = vscode.workspace.getConfiguration('i18n-swapper');
-        this.localesPaths = config.get('localesPaths', []);
-        this.defaultLocale = config.get('defaultLocale', 'zh-CN');
-        this.decorationStyle = config.get('decorationStyle', 'suffix');
-        this.showFullFormInEditMode = config.get('showFullFormInEditMode', false);
-        this.functionName = config.get('functionName', 't');
-        this.quoteType = config.get('quoteType', 'single');
+        this.localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
+        this.defaultLocale = config.get('defaultLocale', defaultsConfig.defaultLocale);
+        this.decorationStyle = config.get('decorationStyle', defaultsConfig.decorationStyle);
+        this.showFullFormInEditMode = config.get('showFullFormInEditMode', defaultsConfig.showFullFormInEditMode);
+        this.functionName = config.get('functionName', defaultsConfig.functionName);
+        this.quoteType = config.get('quoteType', defaultsConfig.quoteType);
 
         // 加载样式配置
-        this.suffixStyle = config.get('suffixStyle', {
-            color: '#6A9955',
-            fontSize: '1em',
-            fontWeight: 'normal',
-            fontStyle: 'italic',
-            margin: '0 0 0 3px'
-        });
-
-        this.inlineStyle = config.get('inlineStyle', {
-            color: '#CE9178',
-            fontSize: '1em',
-            fontWeight: 'normal',
-            fontStyle: 'normal',
-            margin: '0'
-        });
+        this.suffixStyle = config.get('suffixStyle', defaultsConfig.suffixStyle);
+        this.inlineStyle = config.get('inlineStyle', defaultsConfig.inlineStyle);
 
         // 更新装饰器类型
         this.updateDecoratorTypes();
@@ -498,15 +486,14 @@ class I18nDecorator {
      */
     async checkAndSelectLocaleFile() {
         if (!this.localesPaths || this.localesPaths.length === 0) {
-            // 提示用户选择国际化文件
+            // 使用轻量级提示代替模态对话框，使用默认配置中的消息文本
             const result = await vscode.window.showInformationMessage(
-                '未配置源语言文件国际化词库路径（将用于国际化函数预览）（*.json 或 *.js）', {
-                    modal: true
-                },
-                '选择文件'
+                defaultsConfig.messages.noLocaleConfigured,
+                defaultsConfig.messages.selectFile,
+                defaultsConfig.messages.ignoreTemporarily
             );
 
-            if (result === '选择文件') {
+            if (result === defaultsConfig.messages.selectFile) {
                 // 打开文件选择器
                 const fileUris = await vscode.window.showOpenDialog({
                     canSelectMany: true,
@@ -520,7 +507,7 @@ class I18nDecorator {
                     // 转换为相对于工作区的路径
                     const workspaceFolders = vscode.workspace.workspaceFolders;
                     if (!workspaceFolders) {
-                        vscode.window.showErrorMessage('未找到工作区文件夹');
+                        vscode.window.showErrorMessage(defaultsConfig.messages.workspaceNotFound);
                         return false;
                     }
 
@@ -537,10 +524,14 @@ class I18nDecorator {
                     // 更新本地变量
                     this.localesPaths = relativePaths;
 
-                    vscode.window.showInformationMessage(`已添加 ${relativePaths.length} 个国际化文件`);
+                    vscode.window.showInformationMessage(defaultsConfig.messages.filesAdded(relativePaths.length));
                     return true;
                 }
+            } else if (result === defaultsConfig.messages.ignoreTemporarily) {
+                // 用户选择忽略，返回true允许操作继续进行
+                return true;
             }
+            // 用户取消或关闭通知，返回false
             return false;
         }
         return true;

@@ -8,6 +8,7 @@ const { analyzeDocument } = require('./services/documentAnalyzer');
 const { createOrSelectLanguageFiles, saveTranslationToFile } = require('./services/languageFileManager');
 const { performReplacements, generateReplacement } = require('./services/replacementService');
 const { generateKeyFromText, translateText, getLanguageName } = require('./services/translationService');
+const defaultsConfig = require('../config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 
 /**
  * 批量替换面板类
@@ -248,16 +249,10 @@ class BatchReplacementPanel {
 
         // 获取配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
-        const scanPatterns = config.get('scanPatterns', [
-          "中文内容",
-          "Chinese content",
-          "错误提示",
-          "标题",
-          "按钮"
-        ]);
-        let localesPaths = config.get('localesPaths', []);
-        const functionName = config.get('functionName', 't');
-        const quoteType = config.get('quoteType', 'single');
+        const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
+        let localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
+        const functionName = config.get('functionName', defaultsConfig.functionName);
+        const quoteType = config.get('quoteType', defaultsConfig.quoteType);
 
         // 尝试检查并选择国际化文件
         if (!localesPaths || localesPaths.length === 0) {
@@ -316,25 +311,17 @@ class BatchReplacementPanel {
     try {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const scanPatterns = config.get('scanPatterns', []);
-      const localesPaths = config.get('localesPaths', []);
-      const decorationStyle = config.get('decorationStyle', 'suffix');
-      const suffixStyle = config.get('suffixStyle', {
-        color: '#6A9955',
-        fontSize: '1em',
-        fontWeight: 'normal'
-      });
-      const inlineStyle = config.get('inlineStyle', {
-        color: '#CE9178',
-        fontSize: '1em',
-        fontWeight: 'normal'
-      });
+      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
+      const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
+      const decorationStyle = config.get('decorationStyle', defaultsConfig.decorationStyle);
+      const suffixStyle = config.get('suffixStyle', defaultsConfig.suffixStyle);
+      const inlineStyle = config.get('inlineStyle', defaultsConfig.inlineStyle);
       
       // 获取编辑模式预览配置
-      const showFullFormInEditMode = config.get('showFullFormInEditMode', true);
+      const showFullFormInEditMode = config.get('showFullFormInEditMode', defaultsConfig.showFullFormInEditMode);
       
       // 获取语言映射配置
-      const languageMappings = config.get('tencentTranslation.languageMappings', []);
+      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
       
       // 提前加载每个I18n键的翻译值信息
       if (languageMappings && languageMappings.length > 0) {
@@ -475,8 +462,8 @@ class BatchReplacementPanel {
     try {
       // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const scanPatterns = config.get('scanPatterns', []);
-      const localesPaths = config.get('localesPaths', []);
+      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
+      const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
       
       // 重新分析文档
       if (this.document) {
@@ -536,7 +523,7 @@ class BatchReplacementPanel {
     if (!pattern) return;
     
     const config = vscode.workspace.getConfiguration('i18n-swapper');
-    const scanPatterns = config.get('scanPatterns', []);
+    const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
     
     if (scanPatterns.includes(pattern)) {
       vscode.window.showInformationMessage(`模式 "${pattern}" 已存在`);
@@ -557,7 +544,7 @@ class BatchReplacementPanel {
     if (!pattern) return;
     
     const config = vscode.workspace.getConfiguration('i18n-swapper');
-    let scanPatterns = config.get('scanPatterns', []);
+    let scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
     
     scanPatterns = scanPatterns.filter(p => p !== pattern);
     await config.update('scanPatterns', scanPatterns, vscode.ConfigurationTarget.Workspace);
@@ -755,7 +742,7 @@ class BatchReplacementPanel {
       console.log(`[翻译] 使用键名: ${suggestedKey}, 源语言: ${sourceLanguage}`);
 
       // 获取语言映射
-      const languageMappings = config.get('tencentTranslation.languageMappings', []);
+      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
       console.log(`[翻译] 语言映射配置: ${JSON.stringify(languageMappings)}`);
 
       // 无法继续翻译
@@ -854,7 +841,7 @@ class BatchReplacementPanel {
     try {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const scanPatterns = config.get('scanPatterns', []);
+      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
       
       // 防止重复添加
       if (scanPatterns.includes(pattern)) {
@@ -885,7 +872,7 @@ class BatchReplacementPanel {
     try {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      let scanPatterns = config.get('scanPatterns', []);
+      let scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
       
       // 移除指定模式
       scanPatterns = scanPatterns.filter(p => p !== pattern);
@@ -923,7 +910,7 @@ class BatchReplacementPanel {
       
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      let localesPaths = config.get('localesPaths', []);
+      let localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
       
       // 获取工作区路径作为基准，以便存储相对路径
       const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -964,7 +951,7 @@ class BatchReplacementPanel {
     try {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      let localesPaths = config.get('localesPaths', []);
+      let localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
       
       // 移除指定路径
       localesPaths = localesPaths.filter(p => p !== path);
@@ -987,7 +974,7 @@ class BatchReplacementPanel {
     try {
       // 更新配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      await config.update('decorationStyle', style, vscode.ConfigurationTarget.Global);
+      await config.update('decorationStyle', style, vscode.ConfigurationTarget.Workspace);
       
       // 通知用户
       const styleNames = {
@@ -1021,7 +1008,7 @@ class BatchReplacementPanel {
       await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
       
       // 提示用户
-      vscode.window.showInformationMessage('已更新装饰样式设置');
+      vscode.window.showInformationMessage('已更新装饰样式设置，手动返回代码页面激活生效。');
     } catch (error) {
       console.error('更新装饰样式设置时出错:', error);
       vscode.window.showErrorMessage(`更新样式设置失败: ${error.message}`);
@@ -1062,7 +1049,7 @@ class BatchReplacementPanel {
     try {
       // 获取语言映射配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const languageMappings = config.get('tencentTranslation.languageMappings', []);
+      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
       
       if (!languageMappings || languageMappings.length === 0) return;
       

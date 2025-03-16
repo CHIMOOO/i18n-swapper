@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const utils = require('../utils');
 const { LANGUAGE_NAMES } = require('../utils/language-mappings');
+const { generateLanguageHoverContent } = require('../utils/hover-content-generator');
 
 // 存储所有待确认的替换项
 let pendingReplacements = [];
@@ -146,6 +147,51 @@ async function quickBatchReplace() {
 }
 
 /**
+ * 加载所有配置的语言数据
+ * @returns {Object} 语言数据映射表
+ */
+function loadAllLanguageData() {
+    // 获取工作区根目录
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
+    
+    // 获取语言映射配置
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const languageMappings = config.get('tencentTranslation.languageMappings', []);
+    
+    // 加载所有语言文件
+    const allLanguageData = {};
+    
+    // 检查 languageMappings 是否为数组
+    if (Array.isArray(languageMappings)) {
+        // 遍历数组中的每个映射对象
+        languageMappings.forEach(mapping => {
+            // 确保映射对象有效且包含必要字段
+            if (mapping && typeof mapping === 'object' && 
+                mapping.languageCode && typeof mapping.languageCode === 'string' &&
+                mapping.filePath && typeof mapping.filePath === 'string') {
+                
+                try {
+                    const filePath = path.join(rootPath, mapping.filePath);
+                    const data = utils.loadLocaleFile(filePath);
+                    if (data) {
+                        allLanguageData[mapping.languageCode] = data;
+                    }
+                } catch (err) {
+                    console.error(`加载语言文件失败 ${mapping.languageCode}: ${mapping.filePath}`, err);
+                }
+            } else {
+                console.warn('语言映射配置项格式不正确:', mapping);
+            }
+        });
+    } else {
+        console.warn('语言映射配置不是数组格式:', languageMappings);
+    }
+    
+    return { allLanguageData, languageMappings };
+}
+
+/**
  * 显示确认装饰
  */
 function showConfirmationDecorations(editor, document, replacements, functionName, codeQuote) {
@@ -184,42 +230,8 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
         };
     });
 
-    // 获取工作区根目录
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
-    
-    // 获取语言映射配置
-    const config = vscode.workspace.getConfiguration('i18n-swapper');
-    const languageMappings = config.get('tencentTranslation.languageMappings', []);
-    
-    // 加载所有语言文件到缓存 - 处理数组结构
-    const allLanguageData = {};
-    
-    // 检查 languageMappings 是否为数组
-    if (Array.isArray(languageMappings)) {
-        // 遍历数组中的每个映射对象
-        languageMappings.forEach(mapping => {
-            // 确保映射对象有效且包含必要字段
-            if (mapping && typeof mapping === 'object' && 
-                mapping.languageCode && typeof mapping.languageCode === 'string' &&
-                mapping.filePath && typeof mapping.filePath === 'string') {
-                
-                try {
-                    const filePath = path.join(rootPath, mapping.filePath);
-                    const data = utils.loadLocaleFile(filePath);
-                    if (data) {
-                        allLanguageData[mapping.languageCode] = data;
-                    }
-                } catch (err) {
-                    console.error(`加载语言文件失败 ${mapping.languageCode}: ${mapping.filePath}`, err);
-                }
-            } else {
-                console.warn('语言映射配置项格式不正确:', mapping);
-            }
-        });
-    } else {
-        console.warn('语言映射配置不是数组格式:', languageMappings);
-    }
+    // 使用抽取的函数加载语言数据
+    const { allLanguageData, languageMappings } = loadAllLanguageData();
     
     // 创建装饰
     const decorations = pendingReplacements.map((item, index) => {
@@ -229,103 +241,18 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
         const lineText = document.lineAt(line).text;
         const indentation = lineText.match(/^\s*/)[0];
         
-        // 添加接受/取消按钮到替换建议
-        const buttonHtml = `<span style="display:inline-flex;">
-            <a href="command:i18n-swapper.confirmReplacement?${encodeURIComponent(JSON.stringify({ index }))}" 
-               style="text-decoration:none; margin-right:8px; background-color:rgba(55, 190, 60, 0.15); padding:0px 3px; border-radius:3px;">
-                ✓ 接受
-            </a>
-            <a href="command:i18n-swapper.cancelReplacement?${encodeURIComponent(JSON.stringify({ index }))}" 
-               style="text-decoration:none; background-color:rgba(190, 55, 60, 0.15); padding:0px 3px; border-radius:3px;">
-                ✗ 取消
-            </a>
-        </span>`;
+        // 使用生成器函数生成悬停内容
+        const hoverMessage = generateLanguageHoverContent({
+            allLanguageData,
+            languageMappings,
+            i18nKey: item.i18nKey,
+            index,
+            showActions: true,
+            useHideHoverCommand: false
+        });
         
         // 显示替换建议 - 确保格式清晰
         const contentText = `${item.replacement} ${item.text} `;
-        
-        // 生成多语言值显示
-        let languageValuesMarkdown = '';
-        
-        if (item.i18nKey) {
-            const keyPath = item.i18nKey.split('.');
-            
-            // 获取所有配置的语言，确保即使没有值也显示语言
-            Object.keys(allLanguageData).forEach(langCode => {
-                // 获取语言显示名称
-                const langName = `${LANGUAGE_NAMES[langCode]}[${langCode}]` || langCode;
-                
-                if (!allLanguageData[langCode]) {
-                    // 语言文件不存在
-                    languageValuesMarkdown += `- **${langName}**: *文件未找到*\n`;
-                    return;
-                }
-                
-                // 从语言数据中获取值
-                let value = allLanguageData[langCode];
-                let found = true;
-                
-                for (const key of keyPath) {
-                    if (value && typeof value === 'object' && key in value) {
-                        value = value[key];
-                    } else {
-                        found = false;
-                        break;
-                    }
-                }
-                
-                if (found && value !== undefined) {
-                    // 处理值是对象的情况
-                    if (typeof value === 'object') {
-                        value = JSON.stringify(value);
-                    }
-                    
-                    // 添加可点击的语言名称，跳转到对应文件
-                    const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                    if (mappingObj && mappingObj.filePath) {
-                        languageValuesMarkdown += 
-                            `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                            `${encodeURIComponent(JSON.stringify({ 
-                                filePath: mappingObj.filePath, 
-                                langCode: langCode,
-                                i18nKey: item.i18nKey 
-                            }))})**` +
-                            `: ${value}\n`;
-                    } else {
-                        languageValuesMarkdown += `- **${langName}**: ${value}\n`;
-                    }
-                } else {
-                    // 该语言中没有此键值，但仍添加可点击链接以便添加
-                    const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                    if (mappingObj && mappingObj.filePath) {
-                        languageValuesMarkdown += 
-                            `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                            `${encodeURIComponent(JSON.stringify({ 
-                                filePath: mappingObj.filePath, 
-                                langCode: langCode,
-                                i18nKey: item.i18nKey 
-                            }))})**` +
-                            `: \n`;
-                    } else {
-                        languageValuesMarkdown += `- **${langName}**: \n`;
-                    }
-                }
-            });
-        }
-        
-        // 如果没有配置任何语言
-        if (!languageValuesMarkdown) {
-            languageValuesMarkdown = '- *未配置其他语言*\n';
-        }
-        
-        // 创建悬停信息
-        const hoverMessage = new vscode.MarkdownString(
-            `**[✓ 接受此替换](command:i18n-swapper.confirmReplacement?${encodeURIComponent(JSON.stringify({ index }))})**\n` +
-            `**[✗ 取消此替换](command:i18n-swapper.cancelReplacement?${encodeURIComponent(JSON.stringify({ index }))})**\n` +
-            `### 其他语言值\n\n${languageValuesMarkdown}\n` 
-        );
-        hoverMessage.isTrusted = true;
-        hoverMessage.supportHtml = true;
         
         // 根据文本的位置创建范围 - 确保装饰显示在文本之后
         const decorationRange = new vscode.Range(
@@ -513,38 +440,8 @@ function registerCustomHoverProvider(document, replacementCount) {
         global.i18nSwapperHoverProvider.dispose();
     }
     
-    // 获取工作区根目录
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
-    
-    // 获取语言映射配置
-    const config = vscode.workspace.getConfiguration('i18n-swapper');
-    const languageMappings = config.get('tencentTranslation.languageMappings', []);
-    
-    // 加载所有语言文件 - 处理数组结构
-    const allLanguageData = {};
-    
-    // 检查 languageMappings 是否为数组
-    if (Array.isArray(languageMappings)) {
-        // 遍历数组中的每个映射对象
-        languageMappings.forEach(mapping => {
-            // 确保映射对象有效且包含必要字段
-            if (mapping && typeof mapping === 'object' && 
-                mapping.languageCode && typeof mapping.languageCode === 'string' &&
-                mapping.filePath && typeof mapping.filePath === 'string') {
-                
-                try {
-                    const filePath = path.join(rootPath, mapping.filePath);
-                    const data = utils.loadLocaleFile(filePath);
-                    if (data) {
-                        allLanguageData[mapping.languageCode] = data;
-                    }
-                } catch (err) {
-                    console.error(`加载语言文件失败 ${mapping.languageCode}: ${mapping.filePath}`, err);
-                }
-            }
-        });
-    }
+    // 使用抽取的函数加载语言数据
+    const { allLanguageData, languageMappings } = loadAllLanguageData();
     
     global.i18nSwapperHoverProvider = vscode.languages.registerHoverProvider(
         { pattern: document.uri.fsPath }, 
@@ -571,83 +468,15 @@ function registerCustomHoverProvider(document, replacementCount) {
                         (position.line === item.range.end.line && 
                          position.character > item.range.end.character)) {
                         
-                        // 获取多语言键值
-                        let languageValuesMarkdown = '';
-                        
-                        if (item.i18nKey) {
-                            const keyPath = item.i18nKey.split('.');
-                            
-                            // 获取所有配置的语言，确保即使没有值也显示语言
-                            Object.keys(allLanguageData).forEach(langCode => {
-                                // 获取语言显示名称
-                                const langName = `${LANGUAGE_NAMES[langCode]}[${langCode}]` || langCode;
-                                
-                                if (!allLanguageData[langCode]) {
-                                    // 语言文件不存在
-                                    languageValuesMarkdown += `- **${langName}**: *文件未找到*\n`;
-                                    return;
-                                }
-                                
-                                // 从语言数据中获取值
-                                let value = allLanguageData[langCode];
-                                let found = true;
-                                
-                                for (const key of keyPath) {
-                                    if (value && typeof value === 'object' && key in value) {
-                                        value = value[key];
-                                    } else {
-                                        found = false;
-                                        break;
-                                    }
-                                }
-                                
-                                if (found && value !== undefined) {
-                                    // 添加可点击的语言名称，跳转到对应文件
-                                    const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                                    if (mappingObj && mappingObj.filePath) {
-                                        languageValuesMarkdown += 
-                                            `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                                            `${encodeURIComponent(JSON.stringify({ 
-                                                filePath: mappingObj.filePath, 
-                                                langCode: langCode,
-                                                i18nKey: item.i18nKey 
-                                            }))})**` +
-                                            `: ${value}\n`;
-                                    } else {
-                                        languageValuesMarkdown += `- **${langName}**: ${value}\n`;
-                                    }
-                                } else {
-                                    // 该语言中没有此键值，但仍添加可点击链接以便添加
-                                    const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                                    if (mappingObj && mappingObj.filePath) {
-                                        languageValuesMarkdown += 
-                                            `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                                            `${encodeURIComponent(JSON.stringify({ 
-                                                filePath: mappingObj.filePath, 
-                                                langCode: langCode,
-                                                i18nKey: item.i18nKey 
-                                            }))})**` +
-                                            `: \n`;
-                                    } else {
-                                        languageValuesMarkdown += `- **${langName}**: \n`;
-                                    }
-                                }
-                            });
-                        }
-                        
-                        // 如果没有配置任何语言
-                        if (!languageValuesMarkdown) {
-                            languageValuesMarkdown = '- *未配置其他语言*\n';
-                        }
-                        
-                        const hoverContent = new vscode.MarkdownString(
-                         
-                            `**[✓ 接受此替换](command:i18n-swapper.confirmReplacement?${encodeURIComponent(JSON.stringify({ index: i }))})**\n` +
-                            `**[✗ 取消此替换](command:i18n-swapper.cancelReplacement?${encodeURIComponent(JSON.stringify({ index: i }))})**\n` +
-                            `### 其他语言值\n\n${languageValuesMarkdown}\n` 
-                        );
-                        hoverContent.isTrusted = true;
-                        hoverContent.supportHtml = true;
+                        // 使用生成器函数生成悬停内容
+                        const hoverContent = generateLanguageHoverContent({
+                            allLanguageData,
+                            languageMappings,
+                            i18nKey: item.i18nKey,
+                            index: i,
+                            showActions: true,
+                            useHideHoverCommand: false
+                        });
                         
                         return new vscode.Hover(hoverContent, item.range);
                     }

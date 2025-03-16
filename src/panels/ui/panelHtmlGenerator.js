@@ -15,6 +15,7 @@ function escapeHtml(text) {
 
 // 导入LANGUAGE_NAMES
 const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
+const defaultsConfig = require('../../config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 
 /**
  * 生成面板HTML内容
@@ -26,14 +27,14 @@ const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
  * @param {Array} languageMappings 语言映射配置
  */
 function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = []) {
+  // 使用默认值
+  const decorationStyle = context.decorationStyle || defaultsConfig.decorationStyle;
+  const suffixStyle = context.suffixStyle || defaultsConfig.suffixStyle;
+  const inlineStyle = context.inlineStyle || defaultsConfig.inlineStyle;
+  
   // 根据展开状态设置类和样式
   const configSectionClass = isConfigExpanded ? 'collapsible-section active' : 'collapsible-section';
   const configContentStyle = isConfigExpanded ? 'display: block;' : 'display: none;';
-  
-  // 从传入的context中获取装饰风格设置和样式设置
-  const decorationStyle = context.decorationStyle || 'suffix';
-  const suffixStyle = context.suffixStyle || { color: '#6A9955', fontSize: '1em', fontWeight: 'normal' };
-  const inlineStyle = context.inlineStyle || { color: '#CE9178', fontSize: '1em', fontWeight: 'normal' };
   
   return `
     <!DOCTYPE html>

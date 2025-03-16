@@ -4,6 +4,7 @@ const I18nDecorator = require('./src/decorators/i18nDecorator');
 const registerRefreshI18nDecorations = require('./src/commands/refreshI18nDecorations');
 const fs = require('fs');
 const path = require('path');
+const defaultsConfig = require('./src/config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 
 /**
  * 激活扩展
@@ -76,36 +77,22 @@ async function ensureDefaultWorkspaceSettings() {
     let needsUpdate = false;
     let settings = {};
     
-    // 默认设置
+    // 使用统一的默认值配置
     const defaultSettings = {
-      'i18n-swapper.decorationStyle': 'suffix',
-      'i18n-swapper.defaultLocale': 'zh-CN',
-      'i18n-swapper.functionName': 't',
-      'i18n-swapper.inlineStyle': {
-        'color': '#CE9178',
-        'fontSize': '1em',
-        'fontWeight': 'normal',
-        'fontStyle': 'normal',
-        'margin': '0'
-      },
-      'i18n-swapper.localesPaths': [],
-      'i18n-swapper.quoteType': 'single',
-      'i18n-swapper.scanPatterns': [
-        'label', 'value', 'placeholder', 'title', 'message', 'text'
-      ],
-      'i18n-swapper.showFullFormInEditMode': false,
-      'i18n-swapper.suffixStyle': {
-        'color': '#6A9955',
-        'fontSize': '1em',
-        'fontWeight': 'normal',
-        'fontStyle': 'italic',
-        'margin': '0 0 0 3px'
-      },
-      'i18n-swapper.tencentTranslation.apiKey': '',
-      'i18n-swapper.tencentTranslation.apiSecret': '',
-      'i18n-swapper.tencentTranslation.region': 'ap-guangzhou',
-      'i18n-swapper.tencentTranslation.sourceLanguage': 'zh',
-      'i18n-swapper.tencentTranslation.languageMappings': []
+        'i18n-swapper.decorationStyle': defaultsConfig.decorationStyle,
+        'i18n-swapper.defaultLocale': defaultsConfig.defaultLocale,
+        'i18n-swapper.functionName': defaultsConfig.functionName,
+        'i18n-swapper.localesPaths': defaultsConfig.localesPaths,
+        'i18n-swapper.quoteType': defaultsConfig.quoteType,
+        'i18n-swapper.scanPatterns': defaultsConfig.scanPatterns,
+        'i18n-swapper.showFullFormInEditMode': defaultsConfig.showFullFormInEditMode,
+        'i18n-swapper.suffixStyle': defaultsConfig.suffixStyle,
+        'i18n-swapper.inlineStyle': defaultsConfig.inlineStyle,
+        'i18n-swapper.tencentTranslation.apiKey': defaultsConfig.tencentTranslation.apiKey,
+        'i18n-swapper.tencentTranslation.apiSecret': defaultsConfig.tencentTranslation.apiSecret,
+        'i18n-swapper.tencentTranslation.region': defaultsConfig.tencentTranslation.region,
+        'i18n-swapper.tencentTranslation.sourceLanguage': defaultsConfig.tencentTranslation.sourceLanguage,
+        'i18n-swapper.tencentTranslation.languageMappings': defaultsConfig.tencentTranslation.languageMappings
     };
     
     // 检查 .vscode 目录是否存在，如果不存在则创建
