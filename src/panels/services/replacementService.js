@@ -46,8 +46,23 @@ async function performReplacements(document, items) {
   
   try {
     const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document !== document) {
-      throw new Error('编辑器已更改，请重新打开批量替换面板');
+    
+    // 放宽检查条件，仅要求有活动编辑器
+    if (!editor) {
+      throw new Error('找不到活动的编辑器窗口');
+    }
+    
+    // 确保编辑器文档与期望的文档匹配
+    if (editor.document.uri.fsPath !== document.uri.fsPath) {
+      // 自动打开正确的文档
+      const doc = await vscode.workspace.openTextDocument(document.uri);
+      await vscode.window.showTextDocument(doc);
+      
+      // 重新获取编辑器引用
+      const newEditor = vscode.window.activeTextEditor;
+      if (!newEditor || newEditor.document.uri.fsPath !== document.uri.fsPath) {
+        throw new Error('无法切换到正确的文档，请手动打开文档后重试');
+      }
     }
     
     // 筛选有效的替换项

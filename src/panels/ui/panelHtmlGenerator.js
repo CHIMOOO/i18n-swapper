@@ -368,8 +368,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
       <div class="container">
         <div class="toolbar">
           <div class="tools-group">
-            <button id="replace-selected">替换选中项</button>
-            <button id="replace-all">替换所有项</button>
+            <button id="replace-selected" class="action-button replace-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3Z"/></svg>
+              替换选中项
+            </button>
+            <button id="replace-all" class="action-button replace-all-btn">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5H2v7"/><path d="m6 9 11 11"/><path d="m15 5 5 5"/><path d="M22 2 2 22"/></svg>
+              替换所有项
+            </button>
             <button id="refresh-panel">刷新</button>
             <button id="create-language-files">创建语言文件</button>
             <button id="open-api-translation">API翻译配置</button>
@@ -714,15 +720,15 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           };
         }
         
-        // 替换选中按钮
-        document.getElementById('replace-selected').addEventListener('click', function() {
+        // 替换选中按钮点击事件
+        document.getElementById('replace-selected').addEventListener('click', () => {
           vscode.postMessage({
             command: 'replaceSelected'
           });
         });
         
-        // 替换所有按钮
-        document.getElementById('replace-all').addEventListener('click', function() {
+        // 替换所有按钮点击事件
+        document.getElementById('replace-all').addEventListener('click', () => {
           vscode.postMessage({
             command: 'replaceAll'
           });

@@ -16,61 +16,110 @@ let globalActionDecoration = null;
 
 /**
  * 快速批量替换
+ * @param {vscode.ExtensionContext} context 扩展上下文
+ * @param {vscode.TextDocument|string} [targetDocument] 可选的目标文档或特殊标志
  */
-async function quickBatchReplace() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor) {
-        vscode.window.showInformationMessage('没有打开的编辑器');
+async function quickBatchReplace(context, targetDocument) {
+    // 检查是否使用全局变量中的信息
+    const useGlobal = targetDocument === 'USE_GLOBAL' && 
+                      global.i18nSwapperPendingReplacements && 
+                      global.i18nSwapperSourceDocument;
+    
+    let editor = vscode.window.activeTextEditor;
+    let document;
+    
+    if (useGlobal) {
+        // 使用全局变量中的文档信息
+        try {
+            const sourceUri = global.i18nSwapperSourceDocument.uri;
+            
+            // 检查当前编辑器是否已经是目标文档
+            if (editor && editor.document.uri.toString() === sourceUri.toString()) {
+                document = editor.document;
+            } else {
+                // 尝试查找已打开的编辑器
+                for (const visibleEditor of vscode.window.visibleTextEditors) {
+                    if (visibleEditor.document.uri.toString() === sourceUri.toString()) {
+                        editor = visibleEditor;
+                        document = editor.document;
+                        // 激活这个编辑器，但不创建新窗口
+                        await vscode.window.showTextDocument(document, {
+                            viewColumn: editor.viewColumn,
+                            preserveFocus: false
+                        });
+                        break;
+                    }
+                }
+                
+                // 如果还没找到，尝试打开文档
+                if (!document) {
+                    document = await vscode.workspace.openTextDocument(sourceUri);
+                    editor = await vscode.window.showTextDocument(document, {
+                        preserveFocus: false
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('打开源文档失败:', error);
+            vscode.window.showErrorMessage('无法打开源文档: ' + error.message);
+            return;
+        }
+    } else {
+        // 原始逻辑
+        if (!targetDocument || typeof targetDocument === 'string') {
+            if (editor) {
+                document = editor.document;
+            }
+        } else {
+            document = targetDocument;
+            if (!editor || editor.document !== document) {
+                try {
+                    editor = await vscode.window.showTextDocument(document, { 
+                        preserveFocus: false
+                    });
+                } catch (error) {
+                    console.error('打开目标文档失败:', error);
+                }
+            }
+        }
+    }
+    
+    if (!editor || !document) {
+        vscode.window.showInformationMessage('没有可操作的编辑器或文档');
         return;
     }
 
-    // 清除之前的装饰
-    clearDecorations();
-
-    // 获取配置
-    const config = vscode.workspace.getConfiguration('i18n-swapper');
-    let scanPatterns = config.get('scanPatterns', []);
-
-    // 使用默认扫描模式并给用户提示
-    if (!scanPatterns || scanPatterns.length === 0) {
-        scanPatterns = [
-            "value",
-            "label",
-            "placeholder",
-            "message",
-            "title",
-            "text"
-        ];
-
-        // 使用默认配置
-        vscode.window.showInformationMessage(
-            '已使用默认扫描配置，您可以右键点击文件并选择"打开面板-批量替换国际化"进行自定义配置',
-            '查看配置'
-        ).then(selection => {
-            if (selection === '查看配置') {
-                vscode.commands.executeCommand('workbench.action.openSettings', 'i18n-swapper.scanPatterns');
-            }
-        });
-    }
-
-    // 检查并选择国际化文件
-    const localesPaths = await utils.checkAndSelectLocaleFile();
-    if (localesPaths.length === 0) {
-        return; // 用户取消了操作或没有选择文件
-    }
-
-    const configQuoteType = config.get('quoteType', 'single');
-    const functionName = config.get('functionName', 't');
-    const codeQuote = configQuoteType === 'single' ? "'" : '"';
-
     try {
+        // 清除之前的装饰
+        clearDecorations();
+        
+        // 获取配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        let scanPatterns = config.get('scanPatterns', []);
+        
+        // 使用默认扫描模式
+        if (!scanPatterns || scanPatterns.length === 0) {
+            scanPatterns = [
+                "value", "label", "placeholder", "message", "title", "text"
+            ];
+        }
+        
+        // 检查并选择国际化文件
+        const localesPaths = await utils.checkAndSelectLocaleFile();
+        if (localesPaths.length === 0) {
+            return; // 用户取消了操作或没有选择文件
+        }
+        
+        const configQuoteType = config.get('quoteType', 'single');
+        const functionName = config.get('functionName', 't');
+        const codeQuote = configQuoteType === 'single' ? "'" : '"';
+
         vscode.window.withProgress({
             location: vscode.ProgressLocation.Notification,
             title: "分析文档中...",
             cancellable: false
         }, async (progress) => {
             // 获取文档内容和类型
-            const document = editor.document;
             const text = document.getText();
             const fileExtension = path.extname(document.fileName).toLowerCase();
 
@@ -79,9 +128,24 @@ async function quickBatchReplace() {
             });
 
             // 收集替换项
-            const replacements = utils.analyzeContent(
-                text, 0, scanPatterns, utils.shouldBeInternationalized
-            );
+            let replacements = [];
+            if (useGlobal) {
+                replacements = global.i18nSwapperPendingReplacements;
+                
+                // 处理已经完成后清除全局变量
+                global.i18nSwapperPendingReplacements = null;
+                global.i18nSwapperSourceDocument = null;
+                
+                pendingReplacements = replacements;
+                showConfirmationDecorations(editor, document, pendingReplacements, functionName, codeQuote);
+                showGlobalActionPanel(editor, document, pendingReplacements.length);
+                
+                return; // 直接返回，不再执行后续分析文档的代码
+            } else {
+                replacements = utils.analyzeContent(
+                    text, 0, scanPatterns, utils.shouldBeInternationalized
+                );
+            }
 
             if (replacements.length === 0) {
                 vscode.window.showInformationMessage('未找到需要国际化的文本');
@@ -141,9 +205,8 @@ async function quickBatchReplace() {
             showGlobalActionPanel(editor, document, validReplacements.length);
         });
     } catch (error) {
-        console.error('快速批量替换时出错:', error);
-        vscode.window.showErrorMessage(`替换出错: ${error.message}`);
-        clearDecorations();
+        console.error('分析文档出错:', error);
+        vscode.window.showErrorMessage('分析文档出错: ' + error.message);
     }
 }
 

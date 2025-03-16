@@ -46,27 +46,28 @@ class BatchReplacementPanel {
       
       return;
     }
-
-    // 获取当前活动编辑器
+    
+    // 确保有活动编辑器
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-      vscode.window.showInformationMessage('没有打开的编辑器');
+      vscode.window.showInformationMessage('请先打开一个文件');
       return;
     }
-
+    
+    // 保存文档引用
     this.document = editor.document;
-
-    // 创建新的面板
+    
+    // 创建面板
     this.panel = vscode.window.createWebviewPanel(
-      'i18nBatchReplacer',
-      '批量替换国际化',
+      'i18nSwapperBatchPanel',
+      'I18n批量替换',
       vscode.ViewColumn.Beside,
       {
         enableScripts: true,
+        retainContextWhenHidden: true,
         localResourceRoots: [
-          vscode.Uri.file(path.join(this.context.extensionPath, 'src', 'webview'))
-        ],
-        retainContextWhenHidden: true
+          vscode.Uri.file(path.join(this.context.extensionPath, 'media'))
+        ]
       }
     );
 
@@ -178,6 +179,12 @@ class BatchReplacementPanel {
           break;
         case 'openLanguageFile':
           await this.openLanguageFile(data.filePath, data.key, data.languageCode);
+          break;
+        case 'replaceSelected':
+          await this.performSelectedReplacements();
+          break;
+        case 'replaceAll':
+          await this.performAllReplacements();
           break;
         default:
           console.log(`未处理的命令: ${command}`);
@@ -655,55 +662,105 @@ class BatchReplacementPanel {
    * 执行选中项的替换
    */
   async performSelectedReplacements() {
-    console.log('执行选中项的替换');
-    
-    if (!this.selectedIndexes || this.selectedIndexes.length === 0) {
-      vscode.window.showInformationMessage('请先选择要替换的项');
-      return;
-    }
-    
-    await this.doBatchReplace(this.selectedIndexes);
-  }
-
-  /**
-   * 执行批量替换
-   * @param {number[]} indexes 选中的索引数组
-   */
-  async doBatchReplace(indexes) {
-    if (!indexes || !Array.isArray(indexes) || indexes.length === 0) {
-      vscode.window.showInformationMessage('没有选中任何项');
-      return;
-    }
-    
-    console.log('执行批量替换，选中的索引:', indexes);
-    
-    // 筛选有效的替换项
-    const validItems = indexes
-      .map(index => this.replacements[index])
-      .filter(item => item && item.i18nKey);
-    
-    if (validItems.length === 0) {
-      vscode.window.showInformationMessage('选中的项目没有可用的国际化键');
-      return;
-    }
-    
     try {
-      const editor = vscode.window.activeTextEditor;
-      if (!editor || editor.document !== this.document) {
-        vscode.window.showWarningMessage('编辑器已更改，请重新打开批量替换面板');
+      if (!this.document) {
+        vscode.window.showWarningMessage('找不到文档，请重新打开面板');
         return;
       }
       
-      // 执行替换
-      const successCount = await performReplacements(this.document, validItems);
+      // 筛选所有选中且有i18nKey的替换项
+      const selectedItems = this.replacements.filter(item => item.selected && item.i18nKey);
       
-      vscode.window.showInformationMessage(`成功替换了 ${successCount} 处文本`);
+      if (selectedItems.length === 0) {
+        vscode.window.showInformationMessage('没有选择任何有效的替换项');
+        return;
+      }
       
-      // 刷新面板
-      await this.refreshPanel();
+      // 获取替换服务
+      const replacementService = require('./services/replacementService');
+      
+      // 在进度条中执行替换
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: '执行替换',
+        cancellable: false
+      }, async (progress) => {
+        progress.report({ message: '正在替换...' });
+        
+        // 执行替换
+        const count = await replacementService.performReplacements(this.document, selectedItems);
+        
+        // 从列表中移除已替换的项目
+        if (count > 0) {
+          this.replacements = this.replacements.filter(item => 
+            !(item.selected && item.i18nKey)
+          );
+          
+          // 更新面板
+          await this.updatePanelContent();
+        }
+        
+        vscode.window.showInformationMessage(`已替换 ${count} 个文本`);
+      });
     } catch (error) {
-      console.error('批量替换出错:', error);
-      vscode.window.showErrorMessage(`批量替换失败: ${error.message}`);
+      console.error('执行选中替换时出错:', error);
+      vscode.window.showErrorMessage(`替换失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 执行所有项替换
+   */
+  async performAllReplacements() {
+    try {
+      if (!this.document) {
+        vscode.window.showWarningMessage('找不到文档，请重新打开面板');
+        return;
+      }
+      
+      // 获取面板中的所有i18nKey不为空的替换项
+      const validItems = this.replacements.filter(item => item.i18nKey);
+      
+      if (validItems.length === 0) {
+        vscode.window.showInformationMessage('没有有效的替换项');
+        return;
+      }
+      
+      // 检查是否当前已打开了这个文档
+      let editor = vscode.window.activeTextEditor;
+      const docIsActive = editor && editor.document.uri.fsPath === this.document.uri.fsPath;
+      
+      // 如果文档已经打开，直接使用，否则使用当前面板的document并标记需要刷新
+      const needRefresh = !docIsActive;
+      
+      // 将当前有效替换项保存到一个全局变量，供quickBatchReplace使用
+      global.i18nSwapperPendingReplacements = validItems.map(item => {
+        return {
+          text: item.text,
+          start: item.start,
+          end: item.end,
+          range: new vscode.Range(
+            this.document.positionAt(item.start),
+            this.document.positionAt(item.end)
+          ),
+          i18nKey: item.i18nKey,
+          i18nFile: item.i18nFile,
+          selected: item.selected
+        };
+      });
+      
+      // 将源文档信息也保存起来
+      global.i18nSwapperSourceDocument = {
+        uri: this.document.uri,
+        fsPath: this.document.uri.fsPath
+      };
+      
+      // 调用quickBatchReplace命令，使用特殊标志指示使用全局变量中的信息
+      await vscode.commands.executeCommand('i18n-swapper.quickBatchReplace', null, 'USE_GLOBAL');
+      
+    } catch (error) {
+      console.error('执行替换所有项时出错:', error);
+      vscode.window.showErrorMessage(`替换失败: ${error.message}`);
     }
   }
 

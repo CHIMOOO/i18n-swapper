@@ -28,7 +28,7 @@ function activate(context) {
     ),
     vscode.commands.registerCommand(
       'i18n-swapper.quickBatchReplace', 
-      commands.quickBatchReplace
+      (context, document) => commands.quickBatchReplace(context, document)
     ),
     vscode.commands.registerCommand(
       'i18n-swapper.setLocalesPaths', 
