@@ -534,7 +534,6 @@ class BatchReplacementPanel {
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) return;
       const rootPath = workspaceFolders[0].uri.fsPath;
-      console.log(this.existingI18nCalls);
       let searchKeys = [];
       if (this.scanMode === 'translated') {
         searchKeys = this.existingI18nCalls
@@ -616,7 +615,6 @@ class BatchReplacementPanel {
               exists,
               value: exists ? value : null
             };
-            console.log(value);
           } catch (error) {
             console.error(`加载键 ${item.i18nKey} 的 ${mapping.languageCode} 翻译状态时出错:`, error);
             item.i18nStatus[mapping.languageCode] = {

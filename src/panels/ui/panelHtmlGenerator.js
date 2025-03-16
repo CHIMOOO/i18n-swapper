@@ -633,8 +633,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         </div>
         
         <!-- 配置面板（位于底部） -->
-        <div class="${configSectionClass}" id="config-section-header">
-          <h3>🔧 扫描配置设置（点击展开/关闭）</h3>
+        <div class="${configSectionClass}" id="config-section-header" style="display: flex;position: sticky;top: 0;">
+          <h3>🔧 配置设置</h3>
+          <span style="margin-left:auto;font-weight: 700;">（点击展开/关闭）</span>
         </div>
         <div class="collapsible-section-content" id="config-section-content" style="${isConfigExpanded ? 'display: block;' : 'display: none;'}">
           <!-- 扫描模式配置 -->
