@@ -22,8 +22,11 @@ class BatchReplacementPanel {
     this.panel = null;
     this.document = null;
     this.replacements = [];
+    this.translatedItems = [];
     this.selectedIndexes = [];
     this.isConfigExpanded = false; // 默认折叠
+    this.scanMode = 'pending'; // 新增：扫描模式，默认为待转义
+    this.existingI18nCalls = []; // 新增：存储已转义的国际化调用
     
     // 处理面板关闭和视图状态变更
     this._disposables = [];
@@ -104,10 +107,10 @@ class BatchReplacementPanel {
 
   /**
    * 处理面板消息
-   * @param {object} message 消息对象
+   * @param {Object} message 消息对象
    */
   async _handlePanelMessage(message) {
-    const { command, data } = message;
+    const { command, data = {} } = message; // 添加默认空对象，防止 data 为 undefined
     
     try {
       switch (command) {
@@ -118,7 +121,7 @@ class BatchReplacementPanel {
           this.toggleItemSelection(data.index, data.selected);
           break;
         case 'toggleSelectAll':
-          this.selectAllItems(data.selected);
+          await this.toggleSelectAll();
           break;
         case 'performReplacements':
           await this.performSelectedReplacements();
@@ -127,10 +130,10 @@ class BatchReplacementPanel {
           await this.refreshPanel();
           break;
         case 'addPattern':
-          await this.addPattern(data.pattern);
+          await this.addScanPattern(data.pattern);
           break;
         case 'removePattern':
-          await this.removePattern(data.pattern);
+          await this.removeScanPattern(data.pattern);
           break;
         case 'selectLocalesFiles':
           await this.selectLocalesFiles();
@@ -159,8 +162,9 @@ class BatchReplacementPanel {
         case 'removeLocalePath':
           await this.removeLocalePath(data.path);
           break;
-        case 'toggleConfigSection':
-          this.isConfigExpanded = data.expanded;
+        case 'toggleConfig':
+          this.isConfigExpanded = !this.isConfigExpanded;
+          await this.updatePanelContent();
           break;
         case 'updateDecorationStyle':
           await this._updateDecorationStyle(data.style);
@@ -186,12 +190,36 @@ class BatchReplacementPanel {
         case 'replaceAll':
           await this.performAllReplacements();
           break;
+        case 'switchScanMode':
+          if (data.mode !== undefined) {
+            this.switchScanMode(data.mode);
+          } else {
+            console.error('切换模式失败：未提供模式参数');
+          }
+          break;
+        case 'openI18nFile':
+          if (data.index !== undefined) {
+            await this.openI18nFile(data.index);
+          } else {
+            console.error('打开文件失败：未提供索引参数');
+          }
+          break;
+        case 'copyI18nKey':
+          if (data.index !== undefined) {
+            await this.copyI18nKey(data.index);
+          } else {
+            console.error('复制键失败：未提供索引参数');
+          }
+          break;
+        case 'refreshScan':
+          await this.refreshScan();
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
     } catch (error) {
       console.error('处理面板消息时出错:', error);
-      vscode.window.showErrorMessage(`处理面板操作失败: ${error.message}`);
+      vscode.window.showErrorMessage(`处理操作失败: ${error.message}`);
     }
   }
 
@@ -286,6 +314,11 @@ class BatchReplacementPanel {
           text, fileExtension, scanPatterns, localesPaths, this.document
         );
 
+        // 分析已转义内容
+        this.existingI18nCalls = await this.analyzeExistingI18nCalls(
+          text, this.document
+        );
+
         // 恢复选择状态
         this.selectedIndexes = [];
         this.replacements.forEach((item, index) => {
@@ -307,6 +340,101 @@ class BatchReplacementPanel {
       // 即使出错也要显示面板
       this.updatePanelContent();
     }
+  }
+
+  /**
+   * 分析文档中已存在的国际化调用
+   * @param {string} text 文档文本
+   * @param {vscode.TextDocument} document 文档对象
+   * @returns {Promise<Array>} 找到的国际化调用
+   */
+  async analyzeExistingI18nCalls(text, document) {
+    const existingCalls = [];
+    
+    try {
+      // 获取配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const functionName = config.get('functionName', 't');
+      
+      // 构建正则表达式匹配 t('key') 或 $t('key') 模式
+      // 支持单引号和双引号
+      const i18nCallRegex = new RegExp(`(\\$?${functionName})\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
+      
+      let match;
+      while ((match = i18nCallRegex.exec(text)) !== null) {
+        const fullMatch = match[0];       // 完整匹配，如 t('common.submit')
+        const fnName = match[1];          // 函数名，如 t 或 $t
+        const quoteType = match[2];       // 引号类型，' 或 "
+        const i18nKey = match[3];         // 国际化键，如 common.submit
+        
+        // 计算位置
+        const startPos = match.index;
+        const endPos = startPos + fullMatch.length;
+        
+        // 获取工作区根目录
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) continue;
+        
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        
+        // 获取语言映射配置
+        const languageMappings = config.get('tencentTranslation.languageMappings', []);
+        
+        // 查找键对应的翻译值
+        let translationValue = null;
+        let sourceFile = null;
+        
+        for (const mapping of languageMappings) {
+          try {
+            const filePath = path.join(rootPath, mapping.filePath);
+            if (!fs.existsSync(filePath)) continue;
+            
+            const localeData = utils.loadLocaleFile(filePath);
+            if (!localeData) continue;
+            
+            // 获取嵌套键的值
+            const keyParts = i18nKey.split('.');
+            let value = localeData;
+            let exists = true;
+            
+            for (const part of keyParts) {
+              if (value && typeof value === 'object' && part in value) {
+                value = value[part];
+              } else {
+                exists = false;
+                break;
+              }
+            }
+            
+            if (exists && typeof value === 'string') {
+              translationValue = value;
+              sourceFile = mapping.filePath;
+              break;
+            }
+          } catch (error) {
+            console.error(`获取键 ${i18nKey} 的翻译值时出错:`, error);
+          }
+        }
+        
+        // 添加到结果
+        existingCalls.push({
+          text: fullMatch,
+          i18nKey: i18nKey,
+          translationValue: translationValue,
+          start: startPos,
+          end: endPos,
+          fnName: fnName,
+          quoteType: quoteType,
+          i18nFile: sourceFile,
+          source: '已转义',
+          selected: false
+        });
+      }
+    } catch (error) {
+      console.error('分析已存在的国际化调用时出错:', error);
+    }
+    
+    return existingCalls;
   }
 
   /**
@@ -340,7 +468,8 @@ class BatchReplacementPanel {
         decorationStyle,
         suffixStyle,
         inlineStyle,
-        showFullFormInEditMode
+        showFullFormInEditMode,
+        scanMode: this.scanMode // 新增：传递扫描模式
       };
       
       // 生成面板HTML
@@ -350,7 +479,8 @@ class BatchReplacementPanel {
         localesPaths || [],
         context,
         this.isConfigExpanded,
-        languageMappings || [] // 传递languageMappings数据
+        languageMappings || [],
+        this.existingI18nCalls || [] // 新增：传递已转义的国际化调用
       );
       
       // 更新面板内容
@@ -477,9 +607,14 @@ class BatchReplacementPanel {
         const text = this.document.getText();
         const fileExtension = path.extname(this.document.fileName).toLowerCase();
         
-        // 分析文档内容
+        // 分析文档内容 - 待转义内容
         this.replacements = await analyzeDocument(
           text, fileExtension, scanPatterns, localesPaths, this.document
+        );
+        
+        // 分析已转义内容
+        this.existingI18nCalls = await this.analyzeExistingI18nCalls(
+          text, this.document
         );
       }
       
@@ -1238,7 +1373,7 @@ class BatchReplacementPanel {
             error: error.message
           };
         }
-      }
+    }
       
       // 将更新的状态发送回面板
       if (this.panel) {
@@ -1344,6 +1479,159 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('打开语言文件出错:', error);
       vscode.window.showErrorMessage(`打开文件失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 切换扫描模式
+   * @param {string} mode 模式名称：'pending'、'translated' 或 'all'
+   */
+  async switchScanMode(mode) {
+    if (this.scanMode === mode) return;
+    
+    this.scanMode = mode;
+    this.selectedIndexes = []; // 切换模式时清空选择
+    
+    // 更新面板内容
+    await this.updatePanelContent();
+  }
+
+  /**
+   * 打开国际化键对应的文件
+   * @param {number} index 项目索引
+   */
+  async openI18nFile(index) {
+    try {
+      // 根据当前模式获取正确的数据源
+      let item;
+      if (this.scanMode === 'pending') {
+        item = this.replacements[index];
+      } else if (this.scanMode === 'translated') {
+        item = this.existingI18nCalls[index];
+      } else if (this.scanMode === 'all') {
+        // 合并数组
+        const allItems = [
+          ...this.replacements.map(item => ({ ...item, itemType: 'pending' })),
+          ...this.existingI18nCalls.map(item => ({ ...item, itemType: 'translated' }))
+        ];
+        item = allItems[index];
+      }
+      
+      if (!item || !item.i18nKey || !item.i18nFile) {
+        vscode.window.showInformationMessage('没有可打开的文件信息');
+        return;
+      }
+      
+      // 执行打开文件命令
+      await vscode.commands.executeCommand('i18n-swapper.openLanguageFile', {
+        filePath: item.i18nFile,
+        langCode: 'unknown', // 这里可能需要从文件名推断语言代码
+        i18nKey: item.i18nKey,
+        shouldLocateKey: true
+      });
+    } catch (error) {
+      console.error('打开国际化文件时出错:', error);
+      vscode.window.showErrorMessage(`打开文件失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 复制国际化键到剪贴板
+   * @param {number} index 项目索引
+   */
+  async copyI18nKey(index) {
+    try {
+      // 根据当前模式获取正确的数据源
+      let item;
+      if (this.scanMode === 'pending') {
+        item = this.replacements[index];
+      } else if (this.scanMode === 'translated') {
+        item = this.existingI18nCalls[index];
+      } else if (this.scanMode === 'all') {
+        // 合并数组
+        const allItems = [
+          ...this.replacements.map(item => ({ ...item, itemType: 'pending' })),
+          ...this.existingI18nCalls.map(item => ({ ...item, itemType: 'translated' }))
+        ];
+        item = allItems[index];
+      }
+      
+      if (!item || !item.i18nKey) {
+        vscode.window.showInformationMessage('没有可复制的国际化键');
+        return;
+      }
+      
+      // 复制到剪贴板
+      await vscode.env.clipboard.writeText(item.i18nKey);
+      vscode.window.showInformationMessage(`已复制键 "${item.i18nKey}" 到剪贴板`);
+    } catch (error) {
+      console.error('复制国际化键时出错:', error);
+      vscode.window.showErrorMessage(`复制失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 刷新扫描
+   */
+  async refreshScan() {
+    try {
+      // 清空当前数据
+      this.replacements = [];
+      this.existingI18nCalls = [];
+      this.selectedIndexes = [];
+      
+      // 重新分析文档
+      await this.analyzeAndLoadPanel();
+      
+      // 显示成功消息
+      vscode.window.showInformationMessage('已刷新扫描结果');
+    } catch (error) {
+      console.error('刷新扫描时出错:', error);
+      vscode.window.showErrorMessage(`刷新扫描失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 切换全选/取消全选
+   */
+  async toggleSelectAll() {
+    try {
+      // 获取当前显示的项目
+      let currentItems = [];
+      if (this.scanMode === 'pending') {
+        currentItems = this.replacements;
+      } else if (this.scanMode === 'translated') {
+        currentItems = this.existingI18nCalls;
+      } else if (this.scanMode === 'all') {
+        currentItems = [
+          ...this.replacements.map(item => ({ ...item, itemType: 'pending' })),
+          ...this.existingI18nCalls.map(item => ({ ...item, itemType: 'translated' }))
+        ];
+      }
+      
+      // 检查是否所有项目都已选中
+      const allSelected = currentItems.every(item => item.selected);
+      
+      // 切换选择状态
+      if (allSelected) {
+        // 如果全部已选中，则取消全选
+        currentItems.forEach(item => {
+          item.selected = false;
+        });
+        this.selectedIndexes = [];
+      } else {
+        // 如果未全选，则全选
+        currentItems.forEach((item, index) => {
+          item.selected = true;
+        });
+        this.selectedIndexes = currentItems.map((_, index) => index);
+      }
+      
+      // 更新面板内容
+      await this.updatePanelContent();
+    } catch (error) {
+      console.error('切换全选状态时出错:', error);
+      vscode.window.showErrorMessage(`操作失败: ${error.message}`);
     }
   }
 }
