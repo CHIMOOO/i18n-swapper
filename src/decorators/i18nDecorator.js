@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const defaultsConfig = require('../config/defaultsConfig');  // 引入默认配置，更改为明确的名称
+const { generateLanguageHoverContent } = require('../utils/hover-content-generator');  // 引入悬浮内容生成器
 
 /**
  * i18n装饰管理器，负责为编辑器中的i18n函数调用添加翻译预览
@@ -54,6 +55,9 @@ class I18nDecorator {
         this.isInEditMode = false;
         this.editModeRange = null;
         this.editModeOriginalKey = null;
+
+        // 添加所有语言数据存储
+        this.allLanguageData = {};
     }
 
     /**
@@ -72,6 +76,9 @@ class I18nDecorator {
 
             // 加载本地化数据
             this.loadLocaleData();
+
+            // 加载所有语言数据
+            this.loadAllLanguageData();
 
             // 如果有活动编辑器，立即更新装饰
             if (this.activeEditor) {
@@ -103,6 +110,9 @@ class I18nDecorator {
         this.decorationType = (this.decorationStyle === 'inline') ?
             this.inlineDecorationType :
             this.suffixDecorationType;
+
+        // 重新加载所有语言数据
+        this.loadAllLanguageData();
     }
 
     /**
@@ -248,6 +258,52 @@ class I18nDecorator {
     }
 
     /**
+     * 加载所有语言数据，用于悬浮显示
+     */
+    loadAllLanguageData() {
+        this.allLanguageData = {};
+        
+        // 获取工作区根路径
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+            return;
+        }
+        const rootPath = workspaceFolders[0].uri.fsPath;
+        
+        // 获取配置的语言映射
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const languageMappings = config.get('tencentTranslation.languageMappings', []);
+        
+        // 加载每种语言的数据
+        for (const mapping of languageMappings) {
+            try {
+                if (mapping.filePath) {
+                    const fullPath = path.join(rootPath, mapping.filePath);
+                    
+                    if (fs.existsSync(fullPath)) {
+                        let data;
+                        
+                        if (fullPath.endsWith('.json')) {
+                            const content = fs.readFileSync(fullPath, 'utf8');
+                            data = JSON.parse(content);
+                        } else if (fullPath.endsWith('.js')) {
+                            // 清除require缓存
+                            delete require.cache[require.resolve(fullPath)];
+                            data = require(fullPath);
+                        }
+                        
+                        if (data) {
+                            this.allLanguageData[mapping.languageCode] = data;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error(`加载语言文件失败 (${mapping.languageCode}):`, error);
+            }
+        }
+    }
+
+    /**
      * 更新文档装饰
      */
     updateDecorations() {
@@ -259,7 +315,12 @@ class I18nDecorator {
         const text = document.getText();
         const suffixDecorations = [];
         const inlineDecorations = [];
+        const hoverDecorations = [];
         this.currentInlineDecorations = []; // 重置当前内联装饰数组
+
+        // 获取语言映射配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const languageMappings = config.get('tencentTranslation.languageMappings', []);
 
         // 正则表达式模式，匹配各种i18n函数调用格式
         const regexPatterns = [
@@ -288,20 +349,13 @@ class I18nDecorator {
                     const startPos = document.positionAt(match.index);
                     const endPos = document.positionAt(match.index + fullMatch.length);
 
-                    // 处理字体大小和间距
-                    let suffixFontSize = this.suffixStyle.fontSize;
-                    if (typeof suffixFontSize === 'number' || !suffixFontSize.includes('px')) {
-                        suffixFontSize = `${suffixFontSize}px`;
-                    }
-
-                    let inlineFontSize = this.inlineStyle.fontSize;
-                    if (typeof inlineFontSize === 'number' || !inlineFontSize.includes('px')) {
-                        inlineFontSize = `${inlineFontSize}px`;
-                    }
-
-                    // 使用配置的margin值，而不是硬编码的值
-                    const suffixMargin = this.suffixStyle.margin || '0 0 0 3px';
-                    const inlineMargin = this.inlineStyle.margin || '0';
+                    // 创建悬浮内容
+                    const hoverContent = generateLanguageHoverContent({
+                        allLanguageData: this.allLanguageData,
+                        languageMappings: languageMappings,
+                        i18nKey: key,
+                        showActions: false
+                    });
 
                     // 创建后缀样式的装饰
                     const suffixDecoration = {
@@ -309,9 +363,11 @@ class I18nDecorator {
                         renderOptions: {
                             after: {
                                 contentText: `(${translatedText})`,
-                                margin: suffixMargin, // 使用配置的间距
+                                margin: this.suffixStyle.margin || '0 0 0 3px',
                                 color: this.suffixStyle.color,
-                                fontSize: suffixFontSize,
+                                fontSize: typeof this.suffixStyle.fontSize === 'number' || 
+                                        !this.suffixStyle.fontSize.includes('px') ? 
+                                        `${this.suffixStyle.fontSize}px` : this.suffixStyle.fontSize,
                                 fontWeight: String(this.suffixStyle.fontWeight),
                                 fontStyle: this.suffixStyle.fontStyle || 'italic'
                             }
@@ -319,8 +375,30 @@ class I18nDecorator {
                     };
                     suffixDecorations.push(suffixDecoration);
 
+                    // 创建专门用于后缀文本的悬浮装饰
+                    // 计算后缀文本的精确位置
+                    const suffixStartPos = endPos;
+                    // 估算后缀文本的长度，加上括号和文本本身
+                    const suffixLength = 2 + translatedText.length; // '(' + 翻译文本 + ')'
+                    const suffixEndPos = document.positionAt(
+                        document.offsetAt(endPos) + suffixLength
+                    );
+
+                    // 为后缀区域创建悬浮装饰
+                    const suffixHoverDecoration = {
+                        range: new vscode.Range(suffixStartPos, suffixEndPos),
+                        hoverMessage: hoverContent
+                    };
+                    hoverDecorations.push(suffixHoverDecoration);
+
+                    // 为原函数调用区域也创建悬浮装饰
+                    const functionHoverDecoration = {
+                        range: new vscode.Range(startPos, endPos),
+                        hoverMessage: hoverContent
+                    };
+                    hoverDecorations.push(functionHoverDecoration);
+
                     // 为内联样式找到括号内的内容位置
-                    // 修复：精确定位引号内的内容，而非整个括号内容
                     const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
                     const quoteEndIndex = fullMatch.lastIndexOf("'");
 
@@ -341,15 +419,17 @@ class I18nDecorator {
                             renderOptions: {
                                 before: {
                                     contentText: translatedText,
-                                    margin: inlineMargin, // 使用配置的间距
+                                    margin: this.inlineStyle.margin || '0',
                                     color: this.inlineStyle.color,
-                                    fontSize: inlineFontSize,
+                                    fontSize: typeof this.inlineStyle.fontSize === 'number' || 
+                                            !this.inlineStyle.fontSize.includes('px') ? 
+                                            `${this.inlineStyle.fontSize}px` : this.inlineStyle.fontSize,
                                     fontWeight: String(this.inlineStyle.fontWeight),
                                     fontStyle: this.inlineStyle.fontStyle || 'normal'
                                 },
-                                textDecoration: 'none; display: none;' // 隐藏原始键名
+                                textDecoration: 'none; display: none;'
                             },
-                            hoverMessage: `原始键: '${key}'`
+                            hoverMessage: hoverContent
                         };
                         inlineDecorations.push(inlineDecoration);
                     }
@@ -357,11 +437,16 @@ class I18nDecorator {
             }
         }
 
+        // 创建专门用于悬浮提示的装饰器
+        const hoverDecorationType = vscode.window.createTextEditorDecorationType({
+            // 不改变外观，只用于悬浮
+            textDecoration: 'none; opacity: 0;'
+        });
+
         // 根据当前设置和编辑模式应用装饰
         if (this.isInEditMode) {
             // 编辑模式下保持当前状态
             if (this.showFullFormInEditMode) {
-                // 后缀模式: t('key')(译文)
                 this.activeEditor.setDecorations(this.suffixDecorationType, suffixDecorations);
                 this.activeEditor.setDecorations(this.inlineDecorationType, []);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
@@ -373,13 +458,20 @@ class I18nDecorator {
                 this.activeEditor.setDecorations(this.suffixDecorationType, suffixDecorations);
                 this.activeEditor.setDecorations(this.inlineDecorationType, []);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
+                // 应用悬浮装饰
+                this.activeEditor.setDecorations(hoverDecorationType, hoverDecorations);
             } else {
                 // 内联模式: t(译文)
                 this.activeEditor.setDecorations(this.suffixDecorationType, []);
                 this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
+                // 内联模式的悬浮已在inlineDecoration中
+                this.activeEditor.setDecorations(hoverDecorationType, []);
             }
         }
+
+        // 使用完毕后释放临时装饰器
+        hoverDecorationType.dispose();
     }
 
     /**
@@ -577,11 +669,10 @@ class I18nDecorator {
         this.editModeRange = range;
 
         // 暂时禁用所有装饰
-        // this.activeEditor.setDecorations(this.suffixDecorationType, []);
         this.activeEditor.setDecorations(this.suffixDecorationType, []);
         this.activeEditor.setDecorations(this.inlineDecorationType, []);
-
         this.activeEditor.setDecorations(this.editModeDecorationType, []);
+        
         // 重新应用装饰
         this.updateDecorations();
 

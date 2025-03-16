@@ -40,6 +40,9 @@ function activate(context) {
     )
   );
 
+  // 初始化其他命令
+  commands.initializeCommands(context);
+
   // 初始化i18n装饰器
   const i18nDecorator = new I18nDecorator(context);
   i18nDecorator.initialize();

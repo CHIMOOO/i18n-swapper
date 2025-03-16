@@ -51,40 +51,21 @@ function generateLanguageHoverContent(params) {
                 }
             }
             
-            if (found && value !== undefined) {
-                if (typeof value === 'object') {
-                    value = JSON.stringify(value);
-                }
-                
-                // 添加可点击的语言名称链接
-                const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                if (mappingObj && mappingObj.filePath) {
-                    languageValuesMarkdown += 
-                        `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                        `${encodeURIComponent(JSON.stringify({ 
-                            filePath: mappingObj.filePath, 
-                            langCode: langCode,
-                            i18nKey: i18nKey 
-                        }))})**` +
-                        `: ${value}\n`;
-                } else {
-                    languageValuesMarkdown += `- **${langName}**: ${value}\n`;
-                }
+            // 无论是否找到值，都添加可点击的语言名称链接
+            const mappingObj = languageMappings.find(m => m.languageCode === langCode);
+            if (mappingObj && mappingObj.filePath) {
+                // 为所有语言添加可点击链接，不管键是否存在
+                languageValuesMarkdown += 
+                    `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
+                    `${encodeURIComponent(JSON.stringify({ 
+                        filePath: mappingObj.filePath, 
+                        langCode: langCode,
+                        i18nKey: i18nKey,
+                        shouldLocateKey: found // 添加一个标志，指示是否应该定位到键
+                    }))})**` +
+                    `: ${found && value !== undefined ? (typeof value === 'object' ? JSON.stringify(value) : value) : '* 键不存在 *'}\n`;
             } else {
-                // 无翻译值但仍添加可点击链接
-                const mappingObj = languageMappings.find(m => m.languageCode === langCode);
-                if (mappingObj && mappingObj.filePath) {
-                    languageValuesMarkdown += 
-                        `- **[${langName}](command:i18n-swapper.openLanguageFile?` + 
-                        `${encodeURIComponent(JSON.stringify({ 
-                            filePath: mappingObj.filePath, 
-                            langCode: langCode,
-                            i18nKey: i18nKey 
-                        }))})**` +
-                        `: \n`;
-                } else {
-                    languageValuesMarkdown += `- **${langName}**: \n`;
-                }
+                languageValuesMarkdown += `- **${langName}**: ${found && value !== undefined ? (typeof value === 'object' ? JSON.stringify(value) : value) : '* 键不存在 *'}\n`;
             }
         });
     }

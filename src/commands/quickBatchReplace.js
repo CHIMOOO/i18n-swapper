@@ -3,6 +3,7 @@ const path = require('path');
 const utils = require('../utils');
 const { LANGUAGE_NAMES } = require('../utils/language-mappings');
 const { generateLanguageHoverContent } = require('../utils/hover-content-generator');
+const fs = require('fs');
 
 // 存储所有待确认的替换项
 let pendingReplacements = [];
@@ -147,45 +148,79 @@ async function quickBatchReplace() {
 }
 
 /**
- * 加载所有配置的语言数据
- * @returns {Object} 语言数据映射表
+ * 加载所有语言数据
+ * @returns {Object} 包含语言数据和映射的对象
  */
 function loadAllLanguageData() {
-    // 获取工作区根目录
-    const workspaceFolders = vscode.workspace.workspaceFolders;
-    const rootPath = workspaceFolders ? workspaceFolders[0].uri.fsPath : '';
+    const allLanguageData = {};
     
-    // 获取语言映射配置
+    // 获取配置
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     const languageMappings = config.get('tencentTranslation.languageMappings', []);
     
-    // 加载所有语言文件
-    const allLanguageData = {};
+    // 获取工作区根目录
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders) {
+        return { allLanguageData, languageMappings };
+    }
     
-    // 检查 languageMappings 是否为数组
-    if (Array.isArray(languageMappings)) {
-        // 遍历数组中的每个映射对象
-        languageMappings.forEach(mapping => {
-            // 确保映射对象有效且包含必要字段
-            if (mapping && typeof mapping === 'object' && 
-                mapping.languageCode && typeof mapping.languageCode === 'string' &&
-                mapping.filePath && typeof mapping.filePath === 'string') {
+    const rootPath = workspaceFolders[0].uri.fsPath;
+    
+    // 为每个语言映射加载数据
+    for (const mapping of languageMappings) {
+        try {
+            const languageCode = mapping.languageCode;
+            const filePath = path.join(rootPath, mapping.filePath);
+            
+            if (fs.existsSync(filePath)) {
+                let data;
                 
-                try {
-                    const filePath = path.join(rootPath, mapping.filePath);
-                    const data = utils.loadLocaleFile(filePath);
-                    if (data) {
-                        allLanguageData[mapping.languageCode] = data;
-                    }
-                } catch (err) {
-                    console.error(`加载语言文件失败 ${mapping.languageCode}: ${mapping.filePath}`, err);
+                if (filePath.endsWith('.json')) {
+                    const content = fs.readFileSync(filePath, 'utf8');
+                    data = JSON.parse(content);
+                } else if (filePath.endsWith('.js')) {
+                    delete require.cache[require.resolve(filePath)];
+                    data = require(filePath);
                 }
-            } else {
-                console.warn('语言映射配置项格式不正确:', mapping);
+                
+                if (data) {
+                    allLanguageData[languageCode] = data;
+                }
             }
-        });
-    } else {
-        console.warn('语言映射配置不是数组格式:', languageMappings);
+        } catch (error) {
+            console.error(`加载语言文件失败 ${mapping.filePath}:`, error);
+        }
+    }
+    
+    // 如果没有找到语言映射，尝试加载localesPaths中的文件
+    if (Object.keys(allLanguageData).length === 0) {
+        const localesPaths = config.get('localesPaths', []);
+        
+        for (const localePath of localesPaths) {
+            try {
+                const filePath = path.join(rootPath, localePath);
+                
+                if (fs.existsSync(filePath)) {
+                    let data;
+                    
+                    if (filePath.endsWith('.json')) {
+                        const content = fs.readFileSync(filePath, 'utf8');
+                        data = JSON.parse(content);
+                    } else if (filePath.endsWith('.js')) {
+                        delete require.cache[require.resolve(filePath)];
+                        data = require(filePath);
+                    }
+                    
+                    if (data) {
+                        // 使用文件名作为语言代码
+                        const langCode = path.basename(localePath, path.extname(localePath));
+                        allLanguageData[langCode] = data;
+                    }
+                }
+            } catch (error) {
+                console.error(`加载国际化文件失败 ${localePath}:`, error);
+            }
+        }
     }
     
     return { allLanguageData, languageMappings };
@@ -252,7 +287,7 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
         });
         
         // 显示替换建议 - 确保格式清晰
-        const contentText = `${item.replacement} ${item.text} `;
+        const contentText = `${item.replacement}`;
         
         // 根据文本的位置创建范围 - 确保装饰显示在文本之后
         const decorationRange = new vscode.Range(
@@ -588,7 +623,7 @@ function registerCommands() {
     }
     
     global.i18nSwapperCommandDisposables = [];
-    
+
     // 确认单个替换
     const confirmCmd = vscode.commands.registerCommand('i18n-swapper.confirmReplacement', async (args) => {
         const editor = vscode.window.activeTextEditor;
@@ -627,15 +662,33 @@ function registerCommands() {
     });
     global.i18nSwapperCommandDisposables.push(cancelCmd);
 
+    // 确认替换并隐藏悬浮窗
+    const confirmHideCmd = vscode.commands.registerCommand('i18n-swapper.confirmReplacementAndHideHover', async (args) => {
+        // 先隐藏悬浮窗
+        await vscode.commands.executeCommand('i18n-swapper.hideHover');
+        // 再确认替换
+        await vscode.commands.executeCommand('i18n-swapper.confirmReplacement', args);
+    });
+    global.i18nSwapperCommandDisposables.push(confirmHideCmd);
+
+    // 取消替换并隐藏悬浮窗
+    const cancelHideCmd = vscode.commands.registerCommand('i18n-swapper.cancelReplacementAndHideHover', async (args) => {
+        // 先隐藏悬浮窗
+        await vscode.commands.executeCommand('i18n-swapper.hideHover');
+        // 再取消替换
+        await vscode.commands.executeCommand('i18n-swapper.cancelReplacement', args);
+    });
+    global.i18nSwapperCommandDisposables.push(cancelHideCmd);
+
     // 应用所有替换
-    const applyAllCmd = vscode.commands.registerCommand('i18n-swapper.applyAllReplacements', () => {
+    const confirmAllCmd = vscode.commands.registerCommand('i18n-swapper.confirmAllReplacements', () => {
         const editor = vscode.window.activeTextEditor;
         if (editor) {
             applyAllReplacements(editor);
         }
     });
-    global.i18nSwapperCommandDisposables.push(applyAllCmd);
-    
+    global.i18nSwapperCommandDisposables.push(confirmAllCmd);
+
     // 取消所有替换
     const cancelAllCmd = vscode.commands.registerCommand('i18n-swapper.cancelAllReplacements', () => {
         clearDecorations();
@@ -643,109 +696,12 @@ function registerCommands() {
     });
     global.i18nSwapperCommandDisposables.push(cancelAllCmd);
 
-    // 添加打开语言文件命令 - 智能选择视图
-    const openLanguageFileCmd = vscode.commands.registerCommand('i18n-swapper.openLanguageFile', async (args) => {
-        const { filePath, langCode, i18nKey } = args;
-        
-        if (!filePath) {
-            vscode.window.showErrorMessage('找不到语言文件路径');
-            return;
-        }
-        
-        // 获取工作区根目录
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-            vscode.window.showErrorMessage('未找到工作区文件夹');
-            return;
-        }
-        
-        const rootPath = workspaceFolders[0].uri.fsPath;
-        const fullPath = path.join(rootPath, filePath);
-        
-        try {
-            // 创建文件URI
-            const fileUri = vscode.Uri.file(fullPath);
-            
-            // 检查当前编辑器状态
-            const currentEditors = vscode.window.visibleTextEditors;
-            
-            // 决定在哪个视图打开文件
-            let targetViewColumn;
-            
-            if (currentEditors.length > 1) {
-                // 已有多个编辑器视图，找出非活动的那个
-                const activeViewColumn = vscode.window.activeTextEditor?.viewColumn || vscode.ViewColumn.One;
-                
-                // 找到一个不是当前活动的视图
-                for (const editor of currentEditors) {
-                    if (editor.viewColumn !== activeViewColumn) {
-                        targetViewColumn = editor.viewColumn;
-                        break;
-                    }
-                }
-                
-                // 如果没找到其他视图，则使用第二视图
-                if (!targetViewColumn) {
-                    targetViewColumn = activeViewColumn === vscode.ViewColumn.One 
-                        ? vscode.ViewColumn.Two 
-                        : vscode.ViewColumn.One;
-                }
-            } else {
-                // 只有一个编辑器视图，先分屏再打开
-                await vscode.commands.executeCommand('workbench.action.splitEditor');
-                targetViewColumn = vscode.ViewColumn.Beside;
-            }
-            
-            // 在目标视图中打开文件
-            const document = await vscode.workspace.openTextDocument(fileUri);
-            const editor = await vscode.window.showTextDocument(document, { 
-                viewColumn: targetViewColumn,
-                preserveFocus: false // 切换焦点到新打开的文件
-            });
-            
-            // 如果有键值，尝试找到该键在文件中的位置
-            if (i18nKey) {
-                // 搜索键的位置
-                const text = document.getText();
-                const keyParts = i18nKey.split('.');
-                
-                // 构建搜索模式：寻找如 "key": 或 "key" : 或 'key': 等模式
-                let searchPosition = 0;
-                let currentPart = 0;
-                
-                while (currentPart < keyParts.length && searchPosition !== -1) {
-                    const key = keyParts[currentPart];
-                    const keyPattern = new RegExp(`['"](${key})['"]\\s*:`, 'g');
-                    keyPattern.lastIndex = searchPosition;
-                    
-                    const match = keyPattern.exec(text);
-                    if (match) {
-                        searchPosition = match.index;
-                        currentPart++;
-                    } else {
-                        searchPosition = -1;
-                    }
-                }
-                
-                if (searchPosition !== -1) {
-                    // 找到键的位置，创建选择区域
-                    const pos = document.positionAt(searchPosition);
-                    editor.selection = new vscode.Selection(pos, pos);
-                    editor.revealRange(
-                        new vscode.Range(pos, pos),
-                        vscode.TextEditorRevealType.InCenter
-                    );
-                } else {
-                    // 没有找到键，给用户提示
-                    vscode.window.showInformationMessage(`在 ${langCode} 语言文件中未找到键 "${i18nKey}"`);
-                }
-            }
-        } catch (error) {
-            console.error('打开语言文件时出错:', error);
-            vscode.window.showErrorMessage(`无法打开语言文件: ${error.message}`);
-        }
-    });
-    global.i18nSwapperCommandDisposables.push(openLanguageFileCmd);
+    // 添加隐藏当前悬浮命令
+    const hideHoverCmd = vscode.commands.registerCommand('i18n-swapper.hideHover', () => {});
+    global.i18nSwapperCommandDisposables.push(hideHoverCmd);
+
+    // 移除openLanguageFile命令的注册，因为它现在由openLanguageFile.js模块注册
+    // 使用新的方法，命令只会注册一次
 }
 
 /**
@@ -844,4 +800,5 @@ function clearDecorations() {
     pendingReplacements = [];
 }
 
+// 导出单个函数，避免循环依赖
 module.exports = quickBatchReplace;
