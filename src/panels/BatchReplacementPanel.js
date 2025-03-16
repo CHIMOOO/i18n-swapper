@@ -1708,6 +1708,21 @@ class BatchReplacementPanel {
       vscode.window.showErrorMessage(`操作失败: ${error.message}`);
     }
   }
+
+  /**
+   * 应用所有替换
+   */
+  async applyAllReplacements() {
+    try {
+      // 这里应该使用confirmAllReplacements命令而不是applyAllReplacements
+      await vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
+      // 替换成功后可能需要刷新或关闭面板
+      this.panel.dispose();
+    } catch (error) {
+      console.error('应用所有替换时出错:', error);
+      vscode.window.showErrorMessage(`应用替换失败: ${error.message}`);
+    }
+  }
 }
 
 module.exports = BatchReplacementPanel;

@@ -28,7 +28,7 @@ function activate(context) {
     ),
     vscode.commands.registerCommand(
       'i18n-swapper.quickBatchReplace', 
-      (document) => commands.quickBatchReplace(context, document)
+      (context, document) => commands.quickBatchReplace(context, document)
     ),
     vscode.commands.registerCommand(
       'i18n-swapper.setLocalesPaths', 
@@ -38,41 +38,11 @@ function activate(context) {
       'i18n-swapper.openApiTranslationConfig', 
       () => commands.openApiTranslationConfig(context)
     ),
-    // 添加确认和取消替换的命令
-    vscode.commands.registerCommand(
-      'i18n-swapper.confirmReplacement',
-      (args) => {
-        // 发送确认替换的消息到全局变量
-        if (global.i18nSwapperPanel) {
-          global.i18nSwapperPanel.confirmReplacement(args.index);
-        }
-      }
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.cancelReplacement',
-      (args) => {
-        // 发送取消替换的消息到全局变量
-        if (global.i18nSwapperPanel) {
-          global.i18nSwapperPanel.cancelReplacement(args.index);
-        }
-      }
-    ),
     vscode.commands.registerCommand(
       'i18n-swapper.applyAllReplacements',
       () => {
-        // 应用所有替换
-        if (global.i18nSwapperPanel) {
-          global.i18nSwapperPanel.applyAllReplacements();
-        }
-      }
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.cancelAllReplacements',
-      () => {
-        // 取消所有替换
-        if (global.i18nSwapperPanel) {
-          global.i18nSwapperPanel.cancelAllReplacements();
-        }
+        // 直接调用已有的命令
+        vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
       }
     )
   );
