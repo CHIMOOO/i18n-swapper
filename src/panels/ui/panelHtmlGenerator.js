@@ -3,6 +3,7 @@
  * @param {string} text 需要转义的文本
  * @returns {string} 转义后的文本
  */
+const vscode = require('vscode');
 function escapeHtml(text) {
   if (text === undefined || text === null) return '';
   return String(text)
@@ -28,6 +29,22 @@ const defaultsConfig = require('../../config/defaultsConfig');  // 引入默认�
  * @param {Array} existingI18nCalls 已存在的国际化调用
  */
 function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = []) {
+  // 获取配置
+  const config = vscode.workspace.getConfiguration('i18n-swapper');
+  const decorationStyle = context.decorationStyle || config.get('decorationStyle', 'suffix');
+  const showFullFormInEditMode = context.showFullFormInEditMode !== undefined ? 
+    context.showFullFormInEditMode : config.get('showFullFormInEditMode', true);
+  const suffixStyle = context.suffixStyle || config.get('suffixStyle', {});
+  const inlineStyle = context.inlineStyle || config.get('inlineStyle', {});
+  
+  // 添加新的翻译功能设置项
+  const autoGenerateKeyFromText = context.autoGenerateKeyFromText !== undefined ?
+    context.autoGenerateKeyFromText : config.get('autoGenerateKeyFromText', true);
+  const autoGenerateKeyPrefix = context.autoGenerateKeyPrefix || 
+    config.get('autoGenerateKeyPrefix', '_iw');
+  const autoTranslateAllLanguages = context.autoTranslateAllLanguages !== undefined ?
+    context.autoTranslateAllLanguages : config.get('autoTranslateAllLanguages', true);
+  
   // 从上下文中获取扫描模式
   const scanMode = context.scanMode || 'pending';
   
@@ -44,11 +61,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
       ...existingI18nCalls.map(item => ({ ...item, itemType: 'translated' }))
     ];
   }
-  
-  // 获取样式配置
-  const decorationStyle = context.decorationStyle || 'suffix';
-  const suffixStyle = context.suffixStyle || {};
-  const inlineStyle = context.inlineStyle || {};
   
   // 配置部分的CSS类
   const configSectionClass = isConfigExpanded ? 'config-section expanded' : 'config-section';
@@ -670,9 +682,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           <div class="config-row">
             <h4>3、装饰显示风格</h4>
           </div>
-          
-        
-          
           <!-- 添加样式配置部分 -->
           <div class="config-row">
             <div class="style-config-container">
@@ -685,7 +694,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               </div>
               <div id="inline-edit-options" class="config-row" style="${decorationStyle === 'inline' ? '' : 'display: none;'}">
                 <div class="config-item">
-                  <input type="checkbox" id="show-preview-in-edit" ${context.showFullFormInEditMode ? 'checked' : ''}>
+                  <input type="checkbox" id="show-preview-in-edit" ${showFullFormInEditMode ? 'checked' : ''}>
                   <label for="show-preview-in-edit">编辑时显示译文预览</label>
                 </div>
               </div>
@@ -750,6 +759,37 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 </div>
               </div>
               <button id="apply-style-changes" class="primary-button">应用样式更改</button>
+            </div>
+          </div>
+          
+          <!-- 添加翻译功能设置模块 -->
+          <div class="config-row">
+            <h4>4、翻译功能设置</h4>
+          </div>
+          <div class="config-row">
+            <div class="style-config-container">
+                
+            <!-- 生成键名前缀设置 -->
+              <div class="config-item">
+                <label>键名前缀：</label>
+                <input type="text" id="key-prefix" value="${autoGenerateKeyPrefix}" class="text-input">
+                <span class="help-text">自动生成键名的前缀，如：前缀.***</span>
+              </div>
+              <!-- 自动生成键名设置 -->
+              <div class="config-item">
+                <input type="checkbox" id="auto-generate-key" ${autoGenerateKeyFromText ? 'checked' : ''}>
+                <label for="auto-generate-key">自动翻译生成键名</label>
+                <span class="help-text">开启后将使用翻译API根据文本内容自动生成有意义的键名</span>
+              </div>
+              
+              
+              
+              <!-- 自动翻译所有语言设置 -->
+              <div class="config-item">
+                <input type="checkbox" id="auto-translate-all" ${autoTranslateAllLanguages ? 'checked' : ''}>
+                <label for="auto-translate-all">自动翻译到所有语言</label>
+                <span class="help-text">开启后会自动翻译并保存到所有配置的语言文件</span>
+              </div>
             </div>
           </div>
         </div>
@@ -1256,6 +1296,37 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             // 等待 DOM 更新
             setTimeout(bindAllEvents, 0);
           }
+        });
+
+        // 翻译功能设置事件处理
+        document.getElementById('auto-generate-key').addEventListener('change', function() {
+          vscode.postMessage({
+            command: 'updateConfig',
+            data: {
+              key: 'i18n-swapper.autoGenerateKeyFromText',
+              value: this.checked
+            }
+          });
+        });
+        
+        document.getElementById('key-prefix').addEventListener('change', function() {
+          vscode.postMessage({
+            command: 'updateConfig',
+            data: {
+              key: 'i18n-swapper.autoGenerateKeyPrefix',
+              value: this.value
+            }
+          });
+        });
+        
+        document.getElementById('auto-translate-all').addEventListener('change', function() {
+          vscode.postMessage({
+            command: 'updateConfig',
+            data: {
+              key: 'i18n-swapper.autoTranslateAllLanguages',
+              value: this.checked
+            }
+          });
         });
       </script>
     </body>

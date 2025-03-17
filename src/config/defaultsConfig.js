@@ -53,6 +53,7 @@ module.exports = {
     },
     
     // 自动生成键名配置
-    autoGenerateKeyFromText: true, // 默认关闭自动生成键名功能
+    autoGenerateKeyFromText: true, // 默认开启自动生成键名功能
+    autoTranslateAllLanguages: true, // 默认开启自动翻译所有语言功能
     autoGenerateKeyPrefix: '_iw', // 自动生成键名的前缀
 }; 

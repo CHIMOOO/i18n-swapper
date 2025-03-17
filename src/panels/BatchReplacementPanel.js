@@ -46,6 +46,9 @@ class BatchReplacementPanel {
     this.scanMode = 'pending'; // 新增：扫描模式，默认为待转义
     this.existingI18nCalls = []; // 新增：存储已转义的国际化调用
 
+    // 加载配置
+    this._loadConfiguration();
+
     // 处理面板关闭和视图状态变更
     this._disposables = [];
   }
@@ -233,6 +236,20 @@ class BatchReplacementPanel {
           break;
         case 'refreshScan':
           await this.refreshScan();
+          break;
+        case 'updateConfig':
+          await vscode.workspace.getConfiguration().update(
+            data.key,
+            data.value,
+            vscode.ConfigurationTarget.Workspace
+          );
+          
+          // 如果是自动翻译相关设置，可能需要刷新
+          if (data.key.includes('autoGenerate') || 
+              data.key.includes('autoTranslate')) {
+            // 更新内部缓存的配置
+            this._loadConfiguration();
+          }
           break;
         default:
           console.log(`未处理的命令: ${command}`);
@@ -1766,6 +1783,18 @@ class BatchReplacementPanel {
       (this.selectedIndexes.includes(item.index) || 
        this.selectedIndexes.length === 0 && item.selected)
     );
+  }
+
+  // 添加一个方法来加载配置
+  _loadConfiguration() {
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    
+    // 加载翻译相关配置
+    this.autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', true);
+    this.autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', '_iw');
+    this.autoTranslateAllLanguages = config.get('autoTranslateAllLanguages', true);
+    
+    // 其他配置...
   }
 }
 

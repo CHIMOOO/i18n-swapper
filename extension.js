@@ -65,7 +65,7 @@ function activate(context) {
                     vscode.window.showInformationMessage(`已翻译并更新: ${translatedText}`);
                     
                     // 先关闭悬浮窗口
-                    await vscode.commands.executeCommand('editor.action.hideHover');
+                    // await vscode.commands.executeCommand('editor.action.hideHover');
                     
                     // 然后刷新国际化装饰器
                     vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
@@ -140,7 +140,8 @@ async function ensureDefaultWorkspaceSettings() {
         'i18n-swapper.tencentTranslation.sourceLanguage': defaultsConfig.tencentTranslation.sourceLanguage,
         'i18n-swapper.tencentTranslation.languageMappings': defaultsConfig.tencentTranslation.languageMappings,
         'i18n-swapper.autoGenerateKeyFromText': defaultsConfig.autoGenerateKeyFromText,
-        'i18n-swapper.autoGenerateKeyPrefix': defaultsConfig.autoGenerateKeyPrefix
+        'i18n-swapper.autoGenerateKeyPrefix': defaultsConfig.autoGenerateKeyPrefix,
+        'i18n-swapper.autoTranslateAllLanguages': defaultsConfig.autoTranslateAllLanguages
     };
     
     // 检查 .vscode 目录是否存在，如果不存在则创建

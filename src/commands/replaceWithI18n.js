@@ -1,6 +1,8 @@
 const vscode = require('vscode');
 const path = require('path');
 const utils = require('../utils');
+const { generateKeyFromTranslation, translateTextToAllLanguages } = require('../services/translationService');
+const { saveTranslationToFile } = require('../panels/services/languageFileManager');
 
 /**
  * 查找文本周围的引号，并扩展选择范围
@@ -66,6 +68,9 @@ async function expandSelectionIfNeeded(editor, selection) {
  * 替换为国际化函数调用
  */
 async function replaceWithI18n() {
+        // 获取配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const autoGenerateKeyFromText = config.get('autoGenerateKeyFromText');
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showInformationMessage('没有打开的编辑器');
@@ -93,8 +98,7 @@ async function replaceWithI18n() {
         return;
     }
 
-    // 获取配置
-    const config = vscode.workspace.getConfiguration('i18n-swapper');
+
 
     // 检查并选择国际化文件
     const localesPaths = await utils.checkAndSelectLocaleFile();
@@ -141,55 +145,71 @@ async function replaceWithI18n() {
             // 已找到匹配的键
             i18nKey = foundPath;
         } else {
-            // 未找到，创建新键
-            // 显示输入框让用户输入键名
-            const inputKey = await vscode.window.showInputBox({
-                placeHolder: '输入国际化键名',
-                prompt: '未找到匹配的国际化键，请输入新的键名',
-                value: 'new.key'
-            });
-
-            if (!inputKey) {
-                vscode.window.showInformationMessage('操作已取消');
-                return;
-            }
-
-            i18nKey = inputKey;
-
-            // 提示用户要添加的内容
-            const addConfirm = await vscode.window.showInformationMessage(
-                `将添加新的国际化键: ${i18nKey} = "${textToFind}"`, {
-                    modal: false
-                },
-                '确认添加'
-            );
-
-            if (addConfirm !== '确认添加') {
-                vscode.window.showInformationMessage('操作已取消');
-                return;
-            }
-
-            // 选择要添加到哪个文件
-            let targetFile;
-            if (localesPaths.length === 1) {
-                targetFile = localesPaths[0];
-            } else {
-                // 多个文件时，让用户选择
-                targetFile = await vscode.window.showQuickPick(localesPaths, {
-                    placeHolder: '选择要添加到哪个国际化文件'
-                });
-
-                if (!targetFile) {
-                    vscode.window.showInformationMessage('操作已取消');
-                    return;
+            // 未找到匹配键时的处理逻辑
+            const autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', false);
+            const autoTranslateAllLanguages = config.get('autoTranslateAllLanguages', false);
+            const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
+            
+            try {
+                // 1. 根据配置生成键名
+                if (autoGenerateKeyFromText) {
+                    // 使用翻译API生成有意义的键名
+                    i18nKey = await generateKeyFromTranslation(textToFind);
+                } else {
+                    // 使用默认前缀加哈希值作为键名
+                    const autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', '_iw');
+                    i18nKey = `${autoGenerateKeyPrefix}.${simpleHash(textToFind).toString(16).substring(0, 6)}`;
                 }
+                
+                // 2. 根据配置翻译并保存到语言文件
+                if (autoTranslateAllLanguages) {
+                    // 调用翻译服务翻译到所有配置的语言
+                    await vscode.window.withProgress({
+                        location: vscode.ProgressLocation.Notification,
+                        title: '翻译中...',
+                        cancellable: false
+                    }, async (progress) => {
+                        progress.report({ message: `正在翻译文本并保存到所有语言文件...` });
+                        
+                        // 使用通用的翻译服务
+                        await translateTextToAllLanguages(textToFind, i18nKey);
+                    });
+                } else {
+                    // 只保存源语言
+                    const workspaceFolders = vscode.workspace.workspaceFolders;
+                    if (!workspaceFolders) {
+                        throw new Error('未找到工作区文件夹');
+                    }
+                    
+                    // 获取语言映射配置
+                    const languageMappings = config.get('tencentTranslation.languageMappings', []);
+                    
+                    // 查找源语言的配置
+                    const sourceLangMapping = languageMappings.find(mapping => 
+                        mapping.languageCode === sourceLanguage
+                    );
+                    
+                    if (sourceLangMapping) {
+                        const rootPath = workspaceFolders[0].uri.fsPath;
+                        const targetFile = path.join(rootPath, sourceLangMapping.filePath);
+                        
+                        // 保存到源语言文件
+                        await utils.saveTranslationToFile(targetFile, i18nKey, textToFind);
+                        
+                        // 设置使用的文件路径
+                        foundInFile = targetFile;
+                    } else {
+                        vscode.window.showWarningMessage(`未找到源语言 ${sourceLanguage} 的映射配置，无法保存翻译`);
+                    }
+                }
+            } catch (error) {
+                console.error('自动生成键名或翻译失败:', error);
+                vscode.window.showErrorMessage(`自动处理失败: ${error.message}`);
+                
+                // 失败时使用默认方式
+                const autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', '_iw');
+                i18nKey = `${autoGenerateKeyPrefix}.${simpleHash(textToFind).toString(16).substring(0, 6)}`;
             }
-
-            // TODO: 向文件添加新的键值对
-            // 注意: 这部分功能需要根据项目实际需求实现
-            // 例如: 解析文件 -> 添加新键 -> 保存文件
-
-            foundInFile = targetFile;
         }
 
         // 生成替换文本
@@ -218,10 +238,28 @@ async function replaceWithI18n() {
             `已替换为 ${functionName}('${i18nKey}')` +
             (foundInFile ? ` [来自: ${foundInFile}]` : '')
         );
+        
+        // 替换完成后刷新装饰器，使新的翻译内容立即显示
+        await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
     } catch (error) {
         console.error('替换出错:', error);
         vscode.window.showErrorMessage(`替换出错: ${error.message}`);
     }
+}
+
+/**
+ * 简单的哈希函数
+ * @param {string} str 输入字符串
+ * @returns {number} 哈希值
+ */
+function simpleHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
 }
 
 module.exports = replaceWithI18n;
