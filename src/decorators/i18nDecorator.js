@@ -520,6 +520,7 @@ class I18nDecorator {
                 // 应用悬浮装饰
                 this.activeEditor.setDecorations(hoverDecorationType, hoverDecorations);
             } else {
+                console.log('内联模式')
                 // 内联模式: t(译文)
                 this.activeEditor.setDecorations(this.suffixDecorationType, []);
                 this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
@@ -744,18 +745,22 @@ class I18nDecorator {
      * 处理选择变化事件
      */
     handleSelectionChange(e) {
-
         // 仅当处于内联模式且有点击事件时处理
         if (this.decorationStyle !== 'inline' || e.selections.length !== 1) {
             return;
         }
 
         const selection = e.selections[0];
+        
+        // 如果选择不为空，用户正在拖拽选择文本，此时不应切换模式
+        if (!selection.isEmpty) {
+            return;
+        }
 
         // 检查是否点击了装饰文本区域
         if (this.isInEditMode) {
             // 如果已经在编辑模式，检查是否点击了其他区域
-            if (!selection.isEmpty || !this.editModeRange.contains(selection.active)) {
+            if (!this.editModeRange.contains(selection.active)) {
                 // 用户点击了其他区域，退出编辑模式
                 this.exitEditMode();
             }
