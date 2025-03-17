@@ -462,8 +462,8 @@ function showGlobalActionPanel(editor, document, replacementCount) {
             
             // 创建悬停消息，正确设置为可点击
             const hoverMessage = new vscode.MarkdownString(
-                `### i18n-swapper 批量国际化替换操作\n\n` +
-                `**[✓ 全部接受](command:i18n-swapper.applyAllReplacements)**  \n\n` +
+                `##### i18n-swapper 批量国际化替换操作\n\n` +
+                `**[✓ 全部接受](command:i18n-swapper.applyAllReplacements)** ` +
                 `**[✗ 全部取消](command:i18n-swapper.cancelAllReplacements)**`
             );
             // 关键：设置为可信任并启用命令
@@ -475,7 +475,7 @@ function showGlobalActionPanel(editor, document, replacementCount) {
                 range,
                 renderOptions: {
                     after: {
-                        contentText: `找到 ${replacementCount} 处可替换的文本 —— 鼠标悬停可操作`,
+                        contentText: `找到 ${replacementCount} 处可替换的文本 （鼠标悬停可操作）`,
                         fontStyle: 'normal',
                         fontWeight: 'bold',
                         color: '#e37933',

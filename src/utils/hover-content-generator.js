@@ -93,7 +93,7 @@ function generateLanguageHoverContent(params) {
     }
     
     // 添加语言值部分
-    content += `### 其他语言值\n\n${languageValuesMarkdown}\n`;
+    content += `##### 其他语言值\n\n${languageValuesMarkdown}\n`;
     
     // 创建MarkdownString对象
     const markdownContent = new vscode.MarkdownString(content);
