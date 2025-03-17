@@ -10,6 +10,11 @@ const { generateLanguageHoverContent } = require('../utils/hover-content-generat
 class I18nDecorator {
     constructor(context) {
         this.context = context;
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        this.missingKeyBorderWidth = config.get('missingKeyBorderWidth', defaultsConfig.missingKeyBorderWidth);
+        this.missingKeyBorderStyle = config.get('missingKeyBorderStyle', defaultsConfig.missingKeyBorderStyle);
+        this.missingKeyBorderColor = config.get('missingKeyBorderColor', defaultsConfig.missingKeyBorderColor);
+        this.missingKeyBorderSpacing = config.get('missingKeyBorderSpacing', defaultsConfig.missingKeyBorderSpacing);
 
         // 后缀模式的装饰器
         this.suffixDecorationType = vscode.window.createTextEditorDecorationType({
@@ -36,6 +41,18 @@ class I18nDecorator {
                 contentText: '',
             },
             textDecoration: 'none;',
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+        });
+
+        // 添加线装饰器（用于标记源语言库中不存在的键）
+        this.missingKeyDecorationType = vscode.window.createTextEditorDecorationType({
+            backgroundColor: 'transparent',
+            isWholeLine: false,
+            overviewRulerLane: vscode.OverviewRulerLane.Right,
+            borderWidth: this.missingKeyBorderWidth,
+            borderStyle: this.missingKeyBorderStyle,
+            borderColor: this.missingKeyBorderColor,
+            borderSpacing: this.missingKeyBorderSpacing,
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
         });
 
@@ -102,6 +119,12 @@ class I18nDecorator {
         // 加载样式配置
         this.suffixStyle = config.get('suffixStyle', defaultsConfig.suffixStyle);
         this.inlineStyle = config.get('inlineStyle', defaultsConfig.inlineStyle);
+        
+        // 加载缺失键样式配置
+        this.missingKeyBorderWidth = config.get('missingKeyBorderWidth', defaultsConfig.missingKeyBorderWidth);
+        this.missingKeyBorderStyle = config.get('missingKeyBorderStyle', defaultsConfig.missingKeyBorderStyle);
+        this.missingKeyBorderColor = config.get('missingKeyBorderColor', defaultsConfig.missingKeyBorderColor);
+        this.missingKeyBorderSpacing = config.get('missingKeyBorderSpacing', defaultsConfig.missingKeyBorderSpacing);
 
         // 更新装饰器类型
         this.updateDecoratorTypes();
@@ -125,6 +148,9 @@ class I18nDecorator {
         }
         if (this.inlineDecorationType) {
             this.inlineDecorationType.dispose();
+        }
+        if (this.missingKeyDecorationType) {
+            this.missingKeyDecorationType.dispose();
         }
 
         // 处理字体大小 - 确保有单位
@@ -160,6 +186,18 @@ class I18nDecorator {
                 margin: this.inlineStyle.margin || '0'
             },
             textDecoration: 'none; opacity: 0; display: none;', // 隐藏原始文本
+            rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
+        });
+
+        // 更新缺失键装饰器
+        this.missingKeyDecorationType = vscode.window.createTextEditorDecorationType({
+            backgroundColor: 'transparent',
+            isWholeLine: false,
+            overviewRulerLane: vscode.OverviewRulerLane.Right,
+            borderWidth: this.missingKeyBorderWidth,
+            borderStyle: this.missingKeyBorderStyle,
+            borderColor: this.missingKeyBorderColor,
+            borderSpacing: this.missingKeyBorderSpacing,
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
         });
     }
@@ -324,6 +362,7 @@ class I18nDecorator {
         const suffixDecorations = [];
         const inlineDecorations = [];
         const hoverDecorations = [];
+        const missingKeyDecorations = []; // 添加不存在键的装饰数组
         this.currentInlineDecorations = []; // 重置当前内联装饰数组
 
         // 获取语言映射配置
@@ -350,21 +389,23 @@ class I18nDecorator {
                     translatedText = this.getNestedValue(key);
                 }
 
+                const fullMatch = match[0]; // 例如: t('key')
+                // 找到开始和结束位置
+                const startPos = document.positionAt(match.index);
+                const endPos = document.positionAt(match.index + fullMatch.length);
+
+                // 创建悬浮内容（无论键是否存在都创建悬浮内容）
+                const hoverContent = generateLanguageHoverContent({
+                    allLanguageData: this.allLanguageData,
+                    languageMappings: languageMappings,
+                    i18nKey: key,
+                    showActions: false, // 不显示操作按钮
+                    missingKey: !translatedText // 标记是否为缺失的键
+                });
+
                 if (translatedText) {
-                    const fullMatch = match[0]; // 例如: t('key')
-
-                    // 找到开始和结束位置
-                    const startPos = document.positionAt(match.index);
-                    const endPos = document.positionAt(match.index + fullMatch.length);
-
-                    // 创建悬浮内容
-                    const hoverContent = generateLanguageHoverContent({
-                        allLanguageData: this.allLanguageData,
-                        languageMappings: languageMappings,
-                        i18nKey: key,
-                        showActions: false
-                    });
-
+                    // 如果有翻译内容，创建正常的装饰
+                    
                     // 创建后缀样式的装饰
                     const suffixDecoration = {
                         range: new vscode.Range(startPos, endPos),
@@ -398,13 +439,6 @@ class I18nDecorator {
                         hoverMessage: hoverContent
                     };
                     hoverDecorations.push(suffixHoverDecoration);
-
-                    // 为原函数调用区域也创建悬浮装饰
-                    const functionHoverDecoration = {
-                        range: new vscode.Range(startPos, endPos),
-                        hoverMessage: hoverContent
-                    };
-                    hoverDecorations.push(functionHoverDecoration);
 
                     // 为内联样式找到括号内的内容位置
                     const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
@@ -441,7 +475,22 @@ class I18nDecorator {
                         };
                         inlineDecorations.push(inlineDecoration);
                     }
+                } else {
+                    // 如果键不存在，添加蓝色波浪线装饰和悬浮提示
+                    // 为函数调用添加波浪线装饰
+                    const missingKeyDecoration = {
+                        range: new vscode.Range(startPos, endPos),
+                        hoverMessage: hoverContent
+                    };
+                    missingKeyDecorations.push(missingKeyDecoration);
                 }
+
+                // 不管键是否存在，都为原函数调用区域创建悬浮装饰
+                const functionHoverDecoration = {
+                    range: new vscode.Range(startPos, endPos),
+                    hoverMessage: hoverContent
+                };
+                hoverDecorations.push(functionHoverDecoration);
             }
         }
 
@@ -458,6 +507,7 @@ class I18nDecorator {
                 this.activeEditor.setDecorations(this.suffixDecorationType, suffixDecorations);
                 this.activeEditor.setDecorations(this.inlineDecorationType, []);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
+                this.activeEditor.setDecorations(this.missingKeyDecorationType, []);
             }
         } else {
             // 正常显示模式
@@ -466,6 +516,7 @@ class I18nDecorator {
                 this.activeEditor.setDecorations(this.suffixDecorationType, suffixDecorations);
                 this.activeEditor.setDecorations(this.inlineDecorationType, []);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
+                this.activeEditor.setDecorations(this.missingKeyDecorationType, missingKeyDecorations);
                 // 应用悬浮装饰
                 this.activeEditor.setDecorations(hoverDecorationType, hoverDecorations);
             } else {
@@ -473,6 +524,7 @@ class I18nDecorator {
                 this.activeEditor.setDecorations(this.suffixDecorationType, []);
                 this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
+                this.activeEditor.setDecorations(this.missingKeyDecorationType, missingKeyDecorations);
                 // 内联模式的悬浮已在inlineDecoration中
                 this.activeEditor.setDecorations(hoverDecorationType, []);
             }
@@ -579,6 +631,7 @@ class I18nDecorator {
         this.suffixDecorationType.dispose();
         this.inlineDecorationType.dispose();
         this.editModeDecorationType.dispose();
+        this.missingKeyDecorationType.dispose(); // 添加清理缺失键装饰器
     }
 
     /**

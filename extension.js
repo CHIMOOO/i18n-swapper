@@ -141,7 +141,11 @@ async function ensureDefaultWorkspaceSettings() {
         'i18n-swapper.tencentTranslation.languageMappings': defaultsConfig.tencentTranslation.languageMappings,
         'i18n-swapper.autoGenerateKeyFromText': defaultsConfig.autoGenerateKeyFromText,
         'i18n-swapper.autoGenerateKeyPrefix': defaultsConfig.autoGenerateKeyPrefix,
-        'i18n-swapper.autoTranslateAllLanguages': defaultsConfig.autoTranslateAllLanguages
+        'i18n-swapper.autoTranslateAllLanguages': defaultsConfig.autoTranslateAllLanguages,
+        'i18n-swapper.missingKeyBorderWidth': defaultsConfig.missingKeyBorderWidth,
+        'i18n-swapper.missingKeyBorderStyle': defaultsConfig.missingKeyBorderStyle,
+        'i18n-swapper.missingKeyBorderColor': defaultsConfig.missingKeyBorderColor,
+        'i18n-swapper.missingKeyBorderSpacing': defaultsConfig.missingKeyBorderSpacing
     };
     
     // 检查 .vscode 目录是否存在，如果不存在则创建

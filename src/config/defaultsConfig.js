@@ -56,4 +56,8 @@ module.exports = {
     autoGenerateKeyFromText: true, // 默认开启自动生成键名功能
     autoTranslateAllLanguages: true, // 默认开启自动翻译所有语言功能
     autoGenerateKeyPrefix: '_iw', // 自动生成键名的前缀
+    missingKeyBorderWidth: '0 0 2px 0',
+    missingKeyBorderStyle: 'solid',
+    missingKeyBorderColor: '#ff6900',
+    missingKeyBorderSpacing: '2px',
 }; 
