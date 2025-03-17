@@ -102,7 +102,9 @@ async function ensureDefaultWorkspaceSettings() {
         'i18n-swapper.tencentTranslation.apiSecret': defaultsConfig.tencentTranslation.apiSecret,
         'i18n-swapper.tencentTranslation.region': defaultsConfig.tencentTranslation.region,
         'i18n-swapper.tencentTranslation.sourceLanguage': defaultsConfig.tencentTranslation.sourceLanguage,
-        'i18n-swapper.tencentTranslation.languageMappings': defaultsConfig.tencentTranslation.languageMappings
+        'i18n-swapper.tencentTranslation.languageMappings': defaultsConfig.tencentTranslation.languageMappings,
+        'i18n-swapper.autoGenerateKeyFromText': defaultsConfig.autoGenerateKeyFromText,
+        'i18n-swapper.autoGenerateKeyPrefix': defaultsConfig.autoGenerateKeyPrefix
     };
     
     // 检查 .vscode 目录是否存在，如果不存在则创建

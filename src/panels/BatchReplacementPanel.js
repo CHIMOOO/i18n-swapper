@@ -1019,7 +1019,60 @@ class BatchReplacementPanel {
 
       // 如果没有输入键名，则生成一个
       if (!suggestedKey) {
-        suggestedKey = generateKeyFromText(item.text);
+        this.autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', defaultsConfig.autoGenerateKeyFromText);
+        if (this.autoGenerateKeyFromText) {
+          this.autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', defaultsConfig.autoGenerateKeyPrefix);
+          
+          try {
+            // 检查API配置是否完整
+            if (!apiKey || !apiSecret) {
+              throw new Error('腾讯云翻译API密钥未配置，请在设置中配置API密钥');
+            }
+            
+            console.log(`[自动生成键名] 正在翻译文本: "${item.text}"`);
+            
+            // 调用腾讯云翻译API，将中文翻译为英文
+            const translation = await translateText(
+              item.text,
+              'auto', // 源语言设为自动检测
+              'en',   // 目标语言为英文
+              apiKey,
+              apiSecret,
+              region
+            );
+            
+            if (translation ) {
+              // 将翻译结果格式化为键名
+              const translatedText = translation;
+              console.log(`[自动生成键名] 翻译结果: "${translatedText}"`);
+              
+              // 处理翻译结果，生成合适的键名格式
+              const formattedKey = translatedText
+                .toLowerCase() // 转小写
+                .trim() // 去除两端空格
+                .replace(/[^\w\s]/gi, '') // 移除特殊字符
+                .replace(/\s+/g, '_') // 空格替换为下划线
+                .replace(/_+/g, '_'); // 多个下划线合并为一个
+              
+              // 生成完整键名（添加前缀）
+              suggestedKey = `${this.autoGenerateKeyPrefix}.${formattedKey}`;
+              console.log(`[自动生成键名] 生成的键名: "${suggestedKey}"`);
+              
+              // 直接返回，跳过下面的默认键名生成逻辑
+              item.i18nKey = suggestedKey;
+              
+            } else {
+              throw new Error('翻译结果无效');
+            }
+          } catch (error) {
+            console.error('[自动生成键名] 失败:', error);
+            vscode.window.showWarningMessage(`自动生成键名失败: ${error.message}，将使用默认生成方法`);
+            // 失败时继续使用默认的键名生成方法
+            suggestedKey = generateKeyFromText(item.text);
+          }
+        }
+       
+     
       }
 
       // 更新键名

@@ -9,7 +9,7 @@ module.exports = {
     functionName: 't',                  // 国际化函数名称
     quoteType: 'single',                // 引号类型: 'single' 或 'double'
     localesPaths: [],                   // 本地化文件路径
-    showFullFormInEditMode: false,      // 编辑模式下是否显示完整形式
+    showFullFormInEditMode: true,      // 编辑模式下是否显示完整形式
     
     // 扫描配置
     scanPatterns: [
@@ -50,5 +50,9 @@ module.exports = {
         ignoreTemporarily: '暂时忽略',
         workspaceNotFound: '未找到工作区文件夹',
         filesAdded: (count) => `已添加 ${count} 个国际化文件`
-    }
+    },
+    
+    // 自动生成键名配置
+    autoGenerateKeyFromText: true, // 默认关闭自动生成键名功能
+    autoGenerateKeyPrefix: '_iw', // 自动生成键名的前缀
 }; 
