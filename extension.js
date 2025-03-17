@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 const defaultsConfig = require('./src/config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 const { LANGUAGE_NAMES } = require('./src/utils/language-mappings');
+const { handleHoverTranslate } = require('./src/commands/translateHover');
 
 /**
  * 激活扩展
@@ -78,7 +79,8 @@ function activate(context) {
             console.error('翻译出错:', error);
             vscode.window.showErrorMessage(`翻译出错: ${error.message}`);
         }
-    })
+    }),
+    vscode.commands.registerCommand('i18n-swapper.translateHover', handleHoverTranslate)
   );
 
   // 初始化其他命令

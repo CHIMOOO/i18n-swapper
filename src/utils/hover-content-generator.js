@@ -105,7 +105,7 @@ function generateLanguageHoverContent(params) {
     
     // 如果有i18nKey，添加标题
     if (i18nKey) {
-        htmlContent += `<div>国际化键: <code>${escapeHtml(i18nKey)}</code><a >全部翻译</a></div>`;
+        htmlContent += `<div>国际化键: <code>${escapeHtml(i18nKey)}</code></div>`;
     }
     
     // 添加语言值部分
@@ -237,10 +237,13 @@ function generateLanguageHoverContent(params) {
             </tr>
         `;
     }
+        const sourceLanguageCode = config.get('tencentTranslation.sourceLanguage', 'zh');
+        const sourceText = getSourceText(i18nKey, allLanguageData, sourceLanguageCode);
         // 添加底部按钮
     languageRowsHtml += `
         <tr>
-            <td></td>
+            <td>
+            <a title="翻译到所有语言" href="command:i18n-swapper.translateHover?${encodeURIComponent(JSON.stringify({ text: sourceText, key: i18nKey }))}">✨翻译</a></td>
             <td></td>
             <td></td>
             <td>
@@ -254,6 +257,13 @@ function generateLanguageHoverContent(params) {
 
     
     htmlContent += `</div>`;
+    
+    // 获取源语言代码和文本
+
+    
+    // 在HTML内容的最后，修改翻译按钮，传递正确的参数
+    // 替换现有的翻译按钮代码
+ 
     
     // 创建MarkdownString对象
     const markdownContent = new vscode.MarkdownString(htmlContent);

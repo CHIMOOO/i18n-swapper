@@ -25,6 +25,7 @@ const {
   translateText,
   getLanguageName
 } = require('./services/translationService');
+const { translateTextToAllLanguages } = require('../services/translationService');
 const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
 
 /**
@@ -1055,128 +1056,51 @@ class BatchReplacementPanel {
     if (!item || !item.text) return;
 
     try {
-      console.log(`[翻译开始] 索引: ${index}, 文本: "${item.text}"`);
-
-      // 获取腾讯翻译API配置
+      console.log(`面板翻译项：索引=${index}, 文本="${item.text}", 用户键="${userInputKey}"`);
+      
+      // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const apiKey = config.get('tencentTranslation.apiKey', '');
       const apiSecret = config.get('tencentTranslation.apiSecret', '');
       const region = config.get('tencentTranslation.region', 'ap-guangzhou');
       const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
-
-      // 使用参数传入的键名或生成一个新的
+      const languageMappings = config.get('tencentTranslation.languageMappings', []);
+      
+      // 生成或使用提供的键名
       let suggestedKey = userInputKey || '';
-
-      // 如果没有输入键名，则生成一个
+      
+      // 如果没有输入键名，则自动生成
       if (!suggestedKey) {
-        this.autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', defaultsConfig.autoGenerateKeyFromText);
-        if (this.autoGenerateKeyFromText) {
-          this.autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', defaultsConfig.autoGenerateKeyPrefix);
-          
-          try {
-            // 检查API配置是否完整
-            if (!apiKey || !apiSecret) {
-              throw new Error('腾讯云翻译API密钥未配置，请在设置中配置API密钥');
-            }
-            
-            console.log(`[自动生成键名] 正在翻译文本: "${item.text}"`);
-            
-            // 调用腾讯云翻译API，将中文翻译为英文
-            const translation = await translateText(
-              item.text,
-              'auto', // 源语言设为自动检测
-              'en',   // 目标语言为英文
-              apiKey,
-              apiSecret,
-              region
-            );
-            
-            if (translation ) {
-              // 将翻译结果格式化为键名
-              const translatedText = translation;
-              console.log(`[自动生成键名] 翻译结果: "${translatedText}"`);
-              
-              // 处理翻译结果，生成合适的键名格式
-              const formattedKey = translatedText
-                .toLowerCase() // 转小写
-                .trim() // 去除两端空格
-                .replace(/[^\w\s]/gi, '') // 移除特殊字符
-                .replace(/\s+/g, '_') // 空格替换为下划线
-                .replace(/_+/g, '_'); // 多个下划线合并为一个
-              
-              // 生成完整键名（添加前缀）
-              suggestedKey = `${this.autoGenerateKeyPrefix}.${formattedKey}`;
-              console.log(`[自动生成键名] 生成的键名: "${suggestedKey}"`);
-              
-              // 直接返回，跳过下面的默认键名生成逻辑
-              item.i18nKey = suggestedKey;
-              
-            } else {
-              throw new Error('翻译结果无效');
-            }
-          } catch (error) {
-            console.error('[自动生成键名] 失败:', error);
-            vscode.window.showWarningMessage(`自动生成键名失败: ${error.message}，将使用默认生成方法`);
-            // 失败时继续使用默认的键名生成方法
-            suggestedKey = generateKeyFromText(item.text);
-          }
+        const { generateKeyFromTranslation } = require('../services/translationService');
+        
+        // 检查是否配置了自动翻译生成
+        const autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', defaultsConfig.autoGenerateKeyFromText);
+        if (autoGenerateKeyFromText) {
+          // 使用翻译服务生成键名
+          suggestedKey = await generateKeyFromTranslation(item.text);
+        } else {
+          // 使用简单哈希生成
+          suggestedKey = generateKeyFromText(item.text);
         }
-       
-     
       }
-
-      // 更新键名
-      item.i18nKey = suggestedKey;
-
-      console.log(`[翻译] 使用键名: ${suggestedKey}, 源语言: ${sourceLanguage}`);
-
-      // 获取语言映射
-      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
-      console.log(`[翻译] 语言映射配置: ${JSON.stringify(languageMappings)}`);
-
-      // 无法继续翻译
-      if (!languageMappings || languageMappings.length === 0) {
-        vscode.window.showWarningMessage('未配置语言映射，请先在API翻译配置中添加语言映射');
-        return;
-      }
-
+      
+      // 保存到所有语言文件
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) throw new Error('未找到工作区');
+      const rootPath = workspaceFolders[0].uri.fsPath;
+      
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: '翻译中...',
-        cancellable: false
+        title: '翻译中...'
       }, async (progress) => {
-        // 检查API配置
-        if (!apiKey || !apiSecret) {
-          vscode.window.showWarningMessage('未配置腾讯翻译API密钥，请先在API翻译配置中设置');
-          return;
-        }
-
-        // 获取工作区目录
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) {
-          vscode.window.showErrorMessage('未找到工作区文件夹');
-          return;
-        }
-        const rootPath = workspaceFolders[0].uri.fsPath;
-
-        // 遍历所有目标语言进行翻译
         for (const mapping of languageMappings) {
-          try {
-            progress.report({
-              message: `翻译为 ${getLanguageName(mapping.languageCode)}...`
-            });
-
-            // 如果是源语言，直接使用原文
-            if (mapping.languageCode === sourceLanguage) {
-              await saveTranslationToFile(
-                path.join(rootPath, mapping.filePath),
-                suggestedKey,
-                item.text
-              );
-              continue;
-            }
-
-            // 调用翻译API
+          progress.report({ message: `翻译为 ${getLanguageName(mapping.languageCode)}...` });
+          
+          if (mapping.languageCode === sourceLanguage) {
+            // 源语言直接使用原文
+            await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, item.text);
+          } else {
+            // 其他语言调用翻译API
             const translatedText = await translateText(
               item.text,
               sourceLanguage,
@@ -1185,24 +1109,16 @@ class BatchReplacementPanel {
               apiSecret,
               region
             );
-
-            console.log(`[翻译结果] ${mapping.languageCode}: "${translatedText}"`);
-
-            // 保存翻译结果
-            await saveTranslationToFile(
-              path.join(rootPath, mapping.filePath),
-              suggestedKey,
-              translatedText
-            );
-          } catch (error) {
-            console.error(`翻译到 ${mapping.languageCode} 失败:`, error);
-            vscode.window.showErrorMessage(`翻译到 ${getLanguageName(mapping.languageCode)} 失败: ${error.message}`);
+            await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, translatedText);
           }
         }
-
-        vscode.window.showInformationMessage(`已生成键名 "${suggestedKey}" 并保存翻译`);
-        await this.updatePanelContent();
       });
+      
+      // 更新项的键值
+      item.i18nKey = suggestedKey;
+      
+      // 更新面板内容
+      await this.updatePanelContent();
     } catch (error) {
       console.error('[翻译严重错误]:', error);
       vscode.window.showErrorMessage(`翻译失败: ${error.message}`);
