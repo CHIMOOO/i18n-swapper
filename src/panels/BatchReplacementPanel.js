@@ -819,68 +819,118 @@ class BatchReplacementPanel {
    * @param {boolean} selected 是否选中
    */
   toggleItemSelection(index, selected) {
-    if (index >= 0 && index < this.replacements.length) {
-      this.replacements[index].selected = selected;
-
-      // 更新选中索引数组
-      if (selected && !this.selectedIndexes.includes(index)) {
-        this.selectedIndexes.push(index);
-        console.log(`添加项 ${index} 到选中列表，当前选中: ${this.selectedIndexes.length} 项`);
-      } else if (!selected && this.selectedIndexes.includes(index)) {
+    // 根据当前模式获取正确的数据源
+    let item;
+    if (this.scanMode === 'pending') {
+      item = this.replacements[index];
+    } else if (this.scanMode === 'translated') {
+      item = this.existingI18nCalls[index];
+    } else if (this.scanMode === 'all') {
+      // 合并数组
+      const allItems = [
+        ...this.replacements,
+        ...this.existingI18nCalls
+      ];
+      item = allItems[index];
+    }
+    
+    if (item) {
+      console.log(`切换项目 #${index} 的选择状态为: ${selected}`);
+      // 确保每个项目都有一个索引字段
+      item.index = index;
+      item.selected = selected;
+      
+      // 更新选中索引列表
+      if (selected) {
+        if (!this.selectedIndexes.includes(index)) {
+          this.selectedIndexes.push(index);
+        }
+      } else {
         this.selectedIndexes = this.selectedIndexes.filter(i => i !== index);
-        console.log(`从选中列表移除项 ${index}，当前选中: ${this.selectedIndexes.length} 项`);
       }
     }
   }
 
   /**
-   * 执行选中项的替换
+   * 翻译并替换所选项目
    */
   async performSelectedReplacements() {
     try {
-      if (!this.document) {
-        vscode.window.showWarningMessage('找不到文档，请重新打开面板');
-        return;
-      }
-
-      // 筛选所有选中且有i18nKey的替换项
-      const selectedItems = this.replacements.filter(item => item.selected && item.i18nKey);
-
+      const selectedItems = this.getSelectedItems();
+      
+      console.log(`获取到 ${selectedItems.length} 个选中项目`);
+      
       if (selectedItems.length === 0) {
-        vscode.window.showInformationMessage('没有选择任何有效的替换项');
+        vscode.window.showInformationMessage('没有选中的项目');
         return;
       }
-
-      // 获取替换服务
-      const replacementService = require('./services/replacementService');
-
-      // 在进度条中执行替换
+      
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: '执行替换',
+        title: '正在替换所选项目...',
         cancellable: false
       }, async (progress) => {
-        progress.report({
-          message: '正在替换...'
-        });
-
-        // 执行替换
-        const count = await replacementService.performReplacements(this.document, selectedItems);
-
-        // 从列表中移除已替换的项目
-        if (count > 0) {
-          this.replacements = this.replacements.filter(item =>
-            !(item.selected && item.i18nKey)
-          );
-
-          // 更新面板
-          await this.updatePanelContent();
+        // 获取配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const functionName = config.get('functionName', 't');
+        const quoteType = config.get('quoteType', 'single');
+        const quote = quoteType === 'single' ? "'" : '"';
+        
+        // 获取当前编辑的文档
+        const document = this.document;
+        if (!document) {
+          throw new Error('未找到关联的文档');
         }
-
-        vscode.window.showInformationMessage(`已替换 ${count} 个文本`);
+        
+        // 获取编辑器
+        const editor = vscode.window.visibleTextEditors.find(
+          editor => editor.document.uri.toString() === document.uri.toString()
+        );
+        
+        if (!editor) {
+          throw new Error('未找到关联的编辑器');
+        }
+        
+        progress.report({ message: `准备替换 ${selectedItems.length} 项...` });
+        
+        // 按照文档中的位置排序（从后往前替换，避免位置偏移）
+        const sortedItems = [...selectedItems].sort((a, b) => b.start - a.start);
+        
+        // 创建编辑对象
+        await editor.edit(editBuilder => {
+          for (const item of sortedItems) {
+            if (!item.i18nKey) {
+              console.warn(`跳过项目 #${item.index}, 因为它没有i18nKey`);
+              continue;
+            }
+            
+            const range = new vscode.Range(
+              document.positionAt(item.start),
+              document.positionAt(item.end)
+            );
+            
+            // 生成替换文本
+            const replacement = `${functionName}(${quote}${item.i18nKey}${quote})`;
+            
+            // 调试信息 - 输出替换详情
+            console.log(`替换范围: [${item.start}-${item.end}], 文本: "${document.getText(range)}", 替换为: "${replacement}"`);
+            
+            // 执行替换
+            editBuilder.replace(range, replacement);
+          }
+        });
+        
+        // 更新已替换的项目状态
+        // 标记已替换的项目
+        const replacedIndexes = selectedItems.map(item => item.index);
+        
+        // 重新分析文档，更新所有项目的位置信息
+        await this.analyzeAndLoadPanel();
+        
+        vscode.window.showInformationMessage(`已替换 ${selectedItems.length} 项`);
       });
     } catch (error) {
-      console.error('执行选中替换时出错:', error);
+      console.error('替换所选项目出错:', error);
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
     }
   }
@@ -1775,6 +1825,31 @@ class BatchReplacementPanel {
       console.error('应用所有替换时出错:', error);
       vscode.window.showErrorMessage(`应用替换失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 获取所有选中的项目
+   * @returns {Array} 选中的项目数组
+   */
+  getSelectedItems() {
+    let itemsSource = [];
+    
+    // 根据当前扫描模式确定项目来源
+    if (this.scanMode === 'translated') {
+      itemsSource = this.existingI18nCalls;
+    } else if (this.scanMode === 'pending') {
+      itemsSource = this.replacements;
+    } else if (this.scanMode === 'all') {
+      // 合并两个列表
+      itemsSource = [...this.replacements, ...this.existingI18nCalls];
+    }
+    
+    // 筛选所有选中且有i18nKey的项目
+    return itemsSource.filter(item => 
+      item.selected && item.i18nKey && 
+      (this.selectedIndexes.includes(item.index) || 
+       this.selectedIndexes.length === 0 && item.selected)
+    );
   }
 }
 
