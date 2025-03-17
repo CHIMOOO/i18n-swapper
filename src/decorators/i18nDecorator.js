@@ -260,7 +260,7 @@ class I18nDecorator {
     /**
      * 加载所有语言数据，用于悬浮显示
      */
-    loadAllLanguageData() {
+    loadAllLanguageData(lang) {
         this.allLanguageData = {};
         
         // 获取工作区根路径
@@ -276,6 +276,7 @@ class I18nDecorator {
         
         // 加载每种语言的数据
         for (const mapping of languageMappings) {
+            if (lang && mapping.languageCode != lang) return; // 如果是加载指定语言，那就只取指定语言
             try {
                 if (mapping.filePath) {
                     const fullPath = path.join(rootPath, mapping.filePath);
@@ -285,7 +286,12 @@ class I18nDecorator {
                         
                         if (fullPath.endsWith('.json')) {
                             const content = fs.readFileSync(fullPath, 'utf8');
-                            data = JSON.parse(content);
+                            if (content) {
+                                
+                                data = JSON.parse(content);
+                            } else {
+                                data={}
+                            }
                         } else if (fullPath.endsWith('.js')) {
                             // 清除require缓存
                             delete require.cache[require.resolve(fullPath)];
@@ -295,6 +301,8 @@ class I18nDecorator {
                         if (data) {
                             this.allLanguageData[mapping.languageCode] = data;
                         }
+                    } else {
+                        this.allLanguageData[mapping.languageCode] = {};
                     }
                 }
             } catch (error) {

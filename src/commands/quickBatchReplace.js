@@ -338,7 +338,6 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
         const line = position.line;
         const lineText = document.lineAt(line).text;
         const indentation = lineText.match(/^\s*/)[0];
-        
         // 使用生成器函数生成悬停内容
         const hoverMessage = generateLanguageHoverContent({
             allLanguageData,

@@ -5,6 +5,7 @@ const registerRefreshI18nDecorations = require('./src/commands/refreshI18nDecora
 const fs = require('fs');
 const path = require('path');
 const defaultsConfig = require('./src/config/defaultsConfig');  // 引入默认配置，更改为明确的名称
+const { LANGUAGE_NAMES } = require('./src/utils/language-mappings');
 
 /**
  * 激活扩展
@@ -44,7 +45,40 @@ function activate(context) {
         // 直接调用已有的命令
         vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
       }
-    )
+    ),
+    vscode.commands.registerCommand('i18n-swapper.translateText', async (params) => {
+        try {
+            const { text, targetLang, i18nKey, filePath } = params;
+            
+            // 显示正在翻译的消息
+            vscode.window.showInformationMessage(`正在翻译文本到 ${LANGUAGE_NAMES[targetLang] || targetLang}...`);
+            
+            // 调用翻译服务
+            const translatedText = await translateText(text, targetLang);
+            
+            if (translatedText) {
+                // 更新语言文件
+                const success = await updateLanguageFile(filePath, i18nKey, translatedText);
+                
+                if (success) {
+                    vscode.window.showInformationMessage(`已翻译并更新: ${translatedText}`);
+                    
+                    // 先关闭悬浮窗口
+                    await vscode.commands.executeCommand('editor.action.hideHover');
+                    
+                    // 然后刷新国际化装饰器
+                    vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+                } else {
+                    vscode.window.showErrorMessage('无法更新语言文件');
+                }
+            } else {
+                vscode.window.showErrorMessage('翻译失败');
+            }
+        } catch (error) {
+            console.error('翻译出错:', error);
+            vscode.window.showErrorMessage(`翻译出错: ${error.message}`);
+        }
+    })
   );
 
   // 初始化其他命令
@@ -151,6 +185,125 @@ async function ensureDefaultWorkspaceSettings() {
 }
 
 function deactivate() {}
+
+/**
+ * 使用腾讯云翻译API翻译文本
+ * @param {string} text 要翻译的文本
+ * @param {string} targetLang 目标语言代码
+ * @returns {Promise<string>} 翻译后的文本
+ */
+async function translateText(text, targetLang) {
+    // 获取翻译配置
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const apiKey = config.get('tencentTranslation.apiKey');
+    const apiSecret = config.get('tencentTranslation.apiSecret');
+    const sourceLanguage = config.get('tencentTranslation.sourceLanguage');
+    const region = config.get('tencentTranslation.region');
+    if (!apiKey || !apiSecret) {
+        vscode.window.showWarningMessage('腾讯云翻译 API 密钥未配置，请先配置');
+        vscode.commands.executeCommand('i18n-swapper.openApiTranslationConfig');
+        return null;
+    }
+    
+    // 调用现有的翻译服务
+    return require('./src/panels/services/translationService').translateText(
+        text, 
+        sourceLanguage, // 源语言代码
+        targetLang, 
+        apiKey, 
+        apiSecret, region
+    );
+}
+
+/**
+ * 更新语言文件中的翻译值
+ * @param {string} filePath 语言文件路径
+ * @param {string} i18nKey 国际化键
+ * @param {string} translatedText 翻译后的文本
+ * @returns {Promise<boolean>} 是否成功更新
+ */
+async function updateLanguageFile(filePath, i18nKey, translatedText) {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        
+        // 确保文件路径存在
+        if (!filePath) {
+            console.error('文件路径为空');
+            return false;
+        }
+        
+        // 获取完整的绝对路径
+        const fullPath = path.isAbsolute(filePath) 
+            ? filePath 
+            : path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath);
+        
+        console.log(`处理语言文件: ${fullPath}`);
+        
+        let langObj = {};
+        
+        // 检查文件是否存在
+        if (!fs.existsSync(fullPath)) {
+            // 文件不存在，创建目录和新文件
+            console.log(`语言文件不存在，将创建: ${fullPath}`);
+            
+            // 确保目录存在
+            const dirPath = path.dirname(fullPath);
+            if (!fs.existsSync(dirPath)) {
+                fs.mkdirSync(dirPath, { recursive: true });
+                console.log(`创建目录: ${dirPath}`);
+            }
+            
+            // 创建空的JSON文件
+            fs.writeFileSync(fullPath, JSON.stringify({}, null, 2), 'utf8');
+            console.log(`创建空语言文件: ${fullPath}`);
+            
+            // 使用空对象作为初始内容
+            langObj = {};
+        } else {
+            // 文件存在，读取内容
+            try {
+                const fileContent = await fs.promises.readFile(fullPath, 'utf8');
+                langObj = JSON.parse(fileContent);
+            } catch (readError) {
+                console.error(`读取或解析语言文件失败: ${fullPath}`, readError);
+                // 文件内容无效，使用空对象覆盖
+                langObj = {};
+            }
+        }
+        
+        // 按路径分割键
+        const keyPath = i18nKey.split('.');
+        let current = langObj;
+        
+        // 导航到倒数第二层
+        for (let i = 0; i < keyPath.length - 1; i++) {
+            const key = keyPath[i];
+            if (!current[key]) {
+                current[key] = {};
+            }
+            current = current[key];
+        }
+        
+        // 设置翻译值
+        const lastKey = keyPath[keyPath.length - 1];
+        current[lastKey] = translatedText;
+        
+        // 写回文件
+        await fs.promises.writeFile(
+            fullPath, 
+            JSON.stringify(langObj, null, 2), 
+            'utf8'
+        );
+        
+        console.log(`成功更新语言文件: ${fullPath}`);
+        return true;
+    } catch (error) {
+        console.error('更新语言文件出错:', error);
+        vscode.window.showErrorMessage(`更新语言文件失败: ${error.message}`);
+        return false;
+    }
+}
 
 module.exports = {
   activate,
