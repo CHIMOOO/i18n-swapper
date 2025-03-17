@@ -365,9 +365,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
            width:80px;
            }
         #inline-edit-options {
-          margin-top: 10px;
-          margin-bottom: 15px;
-          padding: 10px 0;
+          margin-top: 0;
+          margin-bottom: 0;
+          padding: 0 0 10px 0;
           border-radius: 4px;
         }
         #inline-edit-options .config-item {
@@ -670,28 +670,27 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           
           <!-- 添加装饰风格选择区域 -->
           <div class="config-row">
-            <h4>装饰显示风格</h4>
-            <div class="config-item">
-              <select id="decoration-style" class="form-control">
-                <option value="suffix" ${decorationStyle === 'suffix' ? 'selected' : ''}>t('key')(译文)</option>
-                <option value="inline" ${decorationStyle === 'inline' ? 'selected' : ''}>t(译文)</option>
-              </select>
-              <span class="help-text">选择i18n函数调用的显示风格</span>
-            </div>
+            <h4>3、装饰显示风格</h4>
           </div>
           
-          <div id="inline-edit-options" class="config-row" style="${decorationStyle === 'inline' ? '' : 'display: none;'}">
-
-            <div class="config-item">
-              <input type="checkbox" id="show-preview-in-edit" ${context.showFullFormInEditMode ? 'checked' : ''}>
-              <label for="show-preview-in-edit">编辑时显示译文预览</label>
-            </div>
-          </div>
+        
           
           <!-- 添加样式配置部分 -->
           <div class="config-row">
-            <h4>装饰样式配置</h4>
             <div class="style-config-container">
+              <div class="config-item" style="margin-bottom: 10px;">
+                <select id="decoration-style" class="form-control">
+                  <option value="suffix" ${decorationStyle === 'suffix' ? 'selected' : ''}>t('key')(译文)</option>
+                  <option value="inline" ${decorationStyle === 'inline' ? 'selected' : ''}>t(译文)</option>
+                </select>
+                <span class="help-text">选择i18n函数调用的显示风格</span>
+              </div>
+              <div id="inline-edit-options" class="config-row" style="${decorationStyle === 'inline' ? '' : 'display: none;'}">
+                <div class="config-item">
+                  <input type="checkbox" id="show-preview-in-edit" ${context.showFullFormInEditMode ? 'checked' : ''}>
+                  <label for="show-preview-in-edit">编辑时显示译文预览</label>
+                </div>
+              </div>
               <!-- 后缀模式样式配置 -->
               <div id="suffix-style-config" class="style-config-group" ${decorationStyle === 'suffix' ? '' : 'style="display: none;"'}>
                 <div class="config-item">
