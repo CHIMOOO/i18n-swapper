@@ -7,10 +7,22 @@ const { translateTextToAllLanguages } = require('../services/translationService'
  */
 async function handleHoverTranslate(params) {
   try {
-    const { text, key } = params;
+    let { text, key } = params;
     
     if (!text) {
-      throw new Error('文本不能为空');
+      // 提示用户输入文本
+      text = await vscode.window.showInputBox({
+        prompt: '请输入要翻译的文本',
+        placeHolder: '例如：提交表单',
+        validateInput: input => {
+          return input && input.trim() !== '' ? null : '文本不能为空';
+        }
+      });
+      
+      // 如果用户取消输入，则终止流程
+      if (!text) {
+        return null; // 返回 null 表示操作被取消
+      }
     }
     
     console.log(`处理悬浮翻译：文本="${text}", 键="${key}"`);
