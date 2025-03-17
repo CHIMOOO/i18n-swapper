@@ -96,12 +96,52 @@ class I18nDecorator {
 
             // 加载所有语言数据
             this.loadAllLanguageData();
+            
+            // 注册悬浮提供器，用于后缀文本的悬浮显示
+            this.registerHoverProvider();
 
             // 如果有活动编辑器，立即更新装饰
             if (this.activeEditor) {
                 this.updateDecorations();
             }
         }
+    }
+
+    /**
+     * 注册自定义悬浮提供器，用于处理装饰文本的悬浮
+     */
+    registerHoverProvider() {
+        // 存储装饰信息，用于悬浮检测
+        this.decorationHoverMap = new Map();
+        
+        // 注册悬浮提供器
+        this.hoverProviderDisposable = vscode.languages.registerHoverProvider('*', {
+            provideHover: (document, position, token) => {
+                if (this.activeEditor && document === this.activeEditor.document) {
+                    // 检查是否在函数调用区域内
+                    for (const [key, value] of this.decorationHoverMap.entries()) {
+                        // 检查是否在i18n函数调用的范围内
+                        if (value.range.contains(position)) {
+                            return new vscode.Hover(value.hoverContent, value.range);
+                        }
+                        
+                        // 检查后缀模式下是否在后缀文本范围内
+                        if (this.decorationStyle === 'suffix') {
+                            const offset = document.offsetAt(position);
+                            const suffixStart = document.offsetAt(value.range.end);
+                            const suffixEnd = suffixStart + value.suffixLength;
+                            
+                            if (offset >= suffixStart && offset <= suffixEnd) {
+                                return new vscode.Hover(value.hoverContent, value.range);
+                            }
+                        }
+                    }
+                }
+                return null;
+            }
+        });
+        
+        this.context.subscriptions.push(this.hoverProviderDisposable);
     }
 
     /**
@@ -357,11 +397,13 @@ class I18nDecorator {
             return;
         }
 
+        // 重置装饰悬浮映射
+        this.decorationHoverMap = new Map();
+        
         const document = this.activeEditor.document;
         const text = document.getText();
         const suffixDecorations = [];
         const inlineDecorations = [];
-        const hoverDecorations = [];
         const missingKeyDecorations = []; // 添加不存在键的装饰数组
         this.currentInlineDecorations = []; // 重置当前内联装饰数组
 
@@ -403,8 +445,16 @@ class I18nDecorator {
                     missingKey: !translatedText // 标记是否为缺失的键
                 });
 
+                // 存储函数调用的位置和悬浮内容
+                const decorationId = `${match.index}:${key}`;
+                this.decorationHoverMap.set(decorationId, {
+                    range: new vscode.Range(startPos, endPos),
+                    suffixLength: translatedText ? (2 + translatedText.length) : 0, // '(' + 翻译文本 + ')'
+                    hoverContent: hoverContent
+                });
+
                 if (translatedText) {
-                    // 如果有翻译内容，创建正常的装饰
+                    // 如果有翻译内容，创建正常的装饰（但不包含hoverMessage属性）
                     
                     // 创建后缀样式的装饰
                     const suffixDecoration = {
@@ -421,24 +471,9 @@ class I18nDecorator {
                                 fontStyle: this.suffixStyle.fontStyle || 'italic'
                             }
                         }
+                        // 移除hoverMessage属性
                     };
                     suffixDecorations.push(suffixDecoration);
-
-                    // 创建专门用于后缀文本的悬浮装饰
-                    // 计算后缀文本的精确位置
-                    const suffixStartPos = endPos;
-                    // 估算后缀文本的长度，加上括号和文本本身
-                    const suffixLength = 2 + translatedText.length; // '(' + 翻译文本 + ')'
-                    const suffixEndPos = document.positionAt(
-                        document.offsetAt(endPos) + suffixLength
-                    );
-
-                    // 为后缀区域创建悬浮装饰
-                    const suffixHoverDecoration = {
-                        range: new vscode.Range(suffixStartPos, suffixEndPos),
-                        hoverMessage: hoverContent
-                    };
-                    hoverDecorations.push(suffixHoverDecoration);
 
                     // 为内联样式找到括号内的内容位置
                     const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
@@ -455,7 +490,7 @@ class I18nDecorator {
                             originalKey: key
                         });
 
-                        // 创建内联样式装饰，仅替换引号内的内容
+                        // 创建内联样式装饰，仅替换引号内的内容（但不包含hoverMessage属性）
                         const inlineDecoration = {
                             range: new vscode.Range(keyStartPos, keyEndPos),
                             renderOptions: {
@@ -470,27 +505,19 @@ class I18nDecorator {
                                     fontStyle: this.inlineStyle.fontStyle || 'normal'
                                 },
                                 textDecoration: 'none; display: none;'
-                            },
-                            hoverMessage: hoverContent
+                            }
+                            // 移除hoverMessage属性
                         };
                         inlineDecorations.push(inlineDecoration);
                     }
                 } else {
-                    // 如果键不存在，添加蓝色波浪线装饰和悬浮提示
-                    // 为函数调用添加波浪线装饰
+                    // 如果键不存在，添加蓝色波浪线装饰（但不包含hoverMessage属性）
                     const missingKeyDecoration = {
-                        range: new vscode.Range(startPos, endPos),
-                        hoverMessage: hoverContent
+                        range: new vscode.Range(startPos, endPos)
+                        // 移除hoverMessage属性
                     };
                     missingKeyDecorations.push(missingKeyDecoration);
                 }
-
-                // 不管键是否存在，都为原函数调用区域创建悬浮装饰
-                const functionHoverDecoration = {
-                    range: new vscode.Range(startPos, endPos),
-                    hoverMessage: hoverContent
-                };
-                hoverDecorations.push(functionHoverDecoration);
             }
         }
 
@@ -517,17 +544,14 @@ class I18nDecorator {
                 this.activeEditor.setDecorations(this.inlineDecorationType, []);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
                 this.activeEditor.setDecorations(this.missingKeyDecorationType, missingKeyDecorations);
-                // 应用悬浮装饰
-                this.activeEditor.setDecorations(hoverDecorationType, hoverDecorations);
+                // 不再应用悬浮装饰
             } else {
-                console.log('内联模式')
                 // 内联模式: t(译文)
                 this.activeEditor.setDecorations(this.suffixDecorationType, []);
                 this.activeEditor.setDecorations(this.inlineDecorationType, inlineDecorations);
                 this.activeEditor.setDecorations(this.editModeDecorationType, []);
                 this.activeEditor.setDecorations(this.missingKeyDecorationType, missingKeyDecorations);
-                // 内联模式的悬浮已在inlineDecoration中
-                this.activeEditor.setDecorations(hoverDecorationType, []);
+                // 不再应用悬浮装饰
             }
         }
 
@@ -632,7 +656,12 @@ class I18nDecorator {
         this.suffixDecorationType.dispose();
         this.inlineDecorationType.dispose();
         this.editModeDecorationType.dispose();
-        this.missingKeyDecorationType.dispose(); // 添加清理缺失键装饰器
+        this.missingKeyDecorationType.dispose();
+        
+        // 清理悬浮提供器
+        if (this.hoverProviderDisposable) {
+            this.hoverProviderDisposable.dispose();
+        }
     }
 
     /**
