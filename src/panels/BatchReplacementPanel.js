@@ -251,6 +251,27 @@ class BatchReplacementPanel {
             this._loadConfiguration();
           }
           break;
+        case 'updateMissingKeyStyles':
+          // 获取缺失键样式配置
+          const { missingKeyBorderWidth, missingKeyBorderStyle, missingKeyBorderColor, missingKeyBorderSpacing } = message.data;
+          
+          // 更新配置
+          const config = vscode.workspace.getConfiguration('i18n-swapper');
+          
+          // 逐项更新配置
+          config.update('missingKeyBorderWidth', missingKeyBorderWidth, vscode.ConfigurationTarget.Workspace);
+          config.update('missingKeyBorderStyle', missingKeyBorderStyle, vscode.ConfigurationTarget.Workspace);
+          config.update('missingKeyBorderColor', missingKeyBorderColor, vscode.ConfigurationTarget.Workspace);
+          config.update('missingKeyBorderSpacing', missingKeyBorderSpacing, vscode.ConfigurationTarget.Workspace);
+          
+          // 通知用户
+          vscode.window.showInformationMessage('缺失键样式设置已保存，返回代码页面重新激活');
+          
+          // 如果需要，刷新装饰器
+          if (this.decorator) {
+            this.decorator.updateDecorations();
+          }
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }

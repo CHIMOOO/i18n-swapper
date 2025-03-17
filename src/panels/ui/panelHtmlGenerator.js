@@ -364,16 +364,16 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         .unit {
           margin-left: 5px;
         }
-          #suffix-style-config,#inline-style-config{
+          #suffix-style-config,#inline-style-config,#missing-key-style-container{
             display: flex;
             align-items: center;
             flex-wrap: wrap;
           }
-             #suffix-style-config .config-item,#inline-style-config .config-item{
+             #suffix-style-config .config-item,#inline-style-config .config-item,#missing-key-style-container .config-item{
              margin-right:35px;
               margin-bottom:8px;
              }
-           #suffix-style-config   .help-text,#inline-style-config .help-text    {
+           #suffix-style-config   .help-text,#inline-style-config .help-text,#missing-key-style-container .help-text{
            width:80px;
            }
         #inline-edit-options {
@@ -727,36 +727,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                   <input type="text" id="suffix-margin" value="${suffixStyle.margin || '0 0 0 3px'}" class="margin-input" placeholder="上 右 下 左 (例如: 0 0 0 3px)">
                   <span class="help-text small">格式: 上 右 下 左 (例如: 0 0 0 3px)</span>
                 </div>
-                
-                <!-- 缺失键样式配置 -->
-                <h4 class="section-title">缺失键样式</h4>
-                
-                <div class="config-item">
-                  <label>边框宽度：</label>
-                  <input type="text" id="missing-key-border-width" value="${config.missingKeyBorderWidth || '0 0 2px 0'}" class="margin-input" placeholder="上 右 下 左 (例如: 0 0 2px 0)">
-                  <span class="help-text small">格式: 上 右 下 左 (例如: 0 0 2px 0)</span>
-                </div>
-                
-                <div class="config-item">
-                  <label>边框样式：</label>
-                  <select id="missing-key-border-style">
-                    <option value="solid" ${config.missingKeyBorderStyle === 'solid' ? 'selected' : ''}>实线</option>
-                    <option value="dashed" ${config.missingKeyBorderStyle === 'dashed' ? 'selected' : ''}>虚线</option>
-                    <option value="dotted" ${config.missingKeyBorderStyle === 'dotted' ? 'selected' : ''}>点状线</option>
-                    <option value="double" ${config.missingKeyBorderStyle === 'double' ? 'selected' : ''}>双线</option>
-                  </select>
-                </div>
-                
-                <div class="config-item">
-                  <label>边框颜色：</label>
-                  <input type="color" id="missing-key-border-color" value="${config.missingKeyBorderColor || '#ff6900'}">
-                  <input type="text" id="missing-key-border-color-text" value="${config.missingKeyBorderColor || '#ff6900'}" class="color-text-input">
-                </div>
-                
-                <div class="config-item">
-                  <label>边框间距：</label>
-                  <input type="text" id="missing-key-border-spacing" value="${config.missingKeyBorderSpacing || '2px'}" class="small-input" placeholder="例如: 2px">
-                </div>
               </div>
               
               <!-- 内联模式样式配置 -->
@@ -792,9 +762,47 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             </div>
           </div>
           
-          <!-- 添加翻译功能设置模块 -->
+          <!-- 将缺失键样式设置移到这里，作为一个单独的配置部分 -->
           <div class="config-row">
-            <h4>4、翻译功能设置</h4>
+            <h4>4、缺失键样式</h4>
+          </div>
+          <div class="config-row">
+            <div id="missing-key-style-container" class="style-config-container">
+              <div class="config-item">
+                <label>边框宽度：</label>
+                <input type="text" id="missing-key-border-width" value="${config.missingKeyBorderWidth || '0 0 2px 0'}" class="margin-input" placeholder="上 右 下 左 (例如: 0 0 2px 0)">
+                <span class="help-text small">格式: 上 右 下 左 (例如: 0 0 2px 0)</span>
+              </div>
+              
+              <div class="config-item">
+                <label>边框样式：</label>
+                <select id="missing-key-border-style">
+                  <option value="solid" ${config.missingKeyBorderStyle === 'solid' ? 'selected' : ''}>实线</option>
+                  <option value="dashed" ${config.missingKeyBorderStyle === 'dashed' ? 'selected' : ''}>虚线</option>
+                  <option value="dotted" ${config.missingKeyBorderStyle === 'dotted' ? 'selected' : ''}>点状线</option>
+                  <option value="double" ${config.missingKeyBorderStyle === 'double' ? 'selected' : ''}>双线</option>
+                </select>
+              </div>
+              <div class="config-item">
+                <label>边框间距：</label>
+                <input type="text" id="missing-key-border-spacing" value="${config.missingKeyBorderSpacing || '2px'}" class="small-input" placeholder="例如: 2px">
+              </div>           
+              <div class="config-item">
+                <label>边框颜色：</label>
+                <input type="color" id="missing-key-border-color" value="${config.missingKeyBorderColor || '#ff6900'}" class="color-picker">
+                <input type="text" id="missing-key-border-color-text" value="${config.missingKeyBorderColor || '#ff6900'}" class="color-text">
+              </div>
+              
+
+              
+              <!-- 添加保存按钮 -->
+              <button id="save-missing-key-style" class="primary-button">保存缺失键样式</button>
+            </div>
+          </div>
+          
+          <!-- 添加翻译功能设置模块，现在成为第5项 -->
+          <div class="config-row">
+            <h4>5、翻译功能设置</h4>
           </div>
           <div class="config-row">
             <div class="style-config-container">
@@ -1377,34 +1385,36 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         });
 
-        // 在保存配置的部分添加以下代码
-        document.getElementById('save-config-btn').addEventListener('click', () => {
-            // 获取原有配置...
-            
-            // 获取缺失键样式配置
-            const missingKeyBorderWidth = document.getElementById('missing-key-border-width').value;
-            const missingKeyBorderStyle = document.getElementById('missing-key-border-style').value;
-            const missingKeyBorderColor = document.getElementById('missing-key-border-color').value;
-            const missingKeyBorderSpacing = document.getElementById('missing-key-border-spacing').value;
-            
-            // 构建配置对象...
-            
-            // 添加缺失键样式配置
-            updatedConfig.missingKeyBorderWidth = missingKeyBorderWidth;
-            updatedConfig.missingKeyBorderStyle = missingKeyBorderStyle;
-            updatedConfig.missingKeyBorderColor = missingKeyBorderColor;
-            updatedConfig.missingKeyBorderSpacing = missingKeyBorderSpacing;
-            
-            // 发送消息更新配置...
+        // 为颜色输入框和选择器添加联动事件
+        document.getElementById('missing-key-border-color').addEventListener('input', function() {
+          document.getElementById('missing-key-border-color-text').value = this.value;
         });
 
-        // 为颜色输入框添加联动事件
-        document.getElementById('missing-key-border-color').addEventListener('input', (e) => {
-            document.getElementById('missing-key-border-color-text').value = e.target.value;
+        document.getElementById('missing-key-border-color-text').addEventListener('input', function() {
+          document.getElementById('missing-key-border-color').value = this.value;
         });
 
-        document.getElementById('missing-key-border-color-text').addEventListener('input', (e) => {
-            document.getElementById('missing-key-border-color').value = e.target.value;
+        // 添加保存缺失键样式按钮的事件处理
+        document.getElementById('save-missing-key-style').addEventListener('click', function() {
+          // 获取缺失键样式配置
+          const missingKeyBorderWidth = document.getElementById('missing-key-border-width').value;
+          const missingKeyBorderStyle = document.getElementById('missing-key-border-style').value;
+          const missingKeyBorderColor = document.getElementById('missing-key-border-color').value;
+          const missingKeyBorderSpacing = document.getElementById('missing-key-border-spacing').value;
+          
+          // 构建配置对象
+          const missingKeyConfig = {
+            missingKeyBorderWidth,
+            missingKeyBorderStyle,
+            missingKeyBorderColor,
+            missingKeyBorderSpacing
+          };
+          
+          // 发送更新样式的消息
+          vscode.postMessage({
+            command: 'updateMissingKeyStyles',
+            data: missingKeyConfig
+          });
         });
       </script>
     </body>
