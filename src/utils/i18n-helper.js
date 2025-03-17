@@ -98,7 +98,7 @@ async function checkAndSelectLocaleFile() {
       });
       
       if (fileUris && fileUris.length > 0) {
-        // 转换为相对于工作区的路径
+        // 获取工作区根路径
         const workspaceFolders = vscode.workspace.workspaceFolders;
         if (!workspaceFolders) {
           vscode.window.showErrorMessage('未找到工作区文件夹');
@@ -106,6 +106,45 @@ async function checkAndSelectLocaleFile() {
         }
         
         const rootPath = workspaceFolders[0].uri.fsPath;
+        
+        // 获取语言名称映射
+        const { LANGUAGE_NAMES } = require('./language-mappings');
+        
+        // 构建语言选择项
+        const languageOptions = Object.entries(LANGUAGE_NAMES).map(([code, name]) => ({
+          label: `${name} (${code})`,
+          code: code
+        }));
+        
+        // 添加"其他"选项
+        languageOptions.push({ label: '其他', code: 'other' });
+        
+        // 提示用户选择语言
+        const selectedLanguage = await vscode.window.showQuickPick(languageOptions, {
+          placeHolder: '请选择这个文件对应的语言（将用于翻译对齐）',
+          canPickMany: false
+        });
+        
+        if (selectedLanguage && selectedLanguage.code !== 'other') {
+          // 更新源语言设置
+          await config.update('tencentTranslation.sourceLanguage', selectedLanguage.code, vscode.ConfigurationTarget.Workspace);
+          
+          // 准备语言映射（使用相对路径）
+          const languageMappings = fileUris.map(uri => {
+            const absolutePath = uri.fsPath;
+            const relativePath = path.relative(rootPath, absolutePath).replace(/\\/g, '/');
+            return {
+              languageCode: selectedLanguage.code,
+              filePath: relativePath
+            };
+          });
+          
+          // 更新语言映射设置
+          await config.update('tencentTranslation.languageMappings', languageMappings, vscode.ConfigurationTarget.Workspace);
+          
+          vscode.window.showInformationMessage(`已将 ${selectedLanguage.label} 设置为源语言，并更新了语言映射配置`);
+        }
+        
         const relativePaths = fileUris.map(uri => {
           const filePath = uri.fsPath;
           return path.relative(rootPath, filePath).replace(/\\/g, '/');

@@ -506,7 +506,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               替换所有项
             </button>
             <button id="refresh-panel">刷新</button>
-            <button id="create-language-files">创建语言文件</button>
             <button id="open-api-translation">API翻译配置</button>
           </div>
           <div class="tools-group">
@@ -888,12 +887,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           });
         });
         
-        // 创建语言文件按钮
-        document.getElementById('create-language-files').addEventListener('click', function() {
-          vscode.postMessage({
-            command: 'createLanguageFiles'
-          });
-        });
+      
         
         // 添加扫描模式
         const addPatternBtn = document.getElementById('add-pattern');

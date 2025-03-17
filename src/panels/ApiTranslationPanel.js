@@ -716,7 +716,7 @@ class ApiTranslationPanel {
                         翻译后会为以下配置好的语言映射，自动写入对应的翻译词条。
                     </p>
                     <p style="font-size: 14px; color: #ff0000; margin-top: 8px;">
-                       <span style="color: #ff0000;">！</span> 请注意，如果你的中文是zh-CN.json,那么请在下方中文映射路径输入对应的zh-CN.json路径
+                       <span style="color: #ff0000;">！</span> 请注意，如果你的中文文件是zh-CN.json,那么请在下方中文映射路径输入对应的zh-CN.json路径
                     </p>
                     
                     <div id="mappings-container" class="mapping-container">
@@ -749,9 +749,12 @@ class ApiTranslationPanel {
                     </div>
                     
                     <div class="button-group">
-                        <button id="select-folder" class="secondary">选择当前国际化存储文件夹</button>
-                        <button id="create-language-files" disabled>创建选中的语言文件</button>
+                        <button id="select-folder" class="secondary">1.选择当前国际化存储文件夹</button>
+                        <button id="create-language-files" disabled>2.创建选中的语言文件</button>
                     </div>
+                    <p style="font-size: 14px; color: var(--text-light); margin-top: 8px;">
+                        选择储存文件夹后将在该文件夹下创建对应的.json语言库文件。
+                    </p>
                     
                     <div id="folder-display" class="folder-display">
                         <span>选择的文件夹:</span>
@@ -2331,166 +2334,106 @@ class ApiTranslationPanel {
 
 
 
-            // 选择文件格式
+            // 直接使用JSON格式
 
-            const fileFormat = await vscode.window.showQuickPick(
-
-                ['JSON (.json)', 'JavaScript (.js)'],
-
-                {
-
-                    title: '选择文件格式',
-
-                    placeHolder: '请选择国际化文件格式'
-
-                }
-
-            );
-
-
-
-            if (!fileFormat) return;
-
-
-
-            const extension = fileFormat.includes('JSON') ? '.json' : '.js';
+            const extension = '.json';
+            vscode.window.showInformationMessage('将使用JSON格式创建国际化文件');
 
 
 
             // 创建文件和更新映射
 
             const createdFiles = [];
-
             const newMappings = [];
+            
+            // 检查源语言是否已存在于映射中
+            const existingSourceMapping = this.state.languageMappings.find(m => m.languageCode === sourceLanguage);
+            let sourceFilePath;
+            
+            if (existingSourceMapping) {
+                // 使用现有的源语言映射
+                sourceFilePath = this.resolveFilePath(existingSourceMapping.filePath);
+                vscode.window.showInformationMessage(`使用现有的源语言文件: ${existingSourceMapping.filePath}`);
+            } else {
+                // 创建源语言文件
+                const sourceFileName = `${sourceLanguage}${extension}`;
+                sourceFilePath = path.join(folderPath, sourceFileName);
 
-
-
-            // 创建源语言文件
-
-            const sourceFileName = `${sourceLanguage}${extension}`;
-
-            const sourceFilePath = path.join(folderPath, sourceFileName);
-
-
-
-            if (!fs.existsSync(sourceFilePath)) {
-
-                // 创建空对象
-
-                if (extension === '.json') {
-
-                    fs.writeFileSync(sourceFilePath, '{}', 'utf8');
-
-                } else {
-
-                    fs.writeFileSync(sourceFilePath, 'module.exports = {};', 'utf8');
-
+                if (!fs.existsSync(sourceFilePath)) {
+                    // 创建空对象
+                    if (extension === '.json') {
+                        fs.writeFileSync(sourceFilePath, '{}', 'utf8');
+                    } else {
+                        fs.writeFileSync(sourceFilePath, 'module.exports = {};', 'utf8');
+                    }
+                    createdFiles.push(sourceFilePath);
                 }
 
-                createdFiles.push(sourceFilePath);
-
+                // 添加源语言映射
+                const relativeSourcePath = path.relative(rootPath, sourceFilePath).replace(/\\/g, '/');
+                newMappings.push({
+                    languageCode: sourceLanguage,
+                    filePath: relativeSourcePath
+                });
             }
-
-
-
-            // 添加源语言映射
-
-            const relativeSourcePath = path.relative(rootPath, sourceFilePath).replace(/\\/g, '/');
-
-            newMappings.push({
-
-                languageCode: sourceLanguage,
-
-                filePath: relativeSourcePath
-
-            });
-
-
 
             // 创建目标语言文件
-
             for (const langCode of targetLanguages) {
-
+                // 检查目标语言是否已存在于映射中
+                const existingTargetMapping = this.state.languageMappings.find(m => m.languageCode === langCode);
+                
+                if (existingTargetMapping) {
+                    // 跳过已存在的目标语言
+                    vscode.window.showInformationMessage(`跳过已存在的目标语言文件: ${existingTargetMapping.filePath}`);
+                    continue;
+                }
+                
                 const fileName = `${langCode}${extension}`;
-
                 const filePath = path.join(folderPath, fileName);
 
-
-
                 if (!fs.existsSync(filePath)) {
-
                     // 创建空对象
-
                     if (extension === '.json') {
-
                         fs.writeFileSync(filePath, '{}', 'utf8');
-
                     } else {
-
                         fs.writeFileSync(filePath, 'module.exports = {};', 'utf8');
-
                     }
-
                     createdFiles.push(filePath);
-
                 }
 
-
-
                 // 添加映射
-
                 const relativePath = path.relative(rootPath, filePath).replace(/\\/g, '/');
-
                 newMappings.push({
-
                     languageCode: langCode,
-
                     filePath: relativePath
-
                 });
-
             }
 
-
-
             // 合并映射并去重
-
             const existingCodes = this.state.languageMappings.map(m => m.languageCode);
-
             const mappingsToAdd = newMappings.filter(m => !existingCodes.includes(m.languageCode));
-
-
 
             this.state.languageMappings = [...this.state.languageMappings, ...mappingsToAdd];
 
-
-
             // 保存配置
-
             await this.saveConfiguration();
 
-
-
             // 刷新面板
-
             this.updatePanelContent();
 
-
-
-            vscode.window.showInformationMessage(
-
-                `已创建 ${createdFiles.length} 个语言文件并添加 ${mappingsToAdd.length} 个映射`
-
-            );
+            // 根据操作结果显示不同的消息
+            if (createdFiles.length > 0 || mappingsToAdd.length > 0) {
+                vscode.window.showInformationMessage(
+                    `已创建 ${createdFiles.length} 个语言文件并添加 ${mappingsToAdd.length} 个映射`
+                );
+            } else {
+                vscode.window.showInformationMessage('所有语言文件已存在，无需创建新文件');
+            }
 
         } catch (error) {
-
             console.error('创建语言文件出错:', error);
-
             vscode.window.showErrorMessage(`创建语言文件失败: ${error.message}`);
-
         }
-
     }
 
 
@@ -2512,13 +2455,10 @@ class ApiTranslationPanel {
             // 确保目录存在
 
             const dirPath = path.dirname(filePath);
-
             if (!fs.existsSync(dirPath)) {
-
                 fs.mkdirSync(dirPath, {
                     recursive: true
                 });
-
             }
 
 
@@ -2526,7 +2466,6 @@ class ApiTranslationPanel {
             // 加载现有文件或创建新对象
 
             let data = {};
-
             if (fs.existsSync(filePath)) {
 
                 try {
@@ -2534,7 +2473,6 @@ class ApiTranslationPanel {
                     if (filePath.endsWith('.json')) {
 
                         const content = fs.readFileSync(filePath, 'utf8');
-
                         data = JSON.parse(content);
 
                     } else if (filePath.endsWith('.js')) {
@@ -2548,7 +2486,6 @@ class ApiTranslationPanel {
                         // 尝试加载JS模块
 
                         delete require.cache[require.resolve(filePath)];
-
                         data = require(filePath);
 
                     }
@@ -2710,13 +2647,9 @@ class ApiTranslationPanel {
             // 转换为相对路径
 
             let relativePath = filePath;
-
             if (vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-
                 const rootPath = vscode.workspace.workspaceFolders[0].uri.fsPath;
-
                 relativePath = path.relative(rootPath, filePath).replace(/\\/g, '/');
-
             }
 
 
@@ -2786,16 +2719,13 @@ class ApiTranslationPanel {
             }, async (progress, token) => {
 
                 const total = itemsToTranslate.length * this.state.languageMappings.length;
-
                 let completed = 0;
 
 
                 // 添加取消功能
 
                 token.onCancellationRequested(() => {
-
                     throw new Error('用户取消了翻译');
-
                 });
 
 
@@ -2830,7 +2760,6 @@ class ApiTranslationPanel {
                             // 获取文件路径
 
                             const filePath = this.resolveFilePath(mapping.filePath);
-
                             if (!filePath) continue;
 
 
@@ -2919,27 +2848,20 @@ class ApiTranslationPanel {
             // 从源语言文件中加载键和文本
 
             const sourceMapping = this.state.languageMappings.find(m => m.languageCode === this.state.sourceLanguage);
-
             if (!sourceMapping) {
-
                 throw new Error('未找到源语言映射');
-
             }
 
 
             const sourceFilePath = this.resolveFilePath(sourceMapping.filePath);
-
             if (!sourceFilePath || !fs.existsSync(sourceFilePath)) {
-
                 throw new Error(`源语言文件不存在: ${sourceMapping.filePath}`);
-
             }
 
 
             // 加载源文件
 
             const sourceData = utils.loadLocaleFile(sourceFilePath);
-
             if (!sourceData) return [];
 
 
@@ -3002,7 +2924,6 @@ class ApiTranslationPanel {
 
 
             const rootPath = workspaceFolders[0].uri.fsPath;
-
             return path.join(rootPath, relativePath);
 
         } catch (error) {
@@ -3030,7 +2951,6 @@ class ApiTranslationPanel {
             // 更新状态
 
             this.state.sourceLanguage = sourceLanguage;
-
             this.state.languageMappings = JSON.parse(JSON.stringify(languageMappings));
 
 
