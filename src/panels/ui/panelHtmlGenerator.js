@@ -657,10 +657,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                               </div>
                             `;
 }).join('')
-} <
-/div> <
-/td> <
-/tr>
+}
 `;
                 }
                 
