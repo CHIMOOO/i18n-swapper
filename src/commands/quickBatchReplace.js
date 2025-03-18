@@ -1,8 +1,12 @@
 const vscode = require('vscode');
 const path = require('path');
 const utils = require('../utils');
-const { LANGUAGE_NAMES } = require('../utils/language-mappings');
-const { generateLanguageHoverContent } = require('../utils/hover-content-generator');
+const {
+    LANGUAGE_NAMES
+} = require('../utils/language-mappings');
+const {
+    generateLanguageHoverContent
+} = require('../utils/hover-content-generator');
 const fs = require('fs');
 
 // 存储所有待确认的替换项
@@ -21,18 +25,18 @@ let globalActionDecoration = null;
  */
 async function quickBatchReplace(context, targetDocument) {
     // 检查是否使用全局变量中的信息
-    const useGlobal = targetDocument === 'USE_GLOBAL' && 
-                      global.i18nSwapperPendingReplacements && 
-                      global.i18nSwapperSourceDocument;
-    
+    const useGlobal = targetDocument === 'USE_GLOBAL' &&
+        global.i18nSwapperPendingReplacements &&
+        global.i18nSwapperSourceDocument;
+
     let editor = vscode.window.activeTextEditor;
     let document;
-    
+
     if (useGlobal) {
         // 使用全局变量中的文档信息
         try {
             const sourceUri = global.i18nSwapperSourceDocument.uri;
-            
+
             // 检查当前编辑器是否已经是目标文档
             if (editor && editor.document.uri.toString() === sourceUri.toString()) {
                 document = editor.document;
@@ -50,7 +54,7 @@ async function quickBatchReplace(context, targetDocument) {
                         break;
                     }
                 }
-                
+
                 // 如果还没找到，尝试打开文档
                 if (!document) {
                     document = await vscode.workspace.openTextDocument(sourceUri);
@@ -74,7 +78,7 @@ async function quickBatchReplace(context, targetDocument) {
             document = targetDocument;
             if (!editor || editor.document !== document) {
                 try {
-                    editor = await vscode.window.showTextDocument(document, { 
+                    editor = await vscode.window.showTextDocument(document, {
                         preserveFocus: false
                     });
                 } catch (error) {
@@ -83,7 +87,7 @@ async function quickBatchReplace(context, targetDocument) {
             }
         }
     }
-    
+
     if (!editor || !document) {
         vscode.window.showInformationMessage('没有可操作的编辑器或文档');
         return;
@@ -92,24 +96,24 @@ async function quickBatchReplace(context, targetDocument) {
     try {
         // 清除之前的装饰
         clearDecorations();
-        
+
         // 获取配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
         let scanPatterns = config.get('scanPatterns', []);
-        
+
         // 使用默认扫描模式
         if (!scanPatterns || scanPatterns.length === 0) {
             scanPatterns = [
                 "value", "label", "placeholder", "message", "title", "text"
             ];
         }
-        
+
         // 检查并选择国际化文件
         const localesPaths = await utils.checkAndSelectLocaleFile();
         if (localesPaths.length === 0) {
             return; // 用户取消了操作或没有选择文件
         }
-        
+
         const configQuoteType = config.get('quoteType', 'single');
         const functionName = config.get('functionName', 't');
         const codeQuote = configQuoteType === 'single' ? "'" : '"';
@@ -131,15 +135,15 @@ async function quickBatchReplace(context, targetDocument) {
             let replacements = [];
             if (useGlobal) {
                 replacements = global.i18nSwapperPendingReplacements;
-                
+
                 // 处理已经完成后清除全局变量
                 global.i18nSwapperPendingReplacements = null;
                 global.i18nSwapperSourceDocument = null;
-                
+
                 pendingReplacements = replacements;
                 showConfirmationDecorations(editor, document, pendingReplacements, functionName, codeQuote);
                 showGlobalActionPanel(editor, document, pendingReplacements.length);
-                
+
                 return; // 直接返回，不再执行后续分析文档的代码
             } else {
                 replacements = utils.analyzeContent(
@@ -200,7 +204,7 @@ async function quickBatchReplace(context, targetDocument) {
 
             // 为每个替换项添加装饰和按钮
             showConfirmationDecorations(editor, document, validReplacements, functionName, codeQuote);
-            
+
             // 显示底部全局操作面板
             showGlobalActionPanel(editor, document, validReplacements.length);
         });
@@ -216,28 +220,31 @@ async function quickBatchReplace(context, targetDocument) {
  */
 function loadAllLanguageData() {
     const allLanguageData = {};
-    
+
     // 获取配置
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     const languageMappings = config.get('tencentTranslation.languageMappings', []);
-    
+
     // 获取工作区根目录
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
-        return { allLanguageData, languageMappings };
+        return {
+            allLanguageData,
+            languageMappings
+        };
     }
-    
+
     const rootPath = workspaceFolders[0].uri.fsPath;
-    
+
     // 为每个语言映射加载数据
     for (const mapping of languageMappings) {
         try {
             const languageCode = mapping.languageCode;
             const filePath = path.join(rootPath, mapping.filePath);
-            
+
             if (fs.existsSync(filePath)) {
                 let data;
-                
+
                 if (filePath.endsWith('.json')) {
                     const content = fs.readFileSync(filePath, 'utf8');
                     data = JSON.parse(content);
@@ -245,7 +252,7 @@ function loadAllLanguageData() {
                     delete require.cache[require.resolve(filePath)];
                     data = require(filePath);
                 }
-                
+
                 if (data) {
                     allLanguageData[languageCode] = data;
                 }
@@ -254,18 +261,18 @@ function loadAllLanguageData() {
             console.error(`加载语言文件失败 ${mapping.filePath}:`, error);
         }
     }
-    
+
     // 如果没有找到语言映射，尝试加载localesPaths中的文件
     if (Object.keys(allLanguageData).length === 0) {
         const localesPaths = config.get('localesPaths', []);
-        
+
         for (const localePath of localesPaths) {
             try {
                 const filePath = path.join(rootPath, localePath);
-                
+
                 if (fs.existsSync(filePath)) {
                     let data;
-                    
+
                     if (filePath.endsWith('.json')) {
                         const content = fs.readFileSync(filePath, 'utf8');
                         data = JSON.parse(content);
@@ -273,7 +280,7 @@ function loadAllLanguageData() {
                         delete require.cache[require.resolve(filePath)];
                         data = require(filePath);
                     }
-                    
+
                     if (data) {
                         // 使用文件名作为语言代码
                         const langCode = path.basename(localePath, path.extname(localePath));
@@ -285,8 +292,11 @@ function loadAllLanguageData() {
             }
         }
     }
-    
-    return { allLanguageData, languageMappings };
+
+    return {
+        allLanguageData,
+        languageMappings
+    };
 }
 
 /**
@@ -304,7 +314,10 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
     // 存储所有替换项
     pendingReplacements = replacements.map(item => {
         // 查找文本周围的引号
-        const { hasQuotes, range } = utils.findQuotesAround(document, item);
+        const {
+            hasQuotes,
+            range
+        } = utils.findQuotesAround(document, item);
 
         // 生成替换文本
         let replacement;
@@ -329,8 +342,11 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
     });
 
     // 使用抽取的函数加载语言数据
-    const { allLanguageData, languageMappings } = loadAllLanguageData();
-    
+    const {
+        allLanguageData,
+        languageMappings
+    } = loadAllLanguageData();
+
     // 创建装饰
     const decorations = pendingReplacements.map((item, index) => {
         // 获取位置
@@ -347,16 +363,16 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
             showActions: true,
             useHideHoverCommand: false
         });
-        
+
         // 显示替换建议 - 确保格式清晰
         const contentText = `${item.replacement}`;
-        
+
         // 根据文本的位置创建范围 - 确保装饰显示在文本之后
         const decorationRange = new vscode.Range(
             item.range.end, // 使用文本的结束位置
-            item.range.end  // 确保装饰显示在文本之后
+            item.range.end // 确保装饰显示在文本之后
         );
-        
+
         return {
             range: decorationRange, // 使用文本结束位置作为装饰的起始位置
             renderOptions: {
@@ -402,36 +418,40 @@ function registerCodeLensActions(document) {
     if (codeLensProvider) {
         codeLensProvider.dispose();
     }
-    
+
     // 创建新的CodeLens提供器
-    codeLensProvider = vscode.languages.registerCodeLensProvider({ pattern: document.uri.fsPath }, {
+    codeLensProvider = vscode.languages.registerCodeLensProvider({
+        pattern: document.uri.fsPath
+    }, {
         provideCodeLenses(document) {
             const codeLenses = [];
-            
+
             pendingReplacements.forEach((item, index) => {
                 // 确认按钮
                 const acceptLens = new vscode.CodeLens(
-                    item.range,
-                    {
+                    item.range, {
                         title: '✓ 接受',
                         command: 'i18n-swapper.confirmReplacement',
-                        arguments: [{ index }]
+                        arguments: [{
+                            index
+                        }]
                     }
                 );
-                
+
                 // 取消按钮
                 const cancelLens = new vscode.CodeLens(
-                    item.range,
-                    {
+                    item.range, {
                         title: '✗ 取消',
                         command: 'i18n-swapper.cancelReplacement',
-                        arguments: [{ index }]
+                        arguments: [{
+                            index
+                        }]
                     }
                 );
-                
+
                 codeLenses.push(acceptLens, cancelLens);
             });
-            
+
             return codeLenses;
         }
     });
@@ -445,20 +465,20 @@ function showGlobalActionPanel(editor, document, replacementCount) {
     globalActionDecoration = vscode.window.createTextEditorDecorationType({
         isWholeLine: true,
     });
-    
+
     // 每次滚动时更新位置
     let updatePanelPosition = () => {
         if (editor.visibleRanges.length > 0) {
             // 获取当前可见范围的最后一行
             const lastVisibleLine = editor.visibleRanges[0].end.line;
-            
+
             // 创建范围 - 使用行末位置而不是行首，以便悬停更自然
             const lineLength = document.lineAt(lastVisibleLine).text.length;
             const range = new vscode.Range(
                 new vscode.Position(lastVisibleLine, Math.max(0, lineLength - 1)),
                 new vscode.Position(lastVisibleLine, lineLength)
             );
-            
+
             // 创建悬停消息，正确设置为可点击
             const hoverMessage = new vscode.MarkdownString(
                 `##### i18n-swapper 批量国际化替换操作\n\n` +
@@ -468,7 +488,7 @@ function showGlobalActionPanel(editor, document, replacementCount) {
             // 关键：设置为可信任并启用命令
             hoverMessage.isTrusted = true;
             hoverMessage.supportHtml = true;
-            
+
             // 应用装饰
             editor.setDecorations(globalActionDecoration, [{
                 range,
@@ -489,32 +509,32 @@ function showGlobalActionPanel(editor, document, replacementCount) {
             }]);
         }
     };
-    
+
     // 初始更新
     updatePanelPosition();
-    
+
     // 注册滚动事件监听
     const scrollDisposable = vscode.window.onDidChangeTextEditorVisibleRanges(e => {
         if (e.textEditor === editor) {
             updatePanelPosition();
         }
     });
-    
+
     // 保存监听器以便稍后清理
     if (!global.i18nSwapperEventDisposables) {
         global.i18nSwapperEventDisposables = [];
     }
     global.i18nSwapperEventDisposables.push(scrollDisposable);
-    
+
     // 使用Hover Provider提供更精确的悬停位置控制
     registerCustomHoverProvider(document, replacementCount);
-    
+
     // 在文档最后一行添加全局操作按钮的 CodeLens
     addGlobalActionCodeLens(document);
-    
+
     // 同时增强状态栏显示
     enhanceStatusBarDisplay(replacementCount);
-    
+
     // 添加通知提示以确保用户可以找到操作
     vscode.window.showInformationMessage(
         `找到 ${replacementCount} 处可替换的文本`,
@@ -536,54 +556,56 @@ function registerCustomHoverProvider(document, replacementCount) {
     if (global.i18nSwapperHoverProvider) {
         global.i18nSwapperHoverProvider.dispose();
     }
-    
+
     // 使用抽取的函数加载语言数据
-    const { allLanguageData, languageMappings } = loadAllLanguageData();
-    
-    global.i18nSwapperHoverProvider = vscode.languages.registerHoverProvider(
-        { pattern: document.uri.fsPath }, 
-        {
-            provideHover(document, position, token) {
-                // 检查是否悬停在全局操作文本上
-                const lineText = document.lineAt(position.line).text;
-                if (lineText.includes(`找到 ${replacementCount} 处可替换的文本`)) {
-                    const hoverContent = new vscode.MarkdownString(
-                        `### i18n-swapper 批量国际化替换操作\n\n` +
-                        `**[✓ 全部接受](command:i18n-swapper.applyAllReplacements)**  \n\n` +
-                        `**[✗ 全部取消](command:i18n-swapper.cancelAllReplacements)**`
-                    );
-                    hoverContent.isTrusted = true;
-                    hoverContent.supportHtml = true;
-                    
-                    return new vscode.Hover(hoverContent, new vscode.Range(position, position));
-                }
-                
-                // 检查是否悬停在单个替换项上
-                for (let i = 0; i < pendingReplacements.length; i++) {
-                    const item = pendingReplacements[i];
-                    if (item.range.contains(position) || 
-                        (position.line === item.range.end.line && 
-                         position.character > item.range.end.character)) {
-                        
-                        // 使用生成器函数生成悬停内容
-                        const hoverContent = generateLanguageHoverContent({
-                            allLanguageData,
-                            languageMappings,
-                            i18nKey: item.i18nKey,
-                            index: i,
-                            showActions: true,
-                            useHideHoverCommand: false
-                        });
-                        
-                        return new vscode.Hover(hoverContent, item.range);
-                    }
-                }
-                
-                return null;
+    const {
+        allLanguageData,
+        languageMappings
+    } = loadAllLanguageData();
+
+    global.i18nSwapperHoverProvider = vscode.languages.registerHoverProvider({
+        pattern: document.uri.fsPath
+    }, {
+        provideHover(document, position, token) {
+            // 检查是否悬停在全局操作文本上
+            const lineText = document.lineAt(position.line).text;
+            if (lineText.includes(`找到 ${replacementCount} 处可替换的文本`)) {
+                const hoverContent = new vscode.MarkdownString(
+                    `### i18n-swapper 批量国际化替换操作\n\n` +
+                    `**[✓ 全部接受](command:i18n-swapper.applyAllReplacements)**  \n\n` +
+                    `**[✗ 全部取消](command:i18n-swapper.cancelAllReplacements)**`
+                );
+                hoverContent.isTrusted = true;
+                hoverContent.supportHtml = true;
+
+                return new vscode.Hover(hoverContent, new vscode.Range(position, position));
             }
+
+            // 检查是否悬停在单个替换项上
+            for (let i = 0; i < pendingReplacements.length; i++) {
+                const item = pendingReplacements[i];
+                if (item.range.contains(position) ||
+                    (position.line === item.range.end.line &&
+                        position.character > item.range.end.character)) {
+
+                    // 使用生成器函数生成悬停内容
+                    const hoverContent = generateLanguageHoverContent({
+                        allLanguageData,
+                        languageMappings,
+                        i18nKey: item.i18nKey,
+                        index: i,
+                        showActions: true,
+                        useHideHoverCommand: false
+                    });
+
+                    return new vscode.Hover(hoverContent, item.range);
+                }
+            }
+
+            return null;
         }
-    );
-    
+    });
+
     // 保存以便稍后清理
     if (!global.i18nSwapperCommandDisposables) {
         global.i18nSwapperCommandDisposables = [];
@@ -601,40 +623,37 @@ function addGlobalActionCodeLens(document) {
         new vscode.Position(lastLine, 0),
         new vscode.Position(lastLine, document.lineAt(lastLine).text.length)
     );
-    
+
     // 创建新的CodeLens提供器或扩展现有的
-    const globalActionCodeLensProvider = vscode.languages.registerCodeLensProvider(
-        { pattern: document.uri.fsPath },
-        {
-            provideCodeLenses(document) {
-                const codeLenses = [];
-                
-                // 添加全局操作按钮
-                const acceptAllLens = new vscode.CodeLens(
-                    lastLineRange,
-                    {
-                        title: '✓ 全部接受',
-                        command: 'i18n-swapper.applyAllReplacements',
-                        arguments: []
-                    }
-                );
-                
-                const cancelAllLens = new vscode.CodeLens(
-                    lastLineRange,
-                    {
-                        title: '✗ 全部取消',
-                        command: 'i18n-swapper.cancelAllReplacements',
-                        arguments: []
-                    }
-                );
-                
-                codeLenses.push(acceptAllLens, cancelAllLens);
-                
-                return codeLenses;
-            }
+    const globalActionCodeLensProvider = vscode.languages.registerCodeLensProvider({
+        pattern: document.uri.fsPath
+    }, {
+        provideCodeLenses(document) {
+            const codeLenses = [];
+
+            // 添加全局操作按钮
+            const acceptAllLens = new vscode.CodeLens(
+                lastLineRange, {
+                    title: '✓ 全部接受',
+                    command: 'i18n-swapper.applyAllReplacements',
+                    arguments: []
+                }
+            );
+
+            const cancelAllLens = new vscode.CodeLens(
+                lastLineRange, {
+                    title: '✗ 全部取消',
+                    command: 'i18n-swapper.cancelAllReplacements',
+                    arguments: []
+                }
+            );
+
+            codeLenses.push(acceptAllLens, cancelAllLens);
+
+            return codeLenses;
         }
-    );
-    
+    });
+
     // 保存提供器以便稍后清理
     if (!global.i18nSwapperCodeLensDisposables) {
         global.i18nSwapperCodeLensDisposables = [];
@@ -650,28 +669,28 @@ function enhanceStatusBarDisplay(replacementCount) {
     if (global.i18nSwapperStatusBarItems) {
         global.i18nSwapperStatusBarItems.forEach(item => item.dispose());
     }
-    
+
     global.i18nSwapperStatusBarItems = [];
-    
+
     // 创建更加突出的状态栏项
     const countItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 1000);
     countItem.text = `$(megaphone) 国际化替换: ${replacementCount}项`;
     countItem.backgroundColor = new vscode.ThemeColor('statusBarItem.warningBackground');
     countItem.color = new vscode.ThemeColor('statusBarItem.warningForeground');
     countItem.show();
-    
+
     const acceptAllButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 999);
     acceptAllButton.text = "$(check-all) 全部接受";
     acceptAllButton.tooltip = "接受所有替换建议";
     acceptAllButton.command = "i18n-swapper.applyAllReplacements";
     acceptAllButton.show();
-    
+
     const cancelAllButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 998);
     cancelAllButton.text = "$(x) 全部取消";
     cancelAllButton.tooltip = "取消所有替换建议";
     cancelAllButton.command = "i18n-swapper.cancelAllReplacements";
     cancelAllButton.show();
-    
+
     global.i18nSwapperStatusBarItems.push(countItem, acceptAllButton, cancelAllButton);
 }
 
@@ -683,32 +702,80 @@ function registerCommands() {
     if (global.i18nSwapperCommandDisposables) {
         global.i18nSwapperCommandDisposables.forEach(d => d.dispose());
     }
-    
+
     global.i18nSwapperCommandDisposables = [];
 
     // 确认单个替换
     const confirmCmd = vscode.commands.registerCommand('i18n-swapper.confirmReplacement', async (args) => {
-        const editor = vscode.window.activeTextEditor;
-        if (!editor) return;
-
-        // 查找对应的替换项并执行替换
         const index = args.index;
-        if (index >= 0 && index < pendingReplacements.length) {
+        if (!pendingReplacements || index >= pendingReplacements.length) {
+            vscode.window.showErrorMessage('无效的替换项');
+            return;
+        }
+
+        try {
             const item = pendingReplacements[index];
-            const edit = new vscode.WorkspaceEdit();
-            edit.replace(editor.document.uri, item.range, item.replacement);
-            await vscode.workspace.applyEdit(edit);
-            
-            // 从待处理列表中移除
+            const editor = vscode.window.activeTextEditor;
+
+            if (!editor) {
+                vscode.window.showErrorMessage('未找到活动编辑器');
+                return;
+            }
+
+            const document = editor.document;
+
+            // 获取配置
+            const config = vscode.workspace.getConfiguration('i18n-swapper');
+            const functionName = config.get('functionName', 't');
+            const quoteType = config.get('quoteType', 'single');
+            const codeQuote = quoteType === 'single' ? "'" : '"';
+
+            // 检查是否在Vue模板属性中
+            const position = document.positionAt(item.start);
+            const {
+                isVueAttr,
+                attrInfo
+            } = utils.checkVueTemplateAttr(document, position);
+            let range = item.range
+            if (isVueAttr && attrInfo) {
+                // 如果是Vue模板属性，使用属性的完整范围
+                range = new vscode.Range(
+                    document.positionAt(attrInfo.start),
+                    document.positionAt(attrInfo.end)
+                );
+            }
+            // 根据是否在Vue模板中，确定使用的替换文本
+            let replacementText = item.replacement;
+            if (isVueAttr && attrInfo) {
+                // 重新生成替换文本，确保正确处理Vue属性
+                replacementText = utils.generateReplacementText(
+                    item.text,
+                    item.i18nKey,
+                    functionName,
+                    codeQuote,
+                    document,
+                    position
+                );
+            }
+
+            // 执行替换
+            await editor.edit(editBuilder => {
+                editBuilder.replace(range, replacementText);
+            });
+
+            // 从待处理列表中移除此项
             pendingReplacements.splice(index, 1);
-            
+
             // 重要：更新剩余所有项的位置
             await recalculateReplacementPositions(editor.document);
-            
+
             // 重新应用装饰
             applyDecorations(editor);
-            
+
             vscode.window.showInformationMessage('替换成功');
+        } catch (error) {
+            console.error('确认替换时出错:', error);
+            vscode.window.showErrorMessage(`替换失败: ${error.message}`);
         }
     });
     global.i18nSwapperCommandDisposables.push(confirmCmd);
@@ -722,7 +789,7 @@ function registerCommands() {
         const index = args.index;
         if (index >= 0 && index < pendingReplacements.length) {
             pendingReplacements.splice(index, 1);
-            
+
             // 重新应用装饰
             applyDecorations(editor);
         }
@@ -777,18 +844,23 @@ function registerCommands() {
  */
 async function recalculateReplacementPositions(document) {
     if (!pendingReplacements.length) return;
-    
+
     // 获取文档文本
     const text = document.getText();
-    
-    // 对每个待替换项重新计算位置
+
+    // 获取配置
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const functionName = config.get('functionName', 't');
+    const quoteType = config.get('quoteType', 'single');
+    const codeQuote = quoteType === 'single' ? "'" : '"';
+
     for (const item of pendingReplacements) {
         try {
             // 如果有原始文本，尝试在文档中重新定位
             if (item.text) {
                 const escapedText = item.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
                 const regex = new RegExp(escapedText, 'g');
-                
+
                 // 找到所有匹配项
                 let match;
                 const matches = [];
@@ -798,41 +870,84 @@ async function recalculateReplacementPositions(document) {
                         text: match[0]
                     });
                 }
-                
+
                 // 如果找到匹配项，使用最接近原始位置的匹配
                 if (matches.length > 0) {
                     // 按照与原始位置距离排序
                     matches.sort((a, b) => {
                         // 如果没有originalOffset，使用当前range的起始位置
                         const originalOffset = item.originalOffset || document.offsetAt(item.range.start);
-                        return Math.abs(a.index - originalOffset) - 
-                               Math.abs(b.index - originalOffset);
+                        return Math.abs(a.index - originalOffset) -
+                            Math.abs(b.index - originalOffset);
                     });
-                    
+
                     // 更新位置信息，但保留原始替换文本
                     const newStart = document.positionAt(matches[0].index);
                     const newEnd = document.positionAt(matches[0].index + matches[0].text.length);
-                    
+
                     // 保存原始偏移量用于下次查找
                     item.originalOffset = matches[0].index;
-                    
+
                     // 更新范围，但保留原始的replacement值
                     const savedReplacement = item.replacement;
-                    
+
                     // 更新查找文本周围的引号
-                    const { hasQuotes, range } = utils.findQuotesAround(document, {
+                    const {
+                        hasQuotes,
+                        range
+                    } = utils.findQuotesAround(document, {
                         start: matches[0].index,
                         end: matches[0].index + matches[0].text.length,
                         text: matches[0].text
                     });
-                    
+
                     // 更新范围，但保留原始替换文本
                     item.range = range;
                     item.hasQuotes = hasQuotes;
-                    
+
                     // 恢复原始替换文本，避免重复生成
                     item.replacement = savedReplacement;
                 }
+            }
+
+            // 检查是否在Vue模板属性中
+            const position = document.positionAt(item.start);
+            const {
+                isVueAttr,
+                attrInfo
+            } = utils.checkVueTemplateAttr(document, position);
+
+            // 如果是Vue模板属性，更新范围和替换文本
+            if (isVueAttr && attrInfo) {
+                item.isVueAttr = true;
+                item.attrInfo = attrInfo;
+
+                // 使用属性的完整范围
+                item.start = attrInfo.start;
+                item.end = attrInfo.end;
+
+                // 更新当前属性的文本
+                const attrText = document.getText(new vscode.Range(
+                    document.positionAt(attrInfo.start),
+                    document.positionAt(attrInfo.end)
+                ));
+                item.text = attrText;
+
+                // 更新范围对象
+                item.range = new vscode.Range(
+                    document.positionAt(attrInfo.start),
+                    document.positionAt(attrInfo.end)
+                );
+
+                // 关键：重新生成替换文本，确保应用Vue属性绑定规则
+                item.replacement = utils.generateReplacementText(
+                    item.text,
+                    item.i18nKey,
+                    functionName,
+                    codeQuote,
+                    document,
+                    position
+                );
             }
         } catch (error) {
             console.error('重新计算替换位置时出错:', error);
@@ -846,12 +961,12 @@ async function recalculateReplacementPositions(document) {
  */
 function applyDecorations(editor) {
     if (!editor || !pendingReplacements.length) return;
-    
+
     // 清除现有装饰
     if (confirmDecorationType) {
         confirmDecorationType.dispose();
     }
-    
+
     // 创建新的装饰类型 - 保持当前的绿色风格
     confirmDecorationType = vscode.window.createTextEditorDecorationType({
         after: {
@@ -859,10 +974,13 @@ function applyDecorations(editor) {
             textDecoration: 'none; display: inline-block; width: auto; background-color: rgba(120, 200, 120, 0.2);'
         },
     });
-    
+
     // 重新加载语言数据
-    const { allLanguageData, languageMappings } = loadAllLanguageData();
-    
+    const {
+        allLanguageData,
+        languageMappings
+    } = loadAllLanguageData();
+
     // 创建装饰 - 保持当前的样式不变
     const decorations = pendingReplacements.map((item, index) => {
         // 获取位置
@@ -870,7 +988,7 @@ function applyDecorations(editor) {
         const line = position.line;
         const lineText = editor.document.lineAt(line).text;
         const indentation = lineText.match(/^\s*/)[0];
-        
+
         // 使用生成器函数生成悬停内容
         const hoverMessage = generateLanguageHoverContent({
             allLanguageData,
@@ -880,21 +998,21 @@ function applyDecorations(editor) {
             showActions: true,
             useHideHoverCommand: false
         });
-        
+
         // 显示替换建议 - 确保格式清晰
         const contentText = `${item.replacement}`;
-        
+
         // 根据文本的位置创建范围 - 确保装饰显示在文本之后
         const decorationRange = new vscode.Range(
             item.range.end, // 使用文本的结束位置
-            item.range.end  // 确保装饰显示在文本之后
+            item.range.end // 确保装饰显示在文本之后
         );
-        
+
         // 使用与当前相同的装饰样式
         return {
             range: decorationRange,
             renderOptions: {
-                after: { 
+                after: {
                     contentText: contentText,
                     backgroundColor: 'rgba(120, 200, 120, 0.2)',
                     margin: '0 0 0 10px',
@@ -920,10 +1038,10 @@ function applyDecorations(editor) {
             hoverMessage: hoverMessage,
         };
     });
-    
+
     // 应用装饰
     editor.setDecorations(confirmDecorationType, decorations);
-    
+
     // 修复：使用正确的函数名
     registerCodeLensActions(editor.document);
 }
@@ -934,9 +1052,36 @@ function applyDecorations(editor) {
 async function applyAllReplacements(editor) {
     if (pendingReplacements.length === 0) return;
 
+    // 获取配置
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const functionName = config.get('functionName', 't');
+    const quoteType = config.get('quoteType', 'single');
+    const codeQuote = quoteType === 'single' ? "'" : '"';
+
     const workspaceEdit = new vscode.WorkspaceEdit();
     for (const item of pendingReplacements) {
-        workspaceEdit.replace(editor.document.uri, item.range, item.replacement);
+        // 检查是否在Vue模板属性中
+        const position = editor.document.positionAt(item.start);
+        const {
+            isVueAttr,
+            attrInfo
+        } = utils.checkVueTemplateAttr(editor.document, position);
+
+        // 根据是否在Vue模板中，确定使用的替换文本
+        let replacementText = item.replacement;
+        if (isVueAttr && attrInfo) {
+            // 重新生成替换文本，确保正确处理Vue属性
+            replacementText = utils.generateReplacementText(
+                item.text,
+                item.i18nKey,
+                functionName,
+                codeQuote,
+                editor.document,
+                position
+            );
+        }
+
+        workspaceEdit.replace(editor.document.uri, item.range, replacementText);
     }
 
     await vscode.workspace.applyEdit(workspaceEdit);
@@ -953,41 +1098,41 @@ function clearDecorations() {
         confirmDecorationType.dispose();
         confirmDecorationType = null;
     }
-    
+
     if (codeLensProvider) {
         codeLensProvider.dispose();
         codeLensProvider = null;
     }
-    
+
     if (globalActionDecoration) {
         globalActionDecoration.dispose();
         globalActionDecoration = null;
     }
-    
+
     // 清理状态栏项
     if (global.i18nSwapperStatusBarItems) {
         global.i18nSwapperStatusBarItems.forEach(item => item.dispose());
         global.i18nSwapperStatusBarItems = null;
     }
-    
+
     // 清理事件监听器
     if (global.i18nSwapperEventDisposables) {
         global.i18nSwapperEventDisposables.forEach(d => d.dispose());
         global.i18nSwapperEventDisposables = null;
     }
-    
+
     // 清理CodeLens提供器
     if (global.i18nSwapperCodeLensDisposables) {
         global.i18nSwapperCodeLensDisposables.forEach(d => d.dispose());
         global.i18nSwapperCodeLensDisposables = null;
     }
-    
+
     // 清理自定义悬停提供器
     if (global.i18nSwapperHoverProvider) {
         global.i18nSwapperHoverProvider.dispose();
         global.i18nSwapperHoverProvider = null;
     }
-    
+
     pendingReplacements = [];
 }
 
