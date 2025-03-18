@@ -528,7 +528,10 @@ class BatchReplacementPanel {
               console.error(`获取键 ${i18nKey} 的翻译值时出错:`, error);
             }
           }
-
+          
+          if (typeof sourceText === 'object') {
+            sourceText = null;
+          }
           // 添加到结果
           existingCalls.push({
             text: sourceText || null,
@@ -1133,6 +1136,20 @@ class BatchReplacementPanel {
     if (index < 0 || index >= replacementsKeys.length) return;
 
     const item = replacementsKeys[index];
+    if (!item.text) {
+       item.text = await vscode.window.showInputBox({
+        prompt: '请输入要翻译的文本',
+        placeHolder: '无法识别此处文本，请手动输入',
+        validateInput: input => {
+          return input && input.trim() !== '' ? null : '文本不能为空';
+        }
+      });
+      
+      // 如果用户取消输入，则终止流程
+      if (!item.text) {
+        return null; // 返回 null 表示操作被取消
+      }
+    }
     if (!item || !item.text) return;
 
     try {
