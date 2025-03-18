@@ -6,7 +6,8 @@ module.exports = {
     // 基本配置
     decorationStyle: 'inline', // 装饰样式: 'suffix' 或 'inline'
     defaultLocale: 'zh-CN',             // 默认语言
-    functionName: 't',                  // 国际化函数名称
+    functionName: 't',                  // 输出国际化函数名称
+    IdentifyTheCurrentName: ['t', '$t'], // 识别当前页面上的国际化函数方法
     quoteType: 'single',                // 引号类型: 'single' 或 'double'
     localesPaths: [],                   // 本地化文件路径
     showFullFormInEditMode: true,      // 编辑模式下是否显示完整形式

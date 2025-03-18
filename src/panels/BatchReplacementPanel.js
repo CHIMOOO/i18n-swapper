@@ -440,7 +440,8 @@ class BatchReplacementPanel {
 
       // 构建正则表达式匹配 t('key') 或 $t('key') 模式
       // 支持单引号和双引号
-      const i18nCallRegex = new RegExp(`(\\$?${functionName})\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
+      // 修改正则表达式，确保只匹配完整的函数名，使用\b表示单词边界
+      const i18nCallRegex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
 
       let match;
       while ((match = i18nCallRegex.exec(text)) !== null) {
