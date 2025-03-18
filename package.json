@@ -331,6 +331,11 @@
             "type": "string"
           },
           "description": "识别当前页面上的国际化函数名称列表"
+        },
+        "i18n-swapper.autoAddColonInVueTemplate": {
+          "type": "boolean",
+          "default": true,
+          "description": "在Vue模板中自动为属性添加冒号绑定"
         }
       }
     }

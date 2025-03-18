@@ -212,26 +212,37 @@ async function replaceWithI18n() {
             }
         }
 
-        // 生成替换文本
-        let replacement;
-        if (hasQuotes) {
-            // 如果选中文本包含引号，则完全替换，不保留原有引号
-            replacement = `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-        } else {
-            // 根据上下文生成替换文本
-            replacement = utils.generateReplacementText(
+        // 替换选中文本
+        const document = editor.document;
+        await editor.edit(editBuilder => {
+            // 获取位置信息
+            const position = new vscode.Position(selection.start.line, selection.start.character);
+            const { isVueAttr, attrInfo } = utils.checkVueTemplateAttr(document, position);
+            
+            // 确定替换范围
+            let range;
+            if (isVueAttr && attrInfo) {
+                // Vue模板属性，替换整个属性
+                range = new vscode.Range(
+                    document.positionAt(attrInfo.start),
+                    document.positionAt(attrInfo.end)
+                );
+            } else {
+                // 普通文本，只替换选中部分
+                range = selection;
+            }
+            
+            // 生成替换文本
+            const replacement = utils.generateReplacementText(
                 selectedText,
                 i18nKey,
                 functionName,
-                codeQuote,
-                editor.document,
-                expandedSelection.start
+                quoteType,
+                document,
+                position
             );
-        }
-        
-        // 执行替换
-        await editor.edit(editBuilder => {
-            editBuilder.replace(expandedSelection, replacement);
+            
+            editBuilder.replace(range, replacement);
         });
 
         vscode.window.showInformationMessage(

@@ -1,5 +1,6 @@
  const vscode = require('vscode');
  const BatchReplacementPanel = require('../panels/BatchReplacementPanel');
+ const utils = require('../utils');
 
  /**
   * 批量替换国际化

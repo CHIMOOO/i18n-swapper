@@ -25,7 +25,9 @@ const {
   translateText,
   getLanguageName
 } = require('./services/translationService');
-const { translateTextToAllLanguages } = require('../services/translationService');
+const {
+  translateTextToAllLanguages
+} = require('../services/translationService');
 const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
 
 /**
@@ -62,7 +64,7 @@ class BatchReplacementPanel {
       overviewRulerColor: '#FFC107',
       overviewRulerLane: vscode.OverviewRulerLane.Center
     });
-    
+
     // 高亮定时器
     this.highlightTimer = null;
   }
@@ -144,7 +146,10 @@ class BatchReplacementPanel {
    * @param {Object} message 消息对象
    */
   async _handlePanelMessage(message) {
-    const { command, data } = message;
+    const {
+      command,
+      data
+    } = message;
     try {
       switch (command) {
         case 'updateI18nKey':
@@ -253,30 +258,32 @@ class BatchReplacementPanel {
             data.value,
             vscode.ConfigurationTarget.Workspace
           );
-          
+
           // 如果是自动翻译相关设置，可能需要刷新
-          if (data.key.includes('autoGenerate') || 
-              data.key.includes('autoTranslate')) {
+          if (data.key.includes('autoGenerate') ||
+            data.key.includes('autoTranslate')) {
             // 更新内部缓存的配置
             this._loadConfiguration();
           }
           break;
         case 'updateMissingKeyStyles':
           // 获取缺失键样式配置
-          const { missingKeyBorderWidth, missingKeyBorderStyle, missingKeyBorderColor, missingKeyBorderSpacing } = message.data;
-          
+          const {
+            missingKeyBorderWidth, missingKeyBorderStyle, missingKeyBorderColor, missingKeyBorderSpacing
+          } = message.data;
+
           // 更新配置
           const config = vscode.workspace.getConfiguration('i18n-swapper');
-          
+
           // 逐项更新配置
           config.update('missingKeyBorderWidth', missingKeyBorderWidth, vscode.ConfigurationTarget.Workspace);
           config.update('missingKeyBorderStyle', missingKeyBorderStyle, vscode.ConfigurationTarget.Workspace);
           config.update('missingKeyBorderColor', missingKeyBorderColor, vscode.ConfigurationTarget.Workspace);
           config.update('missingKeyBorderSpacing', missingKeyBorderSpacing, vscode.ConfigurationTarget.Workspace);
-          
+
           // 通知用户
           vscode.window.showInformationMessage('缺失键样式设置已保存，返回代码页面重新激活');
-          
+
           // 如果需要，刷新装饰器
           if (this.decorator) {
             this.decorator.updateDecorations();
@@ -296,17 +303,19 @@ class BatchReplacementPanel {
           break;
         case 'updateOutputI18nFunctionName':
           try {
-            const { functionName } = data;
+            const {
+              functionName
+            } = data;
             if (functionName) {
               // 更新配置
               await vscode.workspace.getConfiguration('i18n-swapper').update('functionName', functionName, vscode.ConfigurationTarget.Workspace);
-              
+
               // 不要尝试更新上下文对象，它是不可扩展的
               // this.context.outputI18nFunctionName = functionName; // 删除这行
-              
+
               // 更新内部状态（如果需要）
               this.outputI18nFunctionName = functionName; // 使用实例变量而不是context
-              
+
               vscode.window.showInformationMessage(`已更新输出国际化函数名称为: ${functionName}`);
             }
           } catch (error) {
@@ -463,7 +472,7 @@ class BatchReplacementPanel {
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       // 使用配置文件中定义的国际化函数名数组
       const i18nFunctionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
-      
+
       // 对每个配置的函数名创建正则表达式
       for (const functionName of i18nFunctionNames) {
         // 确保使用词边界匹配完整的函数名
@@ -494,7 +503,7 @@ class BatchReplacementPanel {
           let sourceFile = null;
           let sourceText = null;
           const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
-          
+
           for (const mapping of languageMappings) {
             try {
               const filePath = path.join(rootPath, mapping.filePath);
@@ -528,7 +537,7 @@ class BatchReplacementPanel {
               console.error(`获取键 ${i18nKey} 的翻译值时出错:`, error);
             }
           }
-          
+
           if (typeof sourceText === 'object') {
             sourceText = null;
           }
@@ -917,13 +926,13 @@ class BatchReplacementPanel {
       ];
       item = allItems[index];
     }
-    
+
     if (item) {
       console.log(`切换项目 #${index} 的选择状态为: ${selected}`);
       // 确保每个项目都有一个索引字段
       item.index = index;
       item.selected = selected;
-      
+
       // 更新选中索引列表
       if (selected) {
         if (!this.selectedIndexes.includes(index)) {
@@ -941,14 +950,14 @@ class BatchReplacementPanel {
   async performSelectedReplacements() {
     try {
       const selectedItems = this.getSelectedItems();
-      
+
       console.log(`获取到 ${selectedItems.length} 个选中项目`);
-      
+
       if (selectedItems.length === 0) {
         vscode.window.showInformationMessage('没有选中的项目');
         return;
       }
-      
+
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: '正在替换所选项目...',
@@ -959,58 +968,72 @@ class BatchReplacementPanel {
         const functionName = config.get('functionName', 't');
         const quoteType = config.get('quoteType', 'single');
         const quote = quoteType === 'single' ? "'" : '"';
-        
+
         // 获取当前编辑的文档
         const document = this.document;
         if (!document) {
           throw new Error('未找到关联的文档');
         }
-        
+
         // 获取编辑器
         const editor = vscode.window.visibleTextEditors.find(
           editor => editor.document.uri.toString() === document.uri.toString()
         );
-        
+
         if (!editor) {
           throw new Error('未找到关联的编辑器');
         }
-        
-        progress.report({ message: `准备替换 ${selectedItems.length} 项...` });
-        
-        // 按照文档中的位置排序（从后往前替换，避免位置偏移）
-        const sortedItems = [...selectedItems].sort((a, b) => b.start - a.start);
-        
-        // 创建编辑对象
+
+        progress.report({
+          message: `准备替换 ${selectedItems.length} 项...`
+        });
+
+        // 按从后往前的顺序排序
+        const sortedItems = selectedItems.sort((a, b) => b.start - a.start);
+
         await editor.edit(editBuilder => {
           for (const item of sortedItems) {
-            if (!item.i18nKey) {
-              console.warn(`跳过项目 #${item.index}, 因为它没有i18nKey`);
-              continue;
+            // 获取位置信息
+            const position = document.positionAt(item.start);
+            const { isVueAttr, attrInfo } = utils.checkVueTemplateAttr(document, position);
+            
+            // 确定替换范围
+            let range;
+            if (isVueAttr && attrInfo) {
+              // Vue模板属性，使用属性的完整范围
+              range = new vscode.Range(
+                document.positionAt(attrInfo.start),
+                document.positionAt(attrInfo.end)
+              );
+            } else {
+              // 普通文本，使用原始范围
+              range = new vscode.Range(
+                document.positionAt(item.start),
+                document.positionAt(item.end)
+              );
             }
-            
-            const range = new vscode.Range(
-              document.positionAt(item.start),
-              document.positionAt(item.end)
-            );
-            
+
             // 生成替换文本
-            const replacement = `${functionName}(${quote}${item.i18nKey}${quote})`;
-            
-            // 调试信息 - 输出替换详情
-            console.log(`替换范围: [${item.start}-${item.end}], 文本: "${document.getText(range)}", 替换为: "${replacement}"`);
-            
-            // 执行替换
+            const replacement = utils.generateReplacementText(
+              item.text,
+              item.i18nKey,
+              functionName,
+              quote,
+              document,
+              position
+            );
+
             editBuilder.replace(range, replacement);
           }
         });
-        
+
         // 更新已替换的项目状态
         // 标记已替换的项目
         const replacedIndexes = selectedItems.map(item => item.index);
-        
+
         // 重新分析文档，更新所有项目的位置信息
         await this.analyzeAndLoadPanel();
-        
+
         vscode.window.showInformationMessage(`已替换 ${selectedItems.length} 项`);
       });
     } catch (error) {
@@ -1075,19 +1098,16 @@ class BatchReplacementPanel {
 
           // 生成替换文本
           let replacement;
-          if (item.hasQuotes) {
-            replacement = `${functionName}(${codeQuote}${item.i18nKey}${codeQuote})`;
-          } else {
-            const utils = require('../../utils');
-            replacement = utils.generateReplacementText(
-              item.text,
-              item.i18nKey,
-              functionName,
-              codeQuote,
-              this.document,
-              this.document.positionAt(item.start)
-            );
-          }
+          // 不再直接判断hasQuotes，而是始终使用generateReplacementText
+          // 在该函数内部处理引号问题和Vue模板检测
+          replacement = utils.generateReplacementText(
+            item.text,
+            item.i18nKey,
+            functionName,
+            codeQuote,
+            this.document,
+            this.document.positionAt(item.start)
+          );
 
           // 添加到工作区编辑中
           workspaceEdit.replace(this.document.uri, range, replacement);
@@ -1137,14 +1157,14 @@ class BatchReplacementPanel {
 
     const item = replacementsKeys[index];
     if (!item.text) {
-       item.text = await vscode.window.showInputBox({
+      item.text = await vscode.window.showInputBox({
         prompt: '请输入要翻译的文本',
         placeHolder: '无法识别此处文本，请手动输入',
         validateInput: input => {
           return input && input.trim() !== '' ? null : '文本不能为空';
         }
       });
-      
+
       // 如果用户取消输入，则终止流程
       if (!item.text) {
         return null; // 返回 null 表示操作被取消
@@ -1154,7 +1174,7 @@ class BatchReplacementPanel {
 
     try {
       console.log(`面板翻译项：索引=${index}, 文本="${item.text}", 用户键="${userInputKey}"`);
-      
+
       // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const apiKey = config.get('tencentTranslation.apiKey', '');
@@ -1162,14 +1182,16 @@ class BatchReplacementPanel {
       const region = config.get('tencentTranslation.region', 'ap-guangzhou');
       const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
       const languageMappings = config.get('tencentTranslation.languageMappings', []);
-      
+
       // 生成或使用提供的键名
       let suggestedKey = userInputKey || '';
-      
+
       // 如果没有输入键名，则自动生成
       if (!suggestedKey) {
-        const { generateKeyFromTranslation } = require('../services/translationService');
-        
+        const {
+          generateKeyFromTranslation
+        } = require('../services/translationService');
+
         // 检查是否配置了自动翻译生成
         const autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', defaultsConfig.autoGenerateKeyFromText);
         if (autoGenerateKeyFromText) {
@@ -1180,19 +1202,21 @@ class BatchReplacementPanel {
           suggestedKey = generateKeyFromText(item.text);
         }
       }
-      
+
       // 保存到所有语言文件
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) throw new Error('未找到工作区');
       const rootPath = workspaceFolders[0].uri.fsPath;
-      
+
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: '翻译中...'
       }, async (progress) => {
         for (const mapping of languageMappings) {
-          progress.report({ message: `翻译为 ${getLanguageName(mapping.languageCode)}...` });
-          
+          progress.report({
+            message: `翻译为 ${getLanguageName(mapping.languageCode)}...`
+          });
+
           if (mapping.languageCode === sourceLanguage) {
             // 源语言直接使用原文
             await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, item.text);
@@ -1210,10 +1234,10 @@ class BatchReplacementPanel {
           }
         }
       });
-      
+
       // 更新项的键值
       item.i18nKey = suggestedKey;
-      
+
       // 更新面板内容
       await this.updatePanelContent();
     } catch (error) {
@@ -1846,7 +1870,7 @@ class BatchReplacementPanel {
    */
   getSelectedItems() {
     let itemsSource = [];
-    
+
     // 根据当前扫描模式确定项目来源
     if (this.scanMode === 'translated') {
       itemsSource = this.existingI18nCalls;
@@ -1856,24 +1880,24 @@ class BatchReplacementPanel {
       // 合并两个列表
       itemsSource = [...this.replacements, ...this.existingI18nCalls];
     }
-    
+
     // 筛选所有选中且有i18nKey的项目
-    return itemsSource.filter(item => 
-      item.selected && item.i18nKey && 
-      (this.selectedIndexes.includes(item.index) || 
-       this.selectedIndexes.length === 0 && item.selected)
+    return itemsSource.filter(item =>
+      item.selected && item.i18nKey &&
+      (this.selectedIndexes.includes(item.index) ||
+        this.selectedIndexes.length === 0 && item.selected)
     );
   }
 
   // 添加一个方法来加载配置
   _loadConfiguration() {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
-    
+
     // 加载翻译相关配置
     this.autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', true);
     this.autoGenerateKeyPrefix = config.get('autoGenerateKeyPrefix', '_iw');
     this.autoTranslateAllLanguages = config.get('autoTranslateAllLanguages', true);
-    
+
     // 其他配置...
   }
 
@@ -1889,10 +1913,10 @@ class BatchReplacementPanel {
         vscode.window.showWarningMessage('没有打开的文档');
         return;
       }
-      
+
       // 获取当前所有可见编辑器
       const visibleEditors = vscode.window.visibleTextEditors;
-      
+
       // 查找包含目标文档的编辑器
       let targetEditor = null;
       for (const editor of visibleEditors) {
@@ -1901,7 +1925,7 @@ class BatchReplacementPanel {
           break;
         }
       }
-      
+
       // 如果没找到目标编辑器，再尝试显示文档但不切换焦点
       if (!targetEditor) {
         // 使用preserveFocus:true保持面板焦点
@@ -1909,7 +1933,7 @@ class BatchReplacementPanel {
           preserveFocus: true,
           viewColumn: vscode.ViewColumn.One // 强制使用第一个视图列
         });
-        
+
         // 重新获取编辑器引用
         for (const editor of vscode.window.visibleTextEditors) {
           if (editor.document.uri.toString() === this.document.uri.toString()) {
@@ -1918,13 +1942,13 @@ class BatchReplacementPanel {
           }
         }
       }
-      
+
       // 如果仍然没有找到目标编辑器，给出错误提示
       if (!targetEditor) {
         vscode.window.showErrorMessage('无法定位到源文档编辑器');
         return;
       }
-      
+
       // 获取要高亮的项目
       let item = null;
       if (this.scanMode === 'pending') {
@@ -1936,38 +1960,38 @@ class BatchReplacementPanel {
         const allItems = [...this.replacements, ...this.existingI18nCalls];
         item = allItems[index];
       }
-      
+
       // 使用项目中原始的start和end，而不是参数中传入的
       if (item && typeof item.start === 'number' && typeof item.end === 'number') {
         start = item.start;
         end = item.end;
       }
-      
+
       // 创建位置范围
       const startPos = this.document.positionAt(start);
       const endPos = this.document.positionAt(end);
       const range = new vscode.Range(startPos, endPos);
-      
+
       // 滚动到位置并居中显示
       targetEditor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-      
+
       // 添加高亮装饰
       targetEditor.setDecorations(this.highlightDecorationType, [range]);
-      
+
       // 设置选择
       targetEditor.selection = new vscode.Selection(startPos, endPos);
-      
+
       // 清除之前的定时器
       if (this.highlightTimer) {
         clearTimeout(this.highlightTimer);
       }
-      
+
       // 5秒后自动清除高亮
       this.highlightTimer = setTimeout(() => {
         targetEditor.setDecorations(this.highlightDecorationType, []);
         this.highlightTimer = null;
       }, 5000);
-      
+
     } catch (error) {
       console.error('高亮源文本出错:', error);
       vscode.window.showErrorMessage(`高亮文本失败: ${error.message}`);
@@ -1981,7 +2005,7 @@ class BatchReplacementPanel {
   async replaceSingleItem(data) {
     try {
       const index = data.index;
-      
+
       // 获取正确的数据源
       let items = [];
       if (this.scanMode === 'pending') {
@@ -1991,21 +2015,21 @@ class BatchReplacementPanel {
       } else if (this.scanMode === 'all') {
         items = [...this.replacements, ...this.existingI18nCalls];
       }
-      
+
       // 检查索引是否有效
       if (index < 0 || index >= items.length) {
         vscode.window.showWarningMessage('无效的项目索引');
         return;
       }
-      
+
       const item = items[index];
-      
+
       // 检查项目是否有国际化键
       if (!item.i18nKey) {
         vscode.window.showWarningMessage('无法替换：该项目没有国际化键');
         return;
       }
-      
+
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: '正在替换项目...',
@@ -2016,44 +2040,69 @@ class BatchReplacementPanel {
         const functionName = config.get('functionName', 't');
         const quoteType = config.get('quoteType', 'single');
         const quote = quoteType === 'single' ? "'" : '"';
-        
+
         // 获取当前编辑的文档
         const document = this.document;
         if (!document) {
           throw new Error('未找到关联的文档');
         }
-        
+
         // 获取编辑器
         const editor = vscode.window.visibleTextEditors.find(
           editor => editor.document.uri.toString() === document.uri.toString()
         );
-        
+
         if (!editor) {
           throw new Error('未找到关联的编辑器');
         }
-        
-        progress.report({ message: '正在替换...' });
-        
+
+        progress.report({
+          message: '正在替换...'
+        });
+
         // 创建编辑对象
         await editor.edit(editBuilder => {
-          const range = new vscode.Range(
-            document.positionAt(item.start),
-            document.positionAt(item.end)
+          const position = document.positionAt(item.start);
+          const {
+            isVueAttr,
+            attrInfo
+          } = utils.checkVueTemplateAttr(document, position);
+          let range
+          if (isVueAttr && attrInfo) {
+            // 如果是Vue模板属性，使用属性的完整范围
+            range = new vscode.Range(
+              document.positionAt(attrInfo.start),
+              document.positionAt(attrInfo.end)
+            );
+          } else {
+            // 非Vue模板属性，使用原始范围
+            range = new vscode.Range(
+              document.positionAt(item.start),
+              document.positionAt(item.end)
+            );
+          }
+
+          // 生成替换文本（会包含属性名和绑定）
+          const replacement = utils.generateReplacementText(
+            item.text,
+            item.i18nKey,
+            functionName,
+            quote,
+            document,
+            position
           );
-          
-          // 生成替换文本
-          const replacement = `${functionName}(${quote}${item.i18nKey}${quote})`;
-          
-          // 调试信息 - 输出替换详情
-          console.log(`替换范围: [${item.start}-${item.end}], 文本: "${document.getText(range)}", 替换为: "${replacement}"`);
-          
-          // 执行替换
+
           editBuilder.replace(range, replacement);
+
+
+
+
+
         });
-        
+
         // 重新分析文档，更新所有项目的位置信息
         await this.analyzeAndLoadPanel();
-        
+
         vscode.window.showInformationMessage('项目替换成功');
       });
     } catch (error) {
@@ -2071,22 +2120,22 @@ class BatchReplacementPanel {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const functionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
-      
+
       // 检查是否已存在
       if (functionNames.includes(name)) {
         vscode.window.showInformationMessage(`函数名 ${name} 已存在`);
         return;
       }
-      
+
       // 添加新函数名
       functionNames.push(name);
-      
+
       // 更新配置
       await config.update('IdentifyTheCurrentName', functionNames, vscode.ConfigurationTarget.Workspace);
-      
+
       // 刷新面板
       await this.refreshPanel();
-      
+
       vscode.window.showInformationMessage(`已添加国际化函数名: ${name}`);
     } catch (error) {
       console.error('添加国际化函数名出错:', error);
@@ -2103,16 +2152,16 @@ class BatchReplacementPanel {
       // 获取当前配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       let functionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
-      
+
       // 过滤掉要删除的函数名
       functionNames = functionNames.filter(fn => fn !== name);
-      
+
       // 更新配置
       await config.update('IdentifyTheCurrentName', functionNames, vscode.ConfigurationTarget.Workspace);
-      
+
       // 刷新面板
       await this.refreshPanel();
-      
+
       vscode.window.showInformationMessage(`已删除国际化函数名: ${name}`);
     } catch (error) {
       console.error('删除国际化函数名出错:', error);
@@ -2129,14 +2178,14 @@ class BatchReplacementPanel {
       clearTimeout(this.highlightTimer);
       this.highlightTimer = null;
     }
-    
+
     // 清除高亮装饰
     if (this.highlightDecorationType) {
       this.highlightDecorationType.dispose();
     }
-    
+
     // 现有的清理代码...
-    
+
     if (this.panel) {
       this.panel.dispose();
     }
