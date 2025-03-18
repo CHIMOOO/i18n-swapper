@@ -659,24 +659,20 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                                 <span class="tooltip-text">${escapeHtml(tooltip)}</span>
                               </div>
                             `;
-}).join('')
-} </div> </td> </tr>
-`;
+                          }).join('')
+                          } </div> </td> </tr>
+                          `;
                 }
                 
                 return dataRow + statusRow;
-              }).join('') : ` <
-tr >
-  <
-  td colspan = "${scanMode === 'all' ? '6' : '5'}"
-class = "no-data" >
-  $ {
-    scanMode === 'pending' ? '未找到需要国际化的文本' :
-      scanMode === 'translated' ? '未找到已国际化的文本' :
-      '未找到任何文本'
-  } <
-  /td> <
-  /tr>
+              }).join('') : `
+                <tr>
+                  <td colspan="${scanMode === 'all' ? '6' : '5'}" class="no-data">
+                    ${scanMode === 'pending' ? '未找到需要国际化的文本' : 
+                      scanMode === 'translated' ? '未找到已国际化的文本' : 
+                      '未找到任何文本'}
+                  </td>
+                </tr>
 `}
             </tbody>
           </table>
