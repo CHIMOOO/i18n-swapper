@@ -233,8 +233,8 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           position: absolute;
           z-index: 100;
           bottom: 125%;
-          left: 50%;
-          transform: translateX(-50%);
+          // left: 50%;
+          // transform: translateX(-50%);
           min-width: 200px;
           max-width: 300px;
           background-color: var(--vscode-editorHoverWidget-background);
@@ -256,7 +256,8 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           left: 0;
           transform: translateX(0);
         }
-        .i18n-status-tag:last-child .tooltip-text {
+        /* 修改工具提示的位置规则，只对多个标签时最后一个标签生效 */
+        .i18n-status-tag:nth-child(n+4):last-child .tooltip-text {
           left: auto;
           right: 0;
           transform: translateX(0);
