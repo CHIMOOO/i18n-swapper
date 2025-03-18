@@ -285,6 +285,9 @@ class BatchReplacementPanel {
         case 'highlightSourceText':
           await this.highlightSourceText(data.start, data.end, data.index);
           break;
+        case 'replaceSingleItem':
+          await this.replaceSingleItem(data);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -1925,6 +1928,94 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('高亮源文本出错:', error);
       vscode.window.showErrorMessage(`高亮文本失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 替换单个项目
+   * @param {number} index 项目索引
+   */
+  async replaceSingleItem(data) {
+    try {
+      const index = data.index;
+      
+      // 获取正确的数据源
+      let items = [];
+      if (this.scanMode === 'pending') {
+        items = this.replacements;
+      } else if (this.scanMode === 'translated') {
+        items = this.existingI18nCalls;
+      } else if (this.scanMode === 'all') {
+        items = [...this.replacements, ...this.existingI18nCalls];
+      }
+      
+      // 检查索引是否有效
+      if (index < 0 || index >= items.length) {
+        vscode.window.showWarningMessage('无效的项目索引');
+        return;
+      }
+      
+      const item = items[index];
+      
+      // 检查项目是否有国际化键
+      if (!item.i18nKey) {
+        vscode.window.showWarningMessage('无法替换：该项目没有国际化键');
+        return;
+      }
+      
+      await vscode.window.withProgress({
+        location: vscode.ProgressLocation.Notification,
+        title: '正在替换项目...',
+        cancellable: false
+      }, async (progress) => {
+        // 获取配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const functionName = config.get('functionName', 't');
+        const quoteType = config.get('quoteType', 'single');
+        const quote = quoteType === 'single' ? "'" : '"';
+        
+        // 获取当前编辑的文档
+        const document = this.document;
+        if (!document) {
+          throw new Error('未找到关联的文档');
+        }
+        
+        // 获取编辑器
+        const editor = vscode.window.visibleTextEditors.find(
+          editor => editor.document.uri.toString() === document.uri.toString()
+        );
+        
+        if (!editor) {
+          throw new Error('未找到关联的编辑器');
+        }
+        
+        progress.report({ message: '正在替换...' });
+        
+        // 创建编辑对象
+        await editor.edit(editBuilder => {
+          const range = new vscode.Range(
+            document.positionAt(item.start),
+            document.positionAt(item.end)
+          );
+          
+          // 生成替换文本
+          const replacement = `${functionName}(${quote}${item.i18nKey}${quote})`;
+          
+          // 调试信息 - 输出替换详情
+          console.log(`替换范围: [${item.start}-${item.end}], 文本: "${document.getText(range)}", 替换为: "${replacement}"`);
+          
+          // 执行替换
+          editBuilder.replace(range, replacement);
+        });
+        
+        // 重新分析文档，更新所有项目的位置信息
+        await this.analyzeAndLoadPanel();
+        
+        vscode.window.showInformationMessage('项目替换成功');
+      });
+    } catch (error) {
+      console.error('替换单个项目出错:', error);
+      vscode.window.showErrorMessage(`替换失败: ${error.message}`);
     }
   }
 
