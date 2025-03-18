@@ -1073,7 +1073,10 @@ class BatchReplacementPanel {
         // 创建工作区编辑对象
         const workspaceEdit = new vscode.WorkspaceEdit();
         const totalItems = validItems.length;
-
+        const document = this.document;
+        if (!document) {
+          throw new Error('未找到关联的文档');
+        }
         // 处理每个替换项
         for (let i = 0; i < totalItems; i++) {
           const item = validItems[i];
@@ -1090,12 +1093,25 @@ class BatchReplacementPanel {
           const functionName = config.get('functionName', 't');
           const codeQuote = configQuoteType === 'single' ? "'" : '"';
 
-          // 创建替换范围
-          const range = new vscode.Range(
-            this.document.positionAt(item.start),
-            this.document.positionAt(item.end)
-          );
-
+          const position = document.positionAt(item.start);
+          const {
+            isVueAttr,
+            attrInfo
+          } = utils.checkVueTemplateAttr(document, position);
+          let range
+          if (isVueAttr && attrInfo) {
+            // 如果是Vue模板属性，使用属性的完整范围
+            range = new vscode.Range(
+              document.positionAt(attrInfo.start),
+              document.positionAt(attrInfo.end)
+            );
+          } else {
+            // 非Vue模板属性，使用原始范围
+            range = new vscode.Range(
+              document.positionAt(item.start),
+              document.positionAt(item.end)
+            );
+          }
           // 生成替换文本
           let replacement;
           // 不再直接判断hasQuotes，而是始终使用generateReplacementText

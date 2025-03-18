@@ -28,8 +28,11 @@ function setValueByPath(obj, path, value) {
 }
 
 function findI18nCalls(text, functionName = 't') {
-  // 使用词边界以确保精确匹配
-  const regex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
+  // 修改正则表达式以匹配任意引号
+  const regex = new RegExp(
+    `(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`,
+    'g'
+  );
   // ...其余代码
 }
 

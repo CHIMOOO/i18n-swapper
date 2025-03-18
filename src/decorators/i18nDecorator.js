@@ -417,13 +417,15 @@ class I18nDecorator {
         // 对每个配置的函数名进行处理
         for (const functionName of i18nFunctionNames) {
             // 在识别国际化调用的正则表达式中添加词边界匹配
-            // 查找类似 t('key') 或 $t('key') 的调用模式
+            // 查找类似 t('key') 或 $t('key') 或 t("key") 的调用模式
             const i18nCallRegex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
 
             // 匹配每个i18n函数调用
             let match;
             while ((match = i18nCallRegex.exec(text)) !== null) {
+                const fullMatch = match[0];
                 const key = match[3]; // 提取键名
+                const quoteType = match[2]; // 获取实际使用的引号类型（' 或 "）
                 let translatedText = this.localeData[key];
 
                 if (!translatedText) {
@@ -431,7 +433,6 @@ class I18nDecorator {
                     translatedText = this.getNestedValue(key);
                 }
 
-                const fullMatch = match[0]; // 例如: t('key')
                 // 找到开始和结束位置
                 const startPos = document.positionAt(match.index);
                 const endPos = document.positionAt(match.index + fullMatch.length);
@@ -476,8 +477,8 @@ class I18nDecorator {
                     suffixDecorations.push(suffixDecoration);
 
                     // 为内联样式找到括号内的内容位置
-                    const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
-                    const quoteEndIndex = fullMatch.lastIndexOf("'");
+                    const quoteStartIndex = fullMatch.indexOf(quoteType, fullMatch.indexOf('('));
+                    const quoteEndIndex = fullMatch.lastIndexOf(quoteType);
 
                     if (quoteStartIndex !== -1 && quoteEndIndex !== -1 && quoteStartIndex < quoteEndIndex) {
                         // 精确定位键名所在位置（引号之间的内容）
