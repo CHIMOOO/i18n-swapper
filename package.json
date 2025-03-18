@@ -1,0 +1,330 @@
+{
+  "name": "i18n-swapper",
+  "displayName": "i18n swapper",
+  "description": "查找并替换文本国际化键",
+  "version": "0.4.1",
+  "publisher": "chimoo",
+  "author": {
+    "name": "chimoo"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CHIMOOO/i18n-swapper.git"
+  },
+  "license": "Apache License 2.0",
+  "icon": "images/icon.png",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:i18n-swapper.replaceWithI18n",
+    "onCommand:i18n-swapper.batchReplaceWithI18n",
+    "onCommand:i18n-swapper.quickBatchReplace",
+    "onCommand:i18n-swapper.refreshI18nDecorations",
+    "onCommand:i18n-swapper.setLocalesPaths",
+    "onCommand:i18n-swapper.openApiTranslationConfig",
+    "onCommand:i18n-swapper.confirmReplacement",
+    "onCommand:i18n-swapper.cancelReplacement",
+    "onCommand:i18n-swapper.applyAllReplacements",
+    "onCommand:i18n-swapper.cancelAllReplacements",
+    "onCommand:i18n-swapper.openLanguageFile",
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:vue",
+    "onLanguage:html"
+  ],
+  "main": "./extension.js",
+  "keywords": [
+
+ 
+      "i18n-swapper",
+      "i18n swapper",
+      "I18n Swapper",
+      "I18n swapper",
+      "i18nSwapper",
+    "i18n",
+    "i18n-swapper",
+    "i18n swapper",
+    "i18n finder",
+    "i18n find",
+    "internationalization",
+    "i18n QuickSwap",
+    "locale switch",
+    "国际化",
+    "翻译",
+    "translation",
+    "localization",
+    "本地化",
+    "vue",
+    "react",
+    "javascript",
+    "typescript",
+    "i18next",
+    "vue-i18n"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "i18n-swapper.replaceWithI18n",
+        "title": "I18n Swapper: 替换为国际化函数"
+      },
+      {
+        "command": "i18n-swapper.batchReplaceWithI18n",
+        "title": "I18n Swapper: 打开面板"
+      },
+      {
+        "command": "i18n-swapper.quickBatchReplace",
+        "title": "I18n Swapper: 一键批量替换国际化"
+      },
+      {
+        "command": "i18n-swapper.refreshI18nDecorations",
+        "title": "I18n Swapper: 刷新国际化装饰"
+      },
+      {
+        "command": "i18n-swapper.setLocalesPaths",
+        "title": "I18n Swapper: 设置国际化文件路径"
+      },
+      {
+        "command": "i18n-swapper.openApiTranslationConfig",
+        "title": "I18n Swapper: 配置API翻译"
+      },
+      {
+        "command": "i18n-swapper.applyAllReplacements",
+        "title": "应用所有国际化替换"
+      },
+      {
+        "command": "i18n-swapper.translateHover",
+        "title": "I18n Swapper: 翻译到所有语言"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "i18n-swapper.replaceWithI18n",
+          "group": "i18n-swapper",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "i18n-swapper.batchReplaceWithI18n",
+          "group": "i18n-swapper"
+        },
+        {
+          "command": "i18n-swapper.quickBatchReplace",
+          "group": "i18n-swapper"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "i18n-swapper.replaceWithI18n",
+        "key": "ctrl+alt+y",
+        "mac": "cmd+alt+y",
+        "when": "editorHasSelection"
+      },
+      {
+        "command": "i18n-swapper.quickBatchReplace",
+        "key": "ctrl+alt+i",
+        "mac": "cmd+alt+i",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "i18n Swapper",
+      "properties": {
+        "i18n-swapper.localesPaths": {
+          "type": "array",
+          "default": [],
+          "description": "本地化文件的路径，支持多个文件路径"
+        },
+        "i18n-swapper.defaultLocale": {
+          "type": "string",
+          "default": "zh-CN",
+          "description": "默认本地化语言"
+        },
+        "i18n-swapper.quoteType": {
+          "type": "string",
+          "enum": ["single", "double"],
+          "default": "single",
+          "description": "生成的国际化调用中使用的引号类型"
+        },
+        "i18n-swapper.functionName": {
+          "type": "string",
+          "default": "t",
+          "description": "国际化函数名称"
+        },
+        "i18n-swapper.scanPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "配置扫描的字段列表 (用于批量替换功能)"
+        },
+        "i18n-swapper.tencentTranslation.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "腾讯云翻译API密钥ID (SecretId)"
+        },
+        "i18n-swapper.tencentTranslation.apiSecret": {
+          "type": "string",
+          "default": "",
+          "description": "腾讯云翻译API密钥 (SecretKey)"
+        },
+        "i18n-swapper.tencentTranslation.region": {
+          "type": "string",
+          "default": "ap-guangzhou",
+          "description": "腾讯云API区域"
+        },
+        "i18n-swapper.tencentTranslation.sourceLanguage": {
+          "type": "string",
+          "default": "zh",
+          "description": "源语言代码 (例如: zh)"
+        },
+        "i18n-swapper.tencentTranslation.languageMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "languageCode": {
+                "type": "string",
+                "description": "语言代码 (例如: en)"
+              },
+              "filePath": {
+                "type": "string",
+                "description": "对应的国际化文件路径"
+              }
+            }
+          },
+          "default": [],
+          "description": "语言代码与国际化文件的映射"
+        },
+        "i18n-swapper.decorationStyle": {
+          "type": "string",
+          "enum": ["suffix", "inline"],
+          "default": "suffix",
+          "description": "i18n装饰显示样式 (suffix: 显示为t('key')(译文); inline: 显示为t(译文))"
+        },
+        "i18n-swapper.suffixStyle": {
+          "type": "object",
+          "default": {
+            "color": "#6A9955",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontStyle": "italic",
+            "margin": "0 0 0 3px"
+          },
+          "properties": {
+            "color": {
+              "type": "string",
+              "default": "#6A9955",
+              "description": "后缀模式翻译文本的颜色"
+            },
+            "fontSize": {
+              "type": "string",
+              "default": "14px",
+              "description": "后缀模式翻译文本的字体大小"
+            },
+            "fontWeight": {
+              "type": "string",
+              "default": "400",
+              "description": "后缀模式翻译文本的字体粗细"
+            },
+            "fontStyle": {
+              "type": "string",
+              "default": "italic",
+              "description": "后缀模式翻译文本的字体样式"
+            },
+            "margin": {
+              "type": "string",
+              "default": "0 0 0 3px",
+              "description": "后缀模式翻译文本的边距"
+            }
+          },
+          "description": "后缀模式(t('key')(译文))的样式设置"
+        },
+        "i18n-swapper.inlineStyle": {
+          "type": "object",
+          "default": {
+            "color": "#CE9178",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "margin": "0 0 0 0"
+          },
+          "properties": {
+            "color": {
+              "type": "string",
+              "default": "#CE9178",
+              "description": "内联模式翻译文本的颜色"
+            },
+            "fontSize": {
+              "type": "string",
+              "default": "14px",
+              "description": "内联模式翻译文本的字体大小"
+            },
+            "fontWeight": {
+              "type": "string",
+              "default": "400",
+              "description": "内联模式翻译文本的字体粗细"
+            },
+            "fontStyle": {
+              "type": "string",
+              "default": "normal",
+              "description": "内联模式翻译文本的字体样式"
+            },
+            "margin": {
+              "type": "string",
+              "default": "0",
+              "description": "内联模式翻译文本的边距"
+            }
+          },
+          "description": "内联模式(t(译文))的样式设置"
+        },
+        "i18n-swapper.showFullFormInEditMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "在内联模式下编辑时，是否显示完整形式 t('key')(译文)"
+        },
+        "i18n-swapper.autoGenerateKeyFromText": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否自动根据中文文本生成国际化键名"
+        },
+        "i18n-swapper.autoGenerateKeyPrefix": {
+          "type": "string",
+          "default": "_iw",
+          "description": "自动生成的国际化键名前缀"
+        },
+        "i18n-swapper.autoTranslateAllLanguages": {
+          "type": "boolean",
+          "default": false,
+          "description": "替换时是否自动翻译到所有配置的语言"
+        },
+        "i18n-swapper.missingKeyBorderWidth": {
+          "type": "string",
+          "default": "0 0 2px 0",
+          "description": "缺失键下划线边框宽度（格式: 上 右 下 左）"
+        },
+        "i18n-swapper.missingKeyBorderStyle": {
+          "type": "string",
+          "default": "solid",
+          "enum": ["solid", "dashed", "dotted", "double"],
+          "description": "缺失键下划线边框样式"
+        },
+        "i18n-swapper.missingKeyBorderColor": {
+          "type": "string",
+          "default": "#ff6900",
+          "description": "缺失键下划线边框颜色"
+        },
+        "i18n-swapper.missingKeyBorderSpacing": {
+          "type": "string",
+          "default": "2px",
+          "description": "缺失键下划线边框间距"
+        }
+      }
+    }
+  }
+} 

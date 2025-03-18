@@ -488,6 +488,16 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           word-break: break-all;
           max-width: 300px;
         }
+
+        .text-highlight-trigger {
+          cursor: pointer;
+          text-decoration: underline dotted #409eff;
+          transition: background-color 0.2s;
+        }
+        
+        .text-highlight-trigger:hover {
+          background-color: rgba(64, 158, 255, 0.1);
+        }
       </style>
     </head>
     <body>
@@ -554,10 +564,11 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                         </span>
                       </td>
                     ` : ''}
-                    <td class="text-cell ${item.i18nKey ? 'has-key' : ''}" title="${escapeHtml(item.text)}">
-                      
-                      ${item.translationValue ? `<span class="translation-preview">${escapeHtml(item.translationValue)}</span>` : `${escapeHtml(item.text)}`}
-                    </td>
+                    <td class="text-cell text-highlight-trigger" 
+                        data-start="${item.start}" 
+                        data-end="${item.end}" 
+                        data-index="${index}" 
+                        title="点击定位到代码位置">${item.translationValue ? `<span class="translation-preview">${escapeHtml(item.translationValue)}</span>` : `${escapeHtml(item.text)}`}</td>
                     <td>
                       ${ `<input type="text" class="i18n-key-input" data-index="${index}" 
                           value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
@@ -1414,6 +1425,25 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           vscode.postMessage({
             command: 'updateMissingKeyStyles',
             data: missingKeyConfig
+          });
+        });
+
+        // 添加文本高亮点击处理
+        document.querySelectorAll('.text-highlight-trigger').forEach(item => {
+          item.addEventListener('click', () => {
+            const start = parseInt(item.getAttribute('data-start'));
+            const end = parseInt(item.getAttribute('data-end'));
+            const index = parseInt(item.getAttribute('data-index'));
+            
+            // 发送消息时包含完整信息
+            vscode.postMessage({
+              command: 'highlightSourceText',
+              data: {
+                start: start,
+                end: end,
+                index: index
+              }
+            });
           });
         });
       </script>

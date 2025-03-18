@@ -38,6 +38,15 @@ async function analyzeDocument(text, fileExtension, scanPatterns, localesPaths, 
 
     // 查找国际化键对应
     for (const item of replacements) {
+      // 确保每个替换项都有start和end位置信息
+      if (typeof item.start !== 'number') {
+        item.start = 0;
+      }
+      
+      if (typeof item.end !== 'number') {
+        item.end = item.start + (item.text ? item.text.length : 0);
+      }
+      
       for (const relativePath of localesPaths) {
         // 加载国际化文件
         const filePath = path.join(rootPath, relativePath);
@@ -57,10 +66,35 @@ async function analyzeDocument(text, fileExtension, scanPatterns, localesPaths, 
       
       // 为每个替换项添加范围信息
       if (document) {
+        // 查找文本在文档中的精确位置
+        const text = document.getText();
+        const escapedText = item.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); // 转义特殊字符
+        
+        // 查找文本
+        const regex = new RegExp(escapedText, 'g');
+        let match;
+        let foundAt = -1;
+        
+        while ((match = regex.exec(text)) !== null) {
+          // 找到匹配项，记录位置
+          foundAt = match.index;
+          
+          // 检查这个位置是否已经超出了我们之前确定的范围
+          if (foundAt >= item.start && foundAt <= item.end + item.text.length) {
+            break;
+          }
+        }
+        
+        // 如果找到了精确位置，更新start和end
+        if (foundAt !== -1) {
+          item.start = foundAt;
+          item.end = foundAt + item.text.length;
+        }
+        
         // 查找文本周围的引号
         const { hasQuotes, range } = utils.findQuotesAround(document, item);
         
-        // 确保有正确的位置信息
+        // 如果找到引号，更新位置
         if (hasQuotes) {
           item.start = document.offsetAt(range.start); 
           item.end = document.offsetAt(range.end);

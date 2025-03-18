@@ -33,6 +33,26 @@ function analyzeContent(text, baseIndex, scanPatterns, shouldBeInternationalized
     
     // 分析HTML/Vue模板
     analyzeHtmlContent(text, baseIndex, replacements, shouldBeInternationalizedFn);
+    
+    // 确保所有替换项都保持其原始位置信息
+    replacements.forEach(item => {
+      // 确保起始位置包含baseIndex偏移
+      if (typeof item.start === 'number') {
+        item.start += baseIndex;
+      }
+      
+      // 确保结束位置包含baseIndex偏移
+      if (typeof item.end === 'number') {
+        item.end += baseIndex;
+      }
+      
+      // 记录原始文本和长度，便于调试
+      item.originalText = text.substring(
+        Math.max(0, item.start - baseIndex), 
+        Math.min(text.length, item.end - baseIndex)
+      );
+      item.textLength = item.text ? item.text.length : 0;
+    });
   } catch (error) {
     console.error('分析内容时出错:', error);
   }

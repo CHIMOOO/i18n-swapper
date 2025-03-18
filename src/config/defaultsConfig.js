@@ -4,7 +4,7 @@
  */
 module.exports = {
     // 基本配置
-    decorationStyle: 'suffix',          // 装饰样式: 'suffix' 或 'inline'
+    decorationStyle: 'inline', // 装饰样式: 'suffix' 或 'inline'
     defaultLocale: 'zh-CN',             // 默认语言
     functionName: 't',                  // 国际化函数名称
     quoteType: 'single',                // 引号类型: 'single' 或 'double'
