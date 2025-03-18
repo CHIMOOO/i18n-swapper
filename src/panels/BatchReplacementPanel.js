@@ -294,6 +294,25 @@ class BatchReplacementPanel {
         case 'removeI18nFunctionName':
           await this.removeI18nFunctionName(data.name);
           break;
+        case 'updateOutputI18nFunctionName':
+          try {
+            const { functionName } = data;
+            if (functionName) {
+              // 更新配置
+              await vscode.workspace.getConfiguration('i18n-swapper').update('functionName', functionName, vscode.ConfigurationTarget.Workspace);
+              
+              // 不要尝试更新上下文对象，它是不可扩展的
+              // this.context.outputI18nFunctionName = functionName; // 删除这行
+              
+              // 更新内部状态（如果需要）
+              this.outputI18nFunctionName = functionName; // 使用实例变量而不是context
+              
+              vscode.window.showInformationMessage(`已更新输出国际化函数名称为: ${functionName}`);
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(`更新输出国际化函数名称失败: ${error.message}`);
+          }
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }

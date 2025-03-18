@@ -48,6 +48,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
   const autoTranslateAllLanguages = context.autoTranslateAllLanguages !== undefined ?
     context.autoTranslateAllLanguages : config.get('autoTranslateAllLanguages', true);
 
+  // 获取输出国际化函数名称
+  const outputI18nFunctionName = context.outputI18nFunctionName || config.get('functionName', 't');
+
   // 从上下文中获取扫描模式
   const scanMode = context.scanMode || 'pending';
 
@@ -657,7 +660,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                               </div>
                             `;
 }).join('')
-}
+} </div> </td> </tr>
 `;
                 }
                 
@@ -907,6 +910,19 @@ class = "no-data" >
                   <button id="add-function-name">添加</button>
                 </div>
                 <span class="help-text">定义哪些函数名会被识别为国际化调用，例如：t, $t</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 添加输出国际化函数名配置 -->
+          <div class="config-row">
+            <h4>7、输出国际化函数配置</h4>
+            <div class="style-config-container">
+              <div class="config-item">
+                <label>输出国际化函数名称：</label>
+                <input type="text" id="output-i18n-function-name" value="${escapeHtml(outputI18nFunctionName)}" class="text-input">
+                <span class="help-text">替换时使用的国际化函数名称，例如：t, $t</span>
+                <button id="save-output-function-name" class="primary-button" style="margin-left: 10px;">保存</button>
               </div>
             </div>
           </div>
@@ -1555,6 +1571,18 @@ class = "no-data" >
               data: { name }
             });
           });
+        });
+
+        // 添加输出国际化函数名保存按钮的事件处理
+        document.getElementById('save-output-function-name').addEventListener('click', function() {
+          const functionName = document.getElementById('output-i18n-function-name').value.trim();
+          
+          if (functionName) {
+            vscode.postMessage({
+              command: 'updateOutputI18nFunctionName',
+              data: { functionName }
+            });
+          }
         });
       </script>
     </body>
