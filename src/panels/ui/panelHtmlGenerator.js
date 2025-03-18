@@ -491,7 +491,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
 
         .text-highlight-trigger {
           cursor: pointer;
-          text-decoration: underline dotted #409eff;
+          // text-decoration: underline solid #409eff;
           transition: background-color 0.2s;
         }
         
@@ -545,7 +545,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 ${scanMode === 'all' ? '<th>类型</th>' : (scanMode === 'pending'?'<th>文本</th>':'')}
                 ${scanMode === 'translated' ? '<th>源语言值</th>' :(scanMode === 'all' ? '<th>文本</th>':'')}
                 <th>国际化键</th>
-                <th>来源</th>
               </tr>
             </thead>
             <tbody>
@@ -578,7 +577,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                         </button>`
                       }
                     </td>
-                    <td>${escapeHtml(item.source || '文本')}</td>
                   </tr>`;
                 
                 // 只有当项有i18nKey且languageMappings存在时才添加状态行
