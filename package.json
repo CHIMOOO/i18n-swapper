@@ -323,6 +323,14 @@
           "type": "string",
           "default": "2px",
           "description": "缺失键下划线边框间距"
+        },
+        "i18n-swapper.IdentifyTheCurrentName": {
+          "type": "array",
+          "default": ["t", "$t"],
+          "items": {
+            "type": "string"
+          },
+          "description": "识别当前页面上的国际化函数名称列表"
         }
       }
     }

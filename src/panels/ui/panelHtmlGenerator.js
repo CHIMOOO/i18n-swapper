@@ -4,6 +4,7 @@
  * @returns {string} 转义后的文本
  */
 const vscode = require('vscode');
+
 function escapeHtml(text) {
   if (text === undefined || text === null) return '';
   return String(text)
@@ -15,8 +16,10 @@ function escapeHtml(text) {
 }
 
 // 导入LANGUAGE_NAMES
-const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
-const defaultsConfig = require('../../config/defaultsConfig');  // 引入默认配置，更改为明确的名称
+const {
+  LANGUAGE_NAMES
+} = require('../../utils/language-mappings');
+const defaultsConfig = require('../../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
 
 /**
  * 生成面板HTML内容
@@ -32,22 +35,22 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
   // 获取配置
   const config = vscode.workspace.getConfiguration('i18n-swapper');
   const decorationStyle = context.decorationStyle || config.get('decorationStyle', 'suffix');
-  const showFullFormInEditMode = context.showFullFormInEditMode !== undefined ? 
+  const showFullFormInEditMode = context.showFullFormInEditMode !== undefined ?
     context.showFullFormInEditMode : config.get('showFullFormInEditMode', true);
   const suffixStyle = context.suffixStyle || config.get('suffixStyle', {});
   const inlineStyle = context.inlineStyle || config.get('inlineStyle', {});
-  
+
   // 添加新的翻译功能设置项
   const autoGenerateKeyFromText = context.autoGenerateKeyFromText !== undefined ?
     context.autoGenerateKeyFromText : config.get('autoGenerateKeyFromText', true);
-  const autoGenerateKeyPrefix = context.autoGenerateKeyPrefix || 
+  const autoGenerateKeyPrefix = context.autoGenerateKeyPrefix ||
     config.get('autoGenerateKeyPrefix', '_iw');
   const autoTranslateAllLanguages = context.autoTranslateAllLanguages !== undefined ?
     context.autoTranslateAllLanguages : config.get('autoTranslateAllLanguages', true);
-  
+
   // 从上下文中获取扫描模式
   const scanMode = context.scanMode || 'pending';
-  
+
   // 根据模式确定要显示的数据
   let displayItems = [];
   if (scanMode === 'pending') {
@@ -57,14 +60,20 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
   } else if (scanMode === 'all') {
     // 合并两个数组，添加类型标记
     displayItems = [
-      ...replacements.map(item => ({ ...item, itemType: 'pending' })),
-      ...existingI18nCalls.map(item => ({ ...item, itemType: 'translated' }))
+      ...replacements.map(item => ({
+        ...item,
+        itemType: 'pending'
+      })),
+      ...existingI18nCalls.map(item => ({
+        ...item,
+        itemType: 'translated'
+      }))
     ];
   }
-  
+
   // 配置部分的CSS类
   const configSectionClass = isConfigExpanded ? 'config-section expanded' : 'config-section';
-  
+
   return `
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -272,11 +281,34 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         .config-row {
           margin-bottom: 15px;
         }
-        .pattern-list, .locale-paths-list {
+        .pattern-list, .locale-paths-list,#i18n-function-names {
           margin: 5px 0;
           padding: 0;
           list-style: none;
+          display: flex;
+          flex-wrap: wrap;
         }
+         .pattern-list li,.locale-path-item span,#i18n-function-names .function-name-item {
+        padding: 0 0 0 8px;
+            margin-right: 8px;
+        }
+           .pattern-list li button,.locale-path-item .remove-locale-path,#i18n-function-names .function-name-item button {
+        background:oklch(0.396 0.141 25.723);
+            padding: 5px 5px;
+        }
+            #i18n-function-names .function-name-item{
+                border: 1px solid var(--vscode-input-border);
+    border-radius: 3px;
+            }
+         
+    .del-svg{
+       height: 16px;
+    width: 16px;
+    fill: #d6d6dd;
+    }
+          .pattern-list li  span,#i18n-function-names .function-name-item span{
+              margin-right: 10px;
+          }
         .pattern-item, .locale-path-item {
           display: flex;
           align-items: center;
@@ -624,23 +656,28 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                                 <span class="tooltip-text">${escapeHtml(tooltip)}</span>
                               </div>
                             `;
-                          }).join('')}
-                        </div>
-                      </td>
-                    </tr>
-                  `;
+}).join('')
+} <
+/div> <
+/td> <
+/tr>
+`;
                 }
                 
                 return dataRow + statusRow;
-              }).join('') : `
-                <tr>
-                  <td colspan="${scanMode === 'all' ? '6' : '5'}" class="no-data">
-                    ${scanMode === 'pending' ? '未找到需要国际化的文本' : 
-                      scanMode === 'translated' ? '未找到已国际化的文本' : 
-                      '未找到任何文本'}
-                  </td>
-                </tr>
-              `}
+              }).join('') : ` <
+tr >
+  <
+  td colspan = "${scanMode === 'all' ? '6' : '5'}"
+class = "no-data" >
+  $ {
+    scanMode === 'pending' ? '未找到需要国际化的文本' :
+      scanMode === 'translated' ? '未找到已国际化的文本' :
+      '未找到任何文本'
+  } <
+  /td> <
+  /tr>
+`}
             </tbody>
           </table>
         </div>
@@ -660,14 +697,36 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           <span style="margin-left:auto;font-weight: 700;">（点击展开/关闭）</span>
         </div>
         <div class="collapsible-section-content" id="config-section-content" style="${isConfigExpanded ? 'display: block;' : 'display: none;'}">
+
+          
+          <!-- 国际化文件配置 -->
+          <div class="config-row">
+            <h4>1、配置源文件的国际化字库列表（将根据文件内已有的值进行扫描）</h4>
+            <ul class="locale-paths-list">
+              ${localesPaths.map(path => `
+                <li class="locale-path-item">
+                  <span>${escapeHtml(path)}</span>
+                  <button class="remove-locale-path" data-path="${escapeHtml(path)}"> <svg class="del-svg" data-slot="icon" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path clip-rule="evenodd" fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"></path>
+                  </svg></button>
+                </li>
+              `).join('')}
+            </ul>
+            <button id="select-locale-file">添加文件</button>
+          </div>
+
           <!-- 扫描模式配置 -->
           <div class="config-row">
-            <h4>1、扫描属性配置</h4>
+            <h4>2、扫描属性配置</h4>
             <ul class="pattern-list">
               ${scanPatterns.map(pattern => `
                 <li class="pattern-item">
                   <span>${escapeHtml(pattern)}</span>
-                  <button class="remove-pattern" data-pattern="${escapeHtml(pattern)}">删除</button>
+                  <button class="remove-pattern" data-pattern="${escapeHtml(pattern)}">
+                      <svg class="del-svg" data-slot="icon" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path clip-rule="evenodd" fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"></path>
+                  </svg>
+                  </button>
                 </li>
               `).join('')}
             </ul>
@@ -676,21 +735,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               <button id="add-pattern">添加</button>
             </div>
           </div>
-          
-          <!-- 国际化文件配置 -->
-          <div class="config-row">
-            <h4>2、配置源文件的国际化字库列表（将根据文件内已有的值进行扫描）</h4>
-            <ul class="locale-paths-list">
-              ${localesPaths.map(path => `
-                <li class="locale-path-item">
-                  <span>${escapeHtml(path)}</span>
-                  <button class="remove-locale-path" data-path="${escapeHtml(path)}">删除</button>
-                </li>
-              `).join('')}
-            </ul>
-            <button id="select-locale-file">添加文件</button>
-          </div>
-          
+
           <!-- 添加装饰风格选择区域 -->
           <div class="config-row">
             <h4>3、装饰显示风格</h4>
@@ -840,6 +885,31 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                 <input type="checkbox" id="auto-translate-all" ${autoTranslateAllLanguages ? 'checked' : ''}>
                 <label for="auto-translate-all">自动翻译到所有语言</label>
                 <span class="help-text">开启后会自动翻译并保存到所有配置的语言文件</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 在配置部分添加国际化函数名配置 -->
+          <div class="config-row">
+            <h4>6、国际化函数识别配置</h4>
+            <div class="style-config-container">
+              <div class="config-item">
+                <label>识别的国际化函数：</label>
+                <div id="i18n-function-names">
+                  ${config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName).map(name => `
+                    <div class="function-name-item">
+                      <span>${escapeHtml(name)}</span>
+                      <button class="remove-function-name" data-name="${escapeHtml(name)}"> <svg class="del-svg" data-slot="icon" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path clip-rule="evenodd" fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"></path>
+                  </svg></button>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="new-function-input">
+                  <input type="text" id="new-function-name" placeholder="输入国际化函数名">
+                  <button id="add-function-name">添加</button>
+                </div>
+                <span class="help-text">定义哪些函数名会被识别为国际化调用，例如：t, $t</span>
               </div>
             </div>
           </div>
@@ -1463,6 +1533,32 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             });
           });
         });
+
+        // 添加国际化函数名
+        document.getElementById('add-function-name').addEventListener('click', function() {
+          const input = document.getElementById('new-function-name');
+          const name = input.value.trim();
+          
+          if (name) {
+            vscode.postMessage({
+              command: 'addI18nFunctionName',
+              data: { name }
+            });
+            
+            input.value = '';
+          }
+        });
+
+        // 删除国际化函数名
+        document.querySelectorAll('.remove-function-name').forEach(btn => {
+          btn.addEventListener('click', function() {
+            const name = this.getAttribute('data-name');
+            vscode.postMessage({
+              command: 'removeI18nFunctionName',
+              data: { name }
+            });
+          });
+        });
       </script>
     </body>
     </html>
@@ -1472,4 +1568,4 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
 module.exports = {
   getPanelHtml,
   escapeHtml
-}; 
+};

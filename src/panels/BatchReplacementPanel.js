@@ -288,6 +288,12 @@ class BatchReplacementPanel {
         case 'replaceSingleItem':
           await this.replaceSingleItem(data);
           break;
+        case 'addI18nFunctionName':
+          await this.addI18nFunctionName(data.name);
+          break;
+        case 'removeI18nFunctionName':
+          await this.removeI18nFunctionName(data.name);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -436,88 +442,88 @@ class BatchReplacementPanel {
     try {
       // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const functionName = config.get('functionName', 't');
+      // 使用配置文件中定义的国际化函数名数组
+      const i18nFunctionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
+      
+      // 对每个配置的函数名创建正则表达式
+      for (const functionName of i18nFunctionNames) {
+        // 确保使用词边界匹配完整的函数名
+        const i18nCallRegex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
 
-      // 构建正则表达式匹配 t('key') 或 $t('key') 模式
-      // 支持单引号和双引号
-      // 修改正则表达式，确保只匹配完整的函数名，使用\b表示单词边界
-      const i18nCallRegex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
+        let match;
+        while ((match = i18nCallRegex.exec(text)) !== null) {
+          const fullMatch = match[0]; // 完整匹配，如 t('common.submit')
+          const fnName = match[1]; // 函数名，如 t 或 $t
+          const quoteType = match[2]; // 引号类型，' 或 "
+          const i18nKey = match[3]; // 国际化键，如 common.submit
 
-      let match;
-      while ((match = i18nCallRegex.exec(text)) !== null) {
-        const fullMatch = match[0]; // 完整匹配，如 t('common.submit')
-        const fnName = match[1]; // 函数名，如 t 或 $t
-        const quoteType = match[2]; // 引号类型，' 或 "
-        const i18nKey = match[3]; // 国际化键，如 common.submit
+          // 计算位置
+          const startPos = match.index;
+          const endPos = startPos + fullMatch.length;
 
-        // 计算位置
-        const startPos = match.index;
-        const endPos = startPos + fullMatch.length;
+          // 获取工作区根目录
+          const workspaceFolders = vscode.workspace.workspaceFolders;
+          if (!workspaceFolders) continue;
 
-        // 获取工作区根目录
-        const workspaceFolders = vscode.workspace.workspaceFolders;
-        if (!workspaceFolders) continue;
+          const rootPath = workspaceFolders[0].uri.fsPath;
 
-        const rootPath = workspaceFolders[0].uri.fsPath;
+          // 获取语言映射配置
+          const languageMappings = config.get('tencentTranslation.languageMappings', []);
 
-        // 获取语言映射配置
-        const languageMappings = config.get('tencentTranslation.languageMappings', []);
+          // 查找键对应的翻译值
+          let translationValue = null;
+          let sourceFile = null;
+          let sourceText = null;
+          const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
+          
+          for (const mapping of languageMappings) {
+            try {
+              const filePath = path.join(rootPath, mapping.filePath);
+              if (!fs.existsSync(filePath)) continue;
 
-        // 查找键对应的翻译值
-        let translationValue = null;
-        let sourceFile = null;
-        let sourceText = null;
-        const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
-        for (const mapping of languageMappings) {
-          try {
-            const filePath = path.join(rootPath, mapping.filePath);
-            if (!fs.existsSync(filePath)) continue;
+              const localeData = utils.loadLocaleFile(filePath);
+              if (!localeData) continue;
 
-            const localeData = utils.loadLocaleFile(filePath);
-            if (!localeData) continue;
+              // 获取嵌套键的值
+              const keyParts = i18nKey.split('.');
+              let value = localeData;
+              let exists = true;
 
-            // 获取嵌套键的值
-            const keyParts = i18nKey.split('.');
-            let value = localeData;
-            let exists = true;
-
-            for (const part of keyParts) {
-              if (value && typeof value === 'object' && part in value) {
-
-                value = value[part];
-
-              } else {
-                exists = false;
+              for (const part of keyParts) {
+                if (value && typeof value === 'object' && part in value) {
+                  value = value[part];
+                } else {
+                  exists = false;
+                  break;
+                }
+              }
+              if (mapping.languageCode === sourceLanguage) {
+                sourceText = value;
+              }
+              if (exists && typeof value === 'string') {
+                translationValue = value;
+                sourceFile = mapping.filePath;
                 break;
               }
-
+            } catch (error) {
+              console.error(`获取键 ${i18nKey} 的翻译值时出错:`, error);
             }
-            if (mapping.languageCode === sourceLanguage) {
-              sourceText = value;
-            }
-            if (exists && typeof value === 'string') {
-              translationValue = value;
-              sourceFile = mapping.filePath;
-              break;
-            }
-          } catch (error) {
-            console.error(`获取键 ${i18nKey} 的翻译值时出错:`, error);
           }
-        }
 
-        // 添加到结果
-        existingCalls.push({
-          text: sourceText || null,
-          i18nKey: i18nKey,
-          translationValue: translationValue,
-          start: startPos,
-          end: endPos,
-          fnName: fnName,
-          quoteType: quoteType,
-          i18nFile: sourceFile,
-          source: fullMatch,
-          selected: false
-        });
+          // 添加到结果
+          existingCalls.push({
+            text: sourceText || null,
+            i18nKey: i18nKey,
+            translationValue: translationValue,
+            start: startPos,
+            end: endPos,
+            fnName: fnName,
+            quoteType: quoteType,
+            i18nFile: sourceFile,
+            source: fullMatch,
+            selected: false
+          });
+        }
       }
     } catch (error) {
       console.error('分析已存在的国际化调用时出错:', error);
@@ -2017,6 +2023,64 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('替换单个项目出错:', error);
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 添加国际化函数名
+   * @param {string} name 函数名
+   */
+  async addI18nFunctionName(name) {
+    try {
+      // 获取当前配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const functionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
+      
+      // 检查是否已存在
+      if (functionNames.includes(name)) {
+        vscode.window.showInformationMessage(`函数名 ${name} 已存在`);
+        return;
+      }
+      
+      // 添加新函数名
+      functionNames.push(name);
+      
+      // 更新配置
+      await config.update('IdentifyTheCurrentName', functionNames, vscode.ConfigurationTarget.Workspace);
+      
+      // 刷新面板
+      await this.refreshPanel();
+      
+      vscode.window.showInformationMessage(`已添加国际化函数名: ${name}`);
+    } catch (error) {
+      console.error('添加国际化函数名出错:', error);
+      vscode.window.showErrorMessage(`添加函数名失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 删除国际化函数名
+   * @param {string} name 函数名
+   */
+  async removeI18nFunctionName(name) {
+    try {
+      // 获取当前配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      let functionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
+      
+      // 过滤掉要删除的函数名
+      functionNames = functionNames.filter(fn => fn !== name);
+      
+      // 更新配置
+      await config.update('IdentifyTheCurrentName', functionNames, vscode.ConfigurationTarget.Workspace);
+      
+      // 刷新面板
+      await this.refreshPanel();
+      
+      vscode.window.showInformationMessage(`已删除国际化函数名: ${name}`);
+    } catch (error) {
+      console.error('删除国际化函数名出错:', error);
+      vscode.window.showErrorMessage(`删除函数名失败: ${error.message}`);
     }
   }
 

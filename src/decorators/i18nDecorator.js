@@ -410,108 +410,114 @@ class I18nDecorator {
         // 获取语言映射配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
         const languageMappings = config.get('tencentTranslation.languageMappings', []);
+        
+        // 使用配置文件中定义的国际化函数名数组
+        const i18nFunctionNames = config.get('IdentifyTheCurrentName', defaultsConfig.IdentifyTheCurrentName);
+        
+        // 对每个配置的函数名进行处理
+        for (const functionName of i18nFunctionNames) {
+            // 在识别国际化调用的正则表达式中添加词边界匹配
+            // 查找类似 t('key') 或 $t('key') 的调用模式
+            const i18nCallRegex = new RegExp(`(\\$?\\b${functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
 
-        // 在识别国际化调用的正则表达式中添加词边界匹配
-        // 查找类似 t('key') 或 $t('key') 的调用模式
-        const i18nCallRegex = new RegExp(`(\\$?\\b${this.functionName}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`, 'g');
+            // 匹配每个i18n函数调用
+            let match;
+            while ((match = i18nCallRegex.exec(text)) !== null) {
+                const key = match[3]; // 提取键名
+                let translatedText = this.localeData[key];
 
-        // 匹配每个i18n函数调用
-        let match;
-        while ((match = i18nCallRegex.exec(text)) !== null) {
-            const key = match[3]; // 提取键名
-            let translatedText = this.localeData[key];
+                if (!translatedText) {
+                    // 尝试解析嵌套键
+                    translatedText = this.getNestedValue(key);
+                }
 
-            if (!translatedText) {
-                // 尝试解析嵌套键
-                translatedText = this.getNestedValue(key);
-            }
+                const fullMatch = match[0]; // 例如: t('key')
+                // 找到开始和结束位置
+                const startPos = document.positionAt(match.index);
+                const endPos = document.positionAt(match.index + fullMatch.length);
 
-            const fullMatch = match[0]; // 例如: t('key')
-            // 找到开始和结束位置
-            const startPos = document.positionAt(match.index);
-            const endPos = document.positionAt(match.index + fullMatch.length);
+                // 创建悬浮内容（无论键是否存在都创建悬浮内容）
+                const hoverContent = generateLanguageHoverContent({
+                    allLanguageData: this.allLanguageData,
+                    languageMappings: languageMappings,
+                    i18nKey: key,
+                    showActions: false, // 不显示操作按钮
+                    missingKey: !translatedText // 标记是否为缺失的键
+                });
 
-            // 创建悬浮内容（无论键是否存在都创建悬浮内容）
-            const hoverContent = generateLanguageHoverContent({
-                allLanguageData: this.allLanguageData,
-                languageMappings: languageMappings,
-                i18nKey: key,
-                showActions: false, // 不显示操作按钮
-                missingKey: !translatedText // 标记是否为缺失的键
-            });
-
-            // 存储函数调用的位置和悬浮内容
-            const decorationId = `${match.index}:${key}`;
-            this.decorationHoverMap.set(decorationId, {
-                range: new vscode.Range(startPos, endPos),
-                suffixLength: translatedText ? (2 + translatedText.length) : 0, // '(' + 翻译文本 + ')'
-                hoverContent: hoverContent
-            });
-
-            if (translatedText) {
-                // 如果有翻译内容，创建正常的装饰（但不包含hoverMessage属性）
-                
-                // 创建后缀样式的装饰
-                const suffixDecoration = {
+                // 存储函数调用的位置和悬浮内容
+                const decorationId = `${match.index}:${key}`;
+                this.decorationHoverMap.set(decorationId, {
                     range: new vscode.Range(startPos, endPos),
-                    renderOptions: {
-                        after: {
-                            contentText: `(${translatedText})`,
-                            margin: this.suffixStyle.margin || '0 0 0 3px',
-                            color: this.suffixStyle.color,
-                            fontSize: typeof this.suffixStyle.fontSize === 'number' || 
-                                    !this.suffixStyle.fontSize.includes('px') ? 
-                                    `${this.suffixStyle.fontSize}px` : this.suffixStyle.fontSize,
-                            fontWeight: String(this.suffixStyle.fontWeight),
-                            fontStyle: this.suffixStyle.fontStyle || 'italic'
-                        }
-                    }
-                    // 移除hoverMessage属性
-                };
-                suffixDecorations.push(suffixDecoration);
+                    suffixLength: translatedText ? (2 + translatedText.length) : 0, // '(' + 翻译文本 + ')'
+                    hoverContent: hoverContent
+                });
 
-                // 为内联样式找到括号内的内容位置
-                const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
-                const quoteEndIndex = fullMatch.lastIndexOf("'");
-
-                if (quoteStartIndex !== -1 && quoteEndIndex !== -1 && quoteStartIndex < quoteEndIndex) {
-                    // 精确定位键名所在位置（引号之间的内容）
-                    const keyStartPos = document.positionAt(match.index + quoteStartIndex + 1);
-                    const keyEndPos = document.positionAt(match.index + quoteEndIndex);
-
-                    // 存储装饰范围和原始键用于点击功能
-                    this.currentInlineDecorations.push({
-                        range: new vscode.Range(keyStartPos, keyEndPos),
-                        originalKey: key
-                    });
-
-                    // 创建内联样式装饰，仅替换引号内的内容（但不包含hoverMessage属性）
-                    const inlineDecoration = {
-                        range: new vscode.Range(keyStartPos, keyEndPos),
+                if (translatedText) {
+                    // 如果有翻译内容，创建正常的装饰（但不包含hoverMessage属性）
+                    
+                    // 创建后缀样式的装饰
+                    const suffixDecoration = {
+                        range: new vscode.Range(startPos, endPos),
                         renderOptions: {
-                            before: {
-                                contentText: translatedText,
-                                margin: this.inlineStyle.margin || '0',
-                                color: this.inlineStyle.color,
-                                fontSize: typeof this.inlineStyle.fontSize === 'number' || 
-                                        !this.inlineStyle.fontSize.includes('px') ? 
-                                        `${this.inlineStyle.fontSize}px` : this.inlineStyle.fontSize,
-                                fontWeight: String(this.inlineStyle.fontWeight),
-                                fontStyle: this.inlineStyle.fontStyle || 'normal'
-                            },
-                            textDecoration: 'none; display: none;'
+                            after: {
+                                contentText: `(${translatedText})`,
+                                margin: this.suffixStyle.margin || '0 0 0 3px',
+                                color: this.suffixStyle.color,
+                                fontSize: typeof this.suffixStyle.fontSize === 'number' || 
+                                        !this.suffixStyle.fontSize.includes('px') ? 
+                                        `${this.suffixStyle.fontSize}px` : this.suffixStyle.fontSize,
+                                fontWeight: String(this.suffixStyle.fontWeight),
+                                fontStyle: this.suffixStyle.fontStyle || 'italic'
+                            }
                         }
                         // 移除hoverMessage属性
                     };
-                    inlineDecorations.push(inlineDecoration);
+                    suffixDecorations.push(suffixDecoration);
+
+                    // 为内联样式找到括号内的内容位置
+                    const quoteStartIndex = fullMatch.indexOf("'", fullMatch.indexOf('('));
+                    const quoteEndIndex = fullMatch.lastIndexOf("'");
+
+                    if (quoteStartIndex !== -1 && quoteEndIndex !== -1 && quoteStartIndex < quoteEndIndex) {
+                        // 精确定位键名所在位置（引号之间的内容）
+                        const keyStartPos = document.positionAt(match.index + quoteStartIndex + 1);
+                        const keyEndPos = document.positionAt(match.index + quoteEndIndex);
+
+                        // 存储装饰范围和原始键用于点击功能
+                        this.currentInlineDecorations.push({
+                            range: new vscode.Range(keyStartPos, keyEndPos),
+                            originalKey: key
+                        });
+
+                        // 创建内联样式装饰，仅替换引号内的内容（但不包含hoverMessage属性）
+                        const inlineDecoration = {
+                            range: new vscode.Range(keyStartPos, keyEndPos),
+                            renderOptions: {
+                                before: {
+                                    contentText: translatedText,
+                                    margin: this.inlineStyle.margin || '0',
+                                    color: this.inlineStyle.color,
+                                    fontSize: typeof this.inlineStyle.fontSize === 'number' || 
+                                            !this.inlineStyle.fontSize.includes('px') ? 
+                                            `${this.inlineStyle.fontSize}px` : this.inlineStyle.fontSize,
+                                    fontWeight: String(this.inlineStyle.fontWeight),
+                                    fontStyle: this.inlineStyle.fontStyle || 'normal'
+                                },
+                                textDecoration: 'none; display: none;'
+                            }
+                            // 移除hoverMessage属性
+                        };
+                        inlineDecorations.push(inlineDecoration);
+                    }
+                } else {
+                    // 如果键不存在，添加蓝色波浪线装饰（但不包含hoverMessage属性）
+                    const missingKeyDecoration = {
+                        range: new vscode.Range(startPos, endPos)
+                        // 移除hoverMessage属性
+                    };
+                    missingKeyDecorations.push(missingKeyDecoration);
                 }
-            } else {
-                // 如果键不存在，添加蓝色波浪线装饰（但不包含hoverMessage属性）
-                const missingKeyDecoration = {
-                    range: new vscode.Range(startPos, endPos)
-                    // 移除hoverMessage属性
-                };
-                missingKeyDecorations.push(missingKeyDecoration);
             }
         }
 
