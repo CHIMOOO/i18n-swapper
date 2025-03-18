@@ -702,8 +702,13 @@ function registerCommands() {
             // 从待处理列表中移除
             pendingReplacements.splice(index, 1);
             
-            // 更新装饰
-            updateDecorations(editor);
+            // 重要：更新剩余所有项的位置
+            await recalculateReplacementPositions(editor.document);
+            
+            // 重新应用装饰
+            applyDecorations(editor);
+            
+            vscode.window.showInformationMessage('替换成功');
         }
     });
     global.i18nSwapperCommandDisposables.push(confirmCmd);
@@ -718,8 +723,8 @@ function registerCommands() {
         if (index >= 0 && index < pendingReplacements.length) {
             pendingReplacements.splice(index, 1);
             
-            // 更新装饰
-            updateDecorations(editor);
+            // 重新应用装饰
+            applyDecorations(editor);
         }
     });
     global.i18nSwapperCommandDisposables.push(cancelCmd);
@@ -767,36 +772,160 @@ function registerCommands() {
 }
 
 /**
- * 更新装饰
+ * 重新计算所有替换项的位置
+ * @param {vscode.TextDocument} document 当前文档
  */
-function updateDecorations(editor) {
-    if (pendingReplacements.length === 0) {
-        clearDecorations();
-        vscode.window.showInformationMessage('所有替换已处理完成');
-    } else {
-        // 重新显示装饰和全局操作面板
-        const document = editor.document;
-        
-        // 清除旧的装饰
-        if (confirmDecorationType) {
-            confirmDecorationType.dispose();
-            confirmDecorationType = null;
+async function recalculateReplacementPositions(document) {
+    if (!pendingReplacements.length) return;
+    
+    // 获取文档文本
+    const text = document.getText();
+    
+    // 对每个待替换项重新计算位置
+    for (const item of pendingReplacements) {
+        try {
+            // 如果有原始文本，尝试在文档中重新定位
+            if (item.text) {
+                const escapedText = item.text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const regex = new RegExp(escapedText, 'g');
+                
+                // 找到所有匹配项
+                let match;
+                const matches = [];
+                while ((match = regex.exec(text)) !== null) {
+                    matches.push({
+                        index: match.index,
+                        text: match[0]
+                    });
+                }
+                
+                // 如果找到匹配项，使用最接近原始位置的匹配
+                if (matches.length > 0) {
+                    // 按照与原始位置距离排序
+                    matches.sort((a, b) => {
+                        // 如果没有originalOffset，使用当前range的起始位置
+                        const originalOffset = item.originalOffset || document.offsetAt(item.range.start);
+                        return Math.abs(a.index - originalOffset) - 
+                               Math.abs(b.index - originalOffset);
+                    });
+                    
+                    // 更新位置信息，但保留原始替换文本
+                    const newStart = document.positionAt(matches[0].index);
+                    const newEnd = document.positionAt(matches[0].index + matches[0].text.length);
+                    
+                    // 保存原始偏移量用于下次查找
+                    item.originalOffset = matches[0].index;
+                    
+                    // 更新范围，但保留原始的replacement值
+                    const savedReplacement = item.replacement;
+                    
+                    // 更新查找文本周围的引号
+                    const { hasQuotes, range } = utils.findQuotesAround(document, {
+                        start: matches[0].index,
+                        end: matches[0].index + matches[0].text.length,
+                        text: matches[0].text
+                    });
+                    
+                    // 更新范围，但保留原始替换文本
+                    item.range = range;
+                    item.hasQuotes = hasQuotes;
+                    
+                    // 恢复原始替换文本，避免重复生成
+                    item.replacement = savedReplacement;
+                }
+            }
+        } catch (error) {
+            console.error('重新计算替换位置时出错:', error);
         }
-        
-        if (codeLensProvider) {
-            codeLensProvider.dispose();
-            codeLensProvider = null;
-        }
-        
-        if (globalActionDecoration) {
-            globalActionDecoration.dispose();
-            globalActionDecoration = null;
-        }
-        
-        // 更新显示
-        showConfirmationDecorations(editor, document, pendingReplacements, 't', "'");
-        showGlobalActionPanel(editor, document, pendingReplacements.length);
     }
+}
+
+/**
+ * 应用装饰效果
+ * @param {vscode.TextEditor} editor 编辑器
+ */
+function applyDecorations(editor) {
+    if (!editor || !pendingReplacements.length) return;
+    
+    // 清除现有装饰
+    if (confirmDecorationType) {
+        confirmDecorationType.dispose();
+    }
+    
+    // 创建新的装饰类型 - 保持当前的绿色风格
+    confirmDecorationType = vscode.window.createTextEditorDecorationType({
+        after: {
+            margin: '0 0 0 20px', // 设置左边距，确保与文本有一定间距
+            textDecoration: 'none; display: inline-block; width: auto; background-color: rgba(120, 200, 120, 0.2);'
+        },
+    });
+    
+    // 重新加载语言数据
+    const { allLanguageData, languageMappings } = loadAllLanguageData();
+    
+    // 创建装饰 - 保持当前的样式不变
+    const decorations = pendingReplacements.map((item, index) => {
+        // 获取位置
+        const position = item.range.start;
+        const line = position.line;
+        const lineText = editor.document.lineAt(line).text;
+        const indentation = lineText.match(/^\s*/)[0];
+        
+        // 使用生成器函数生成悬停内容
+        const hoverMessage = generateLanguageHoverContent({
+            allLanguageData,
+            languageMappings,
+            i18nKey: item.i18nKey,
+            index,
+            showActions: true,
+            useHideHoverCommand: false
+        });
+        
+        // 显示替换建议 - 确保格式清晰
+        const contentText = `${item.replacement}`;
+        
+        // 根据文本的位置创建范围 - 确保装饰显示在文本之后
+        const decorationRange = new vscode.Range(
+            item.range.end, // 使用文本的结束位置
+            item.range.end  // 确保装饰显示在文本之后
+        );
+        
+        // 使用与当前相同的装饰样式
+        return {
+            range: decorationRange,
+            renderOptions: {
+                after: { 
+                    contentText: contentText,
+                    backgroundColor: 'rgba(120, 200, 120, 0.2)',
+                    margin: '0 0 0 10px',
+                    width: 'auto',
+                    fontStyle: 'normal',
+                    color: '#e37933',
+                    border: '1px solid rgba(120, 200, 120, 0.4)',
+                    borderRadius: '3px',
+                },
+                light: {
+                    after: {
+                        contentIconPath: undefined,
+                        backgroundColor: 'rgba(120, 200, 120, 0.2)',
+                    }
+                },
+                dark: {
+                    after: {
+                        contentIconPath: undefined,
+                        backgroundColor: 'rgba(120, 200, 120, 0.1)',
+                    }
+                }
+            },
+            hoverMessage: hoverMessage,
+        };
+    });
+    
+    // 应用装饰
+    editor.setDecorations(confirmDecorationType, decorations);
+    
+    // 修复：使用正确的函数名
+    registerCodeLensActions(editor.document);
 }
 
 /**
