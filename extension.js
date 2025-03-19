@@ -7,6 +7,7 @@ const path = require('path');
 const defaultsConfig = require('./src/config/defaultsConfig');  // 引入默认配置，更改为明确的名称
 const { LANGUAGE_NAMES } = require('./src/utils/language-mappings');
 const { handleHoverTranslate } = require('./src/commands/translateHover');
+const { editLanguageEntry } = require('./src/commands/edit-language-entry');
 
 /**
  * 激活扩展
@@ -80,7 +81,75 @@ function activate(context) {
             vscode.window.showErrorMessage(`翻译出错: ${error.message}`);
         }
     }),
-    vscode.commands.registerCommand('i18n-swapper.translateHover', handleHoverTranslate)
+    vscode.commands.registerCommand('i18n-swapper.translateHover', handleHoverTranslate),
+    vscode.commands.registerCommand('i18n-swapper.editLanguageEntry', async (params) => {
+      try {
+        const { langCode, i18nKey, filePath, currentValue = '' } = params;
+        
+        if (!i18nKey || !filePath) {
+            vscode.window.showErrorMessage('缺少必要的参数');
+            return;
+        }
+        
+        // 显示输入框让用户编辑值
+        const inputOptions = {
+            prompt: `编辑 ${i18nKey} (${langCode})`,
+            value: currentValue,
+            placeHolder: '输入翻译文本'
+        };
+        
+        const newValue = await vscode.window.showInputBox(inputOptions);
+        
+        // 如果用户取消了输入或没有改变值，就不执行更新
+        if (newValue === undefined || newValue === currentValue) {
+            return;
+        }
+        
+        // 获取完整的绝对路径
+        let fullPath = filePath;
+        if (!path.isAbsolute(filePath) && vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+            fullPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath);
+        }
+        
+        console.log(`尝试访问文件: ${fullPath}`);
+        
+        // 检查文件是否存在
+        if (!fs.existsSync(fullPath)) {
+            vscode.window.showErrorMessage(`找不到语言文件: ${fullPath}`);
+            
+            // 检查目录是否存在，不存在则创建
+            const dirPath = path.dirname(fullPath);
+            if (!fs.existsSync(dirPath)) {
+                try {
+                    fs.mkdirSync(dirPath, { recursive: true });
+                    console.log(`创建目录: ${dirPath}`);
+                    // 创建空的JSON文件
+                    fs.writeFileSync(fullPath, JSON.stringify({}, null, 2), 'utf8');
+                    console.log(`创建新语言文件: ${fullPath}`);
+                } catch (err) {
+                    vscode.window.showErrorMessage(`无法创建文件或目录: ${err.message}`);
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+        
+        // 使用已有的更新语言文件函数，传递绝对路径
+        const success = await updateLanguageFile(fullPath, i18nKey, newValue);
+        
+        if (success) {
+            vscode.window.showInformationMessage(`已更新 ${langCode} 中的 "${i18nKey}"`);
+            // 刷新装饰器以更新显示
+            vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+        } else {
+            vscode.window.showErrorMessage(`无法更新 ${langCode} 中的 "${i18nKey}"`);
+        }
+      } catch (error) {
+        vscode.window.showErrorMessage(`编辑失败: ${error.message}`);
+        console.error('编辑语言条目时出错:', error);
+      }
+    })
   );
 
   // 初始化其他命令
