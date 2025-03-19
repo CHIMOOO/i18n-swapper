@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const utils = require('../utils');
 
 /**
  * 递归查找对象中指定值的路径
@@ -60,72 +61,6 @@ function loadLocaleFile(filePath) {
 }
 
 /**
- * 分析当前上下文，生成正确的替换文本
- * @param {string} text 原始文本
- * @param {string} i18nKey 国际化键
- * @param {string} functionName 国际化函数名称
- * @param {string} codeQuote 使用的引号类型
- * @param {object} document 文档对象
- * @param {vscode.Position} position 位置
- * @returns {string} 替换文本
- */
-function generateReplacementText(text, i18nKey, functionName, codeQuote, document, position) {
-  if (!document || position === undefined) {
-    return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-  }
-
-  try {
-    const line = document.lineAt(position.line).text;
-    const textBefore = line.substring(0, position.character);
-    const textAfter = line.substring(position.character + text.length);
-    
-    // 判断是否在对象属性值中 (如 label: "文本")
-    const isInObjectValue = /:\s*['"]?$/.test(textBefore) || 
-                           /:/.test(textBefore.split('{').pop().trim());
-    
-    // 检查该行是否包含对象属性赋值
-    if (isInObjectValue) {
-      // 属性值引号处理 - 完全删除外部引号
-      if ((textBefore.trim().endsWith(':') || textBefore.trim().endsWith(': ')) &&
-          ((text.startsWith("'") && text.endsWith("'")) || 
-           (text.startsWith('"') && text.endsWith('"')))) {
-        // 特殊情况: 属性值紧跟冒号，且带有引号
-        return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-      } else if (textBefore.endsWith("'") && textAfter.startsWith("'")) {
-        // 已有单引号包围，用t()替换内容
-        return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-      } else if (textBefore.endsWith('"') && textAfter.startsWith('"')) {
-        // 已有双引号包围，用t()替换内容
-        return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-      }
-    }
-    
-    // Vue 模板中双花括号表达式
-    if ((textBefore.trim().endsWith('{{') || textBefore.trim().endsWith('{{ ')) && 
-        (textAfter.trim().startsWith('}}') || textAfter.trim().startsWith(' }}'))) {
-      return ` ${functionName}(${codeQuote}${i18nKey}${codeQuote}) `;
-    }
-    
-    // 如果文本本身带引号，保留外部引号
-    if ((text.startsWith("'") && text.endsWith("'")) || 
-        (text.startsWith('"') && text.endsWith('"'))) {
-      // 引号类型
-      const quoteChar = text.charAt(0);
-      // 引号内的文本
-      const innerText = text.substring(1, text.length - 1);
-      return `${quoteChar}${functionName}(${codeQuote}${i18nKey}${codeQuote})${quoteChar}`;
-    }
-    
-    // 其他情况，使用标准替换格式
-    return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-  } catch (error) {
-    console.error("生成替换文本时出错:", error);
-    // 出错时使用最安全的格式
-    return `${functionName}(${codeQuote}${i18nKey}${codeQuote})`;
-  }
-}
-
-/**
  * 批量替换面板类
  */
 class BatchReplacementPanel {
@@ -180,6 +115,7 @@ class BatchReplacementPanel {
       async message => {
         switch (message.command) {
           case 'replace':
+            debugger
             await this.performReplacements(message.replacements);
             return;
           case 'cancel':
@@ -262,72 +198,6 @@ class BatchReplacementPanel {
     await this.loadPanelContent();
   }
 
-  /**
-   * 执行替换
-   */
-  async performReplacements(replacements) {
-    if (!replacements || !replacements.length) {
-      vscode.window.showInformationMessage('没有要替换的内容');
-      return;
-    }
-
-    try {
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const configQuoteType = config.get('quoteType', 'single');
-      const functionName = config.get('functionName', 't');
-      const codeQuote = configQuoteType === 'single' ? "'" : '"';
-      
-      // 创建一个工作区编辑对象
-      const workspaceEdit = new vscode.WorkspaceEdit();
-      let replacedCount = 0;
-      
-      // 筛选出选中且有替换的项
-      const selectedReplacements = replacements
-        .filter(item => item.selected && item.i18nKey)
-        .sort((a, b) => b.start - a.start); // 倒序排列，避免位置偏移
-      
-      for (const item of selectedReplacements) {
-        // 查找文本周围的引号
-        const { hasQuotes, range, quoteType } = this.findQuotesAround(this.document, item);
-        
-        // 根据是否有引号生成不同的替换文本
-        let replacement;
-        if (hasQuotes) {
-          // 如果有引号，则替换文本不需要再带引号
-          replacement = `${functionName}(${codeQuote}${item.i18nKey}${codeQuote})`;
-        } else {
-          // 没有引号，使用普通替换文本
-          replacement = generateReplacementText(
-            item.text, 
-            item.i18nKey, 
-            functionName, 
-            codeQuote, 
-            this.document, 
-            this.document.positionAt(item.start)
-          );
-        }
-        
-        workspaceEdit.replace(this.document.uri, range, replacement);
-        replacedCount++;
-      }
-      
-      if (replacedCount > 0) {
-        await vscode.workspace.applyEdit(workspaceEdit);
-        
-        // 替换完成后关闭面板
-        if (this.panel) {
-          this.panel.dispose();
-        }
-        
-        vscode.window.showInformationMessage(`已成功替换 ${replacedCount} 处文本`);
-      } else {
-        vscode.window.showInformationMessage('没有选中要替换的内容');
-      }
-    } catch (error) {
-      console.error('执行替换时出错:', error);
-      vscode.window.showErrorMessage(`替换出错: ${error.message}`);
-    }
-  }
 
   /**
    * 分析文档，找出可能需要国际化的文本
@@ -1081,7 +951,8 @@ function activate(context) {
       if (foundPath) {
         // 替换选中的文本为配置的国际化函数调用
         await editor.edit(editBuilder => {
-          editBuilder.replace(selection, generateReplacementText(textToFind, foundPath, functionName, codeQuote, editor.document, selection.start));
+          const replacementResult = utils.replaceFn(textToFind, foundPath, functionName, codeQuote, editor.document, selection.start);
+          editBuilder.replace(selection, replacementResult.replacementText);
         });
         vscode.window.showInformationMessage(`已替换为: ${functionName}(${codeQuote}${foundPath}${codeQuote}) (从 ${foundInFile} 找到)`);
       } else {

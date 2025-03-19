@@ -99,24 +99,18 @@ async function performReplacements(document, items) {
           const codeQuote = configQuoteType === 'single' ? "'" : '"';
           
           // 生成替换文本
-          let replacement;
-          if (item.hasQuotes) {
-            // 如果有引号，则替换文本不需要再带引号
-            replacement = `${functionName}(${codeQuote}${item.i18nKey}${codeQuote})`;
-          } else {
-            // 没有引号，使用上下文相关的替换
-            replacement = utils.generateReplacementText(
-              item.text,
-              item.i18nKey,
-              functionName,
-              codeQuote,
-              document,
-              document.positionAt(item.start)
-            );
-          }
+          const replacementResult = utils.replaceFn(
+            item.text,
+            item.i18nKey,
+            functionName,
+            codeQuote,
+            document,
+            document.positionAt(item.start)
+          );
+          let replacement = replacementResult.replacementText;
           
           // 执行替换
-          editBuilder.replace(range, replacement);
+          editBuilder.replace(replacementResult.isVueAttr ? replacementResult.range : range, replacement);
           successCount++;
           console.log(`成功替换: "${item.text}" -> ${replacement}`);
         } catch (itemError) {

@@ -995,35 +995,25 @@ class BatchReplacementPanel {
           for (const item of sortedItems) {
             // 获取位置信息
             const position = document.positionAt(item.start);
-            const { isVueAttr, attrInfo } = utils.checkVueTemplateAttr(document, position);
             
-            // 确定替换范围
-            let range;
-            if (isVueAttr && attrInfo) {
-              // Vue模板属性，使用属性的完整范围
-              range = new vscode.Range(
-                document.positionAt(attrInfo.start),
-                document.positionAt(attrInfo.end)
-              );
-            } else {
-              // 普通文本，使用原始范围
-              range = new vscode.Range(
-                document.positionAt(item.start),
-                document.positionAt(item.end)
-              );
-            }
-
-            // 生成替换文本
-            const replacement = utils.generateReplacementText(
-              item.text,
-              item.i18nKey,
-              functionName,
-              quote,
-              document,
-              position
+            // 使用统一的replaceFn方法处理替换逻辑
+            const replacementResult = utils.replaceFn(
+                item.text,
+                item.i18nKey,
+                functionName,
+                quote,
+                document,
+                position
             );
-
-            editBuilder.replace(range, replacement);
+            
+            // 使用返回的范围和替换文本
+            editBuilder.replace(
+                replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
+                    document.positionAt(item.start),
+                    document.positionAt(item.end)
+                ), 
+                replacementResult.replacementText
+            );
           }
         });
 
@@ -1080,53 +1070,39 @@ class BatchReplacementPanel {
         // 处理每个替换项
         for (let i = 0; i < totalItems; i++) {
           const item = validItems[i];
-
+          
           // 更新进度
           progress.report({
             message: `替换第 ${i+1}/${totalItems} 项...`,
             increment: 100 / totalItems
           });
-
+          
           // 获取配置
           const config = vscode.workspace.getConfiguration('i18n-swapper');
           const configQuoteType = config.get('quoteType', 'single');
           const functionName = config.get('functionName', 't');
           const codeQuote = configQuoteType === 'single' ? "'" : '"';
-
+          
+          // 使用统一的replaceFn方法处理替换逻辑
           const position = document.positionAt(item.start);
-          const {
-            isVueAttr,
-            attrInfo
-          } = utils.checkVueTemplateAttr(document, position);
-          let range
-          if (isVueAttr && attrInfo) {
-            // 如果是Vue模板属性，使用属性的完整范围
-            range = new vscode.Range(
-              document.positionAt(attrInfo.start),
-              document.positionAt(attrInfo.end)
-            );
-          } else {
-            // 非Vue模板属性，使用原始范围
-            range = new vscode.Range(
-              document.positionAt(item.start),
-              document.positionAt(item.end)
-            );
-          }
-          // 生成替换文本
-          let replacement;
-          // 不再直接判断hasQuotes，而是始终使用generateReplacementText
-          // 在该函数内部处理引号问题和Vue模板检测
-          replacement = utils.generateReplacementText(
-            item.text,
-            item.i18nKey,
-            functionName,
-            codeQuote,
-            this.document,
-            this.document.positionAt(item.start)
+          const replacementResult = utils.replaceFn(
+              item.text,
+              item.i18nKey,
+              functionName,
+              codeQuote,
+              document,
+              position
           );
-
-          // 添加到工作区编辑中
-          workspaceEdit.replace(this.document.uri, range, replacement);
+          
+          // 使用返回的范围和替换文本
+          workspaceEdit.replace(
+              this.document.uri, 
+              replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
+                  document.positionAt(item.start),
+                  document.positionAt(item.end)
+              ), 
+              replacementResult.replacementText
+          );
         }
 
         // 执行所有替换
@@ -2079,27 +2055,7 @@ class BatchReplacementPanel {
         // 创建编辑对象
         await editor.edit(editBuilder => {
           const position = document.positionAt(item.start);
-          const {
-            isVueAttr,
-            attrInfo
-          } = utils.checkVueTemplateAttr(document, position);
-          let range
-          if (isVueAttr && attrInfo) {
-            // 如果是Vue模板属性，使用属性的完整范围
-            range = new vscode.Range(
-              document.positionAt(attrInfo.start),
-              document.positionAt(attrInfo.end)
-            );
-          } else {
-            // 非Vue模板属性，使用原始范围
-            range = new vscode.Range(
-              document.positionAt(item.start),
-              document.positionAt(item.end)
-            );
-          }
-
-          // 生成替换文本（会包含属性名和绑定）
-          const replacement = utils.generateReplacementText(
+          const replacementResult = utils.replaceFn(
             item.text,
             item.i18nKey,
             functionName,
@@ -2108,12 +2064,14 @@ class BatchReplacementPanel {
             position
           );
 
-          editBuilder.replace(range, replacement);
-
-
-
-
-
+          // 使用返回的范围和替换文本
+          editBuilder.replace(
+            replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
+              document.positionAt(item.start),
+              document.positionAt(item.end)
+            ),
+            replacementResult.replacementText
+          );
         });
 
         // 重新分析文档，更新所有项目的位置信息

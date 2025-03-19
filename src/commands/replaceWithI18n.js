@@ -217,32 +217,20 @@ async function replaceWithI18n() {
         await editor.edit(editBuilder => {
             // 获取位置信息
             const position = new vscode.Position(selection.start.line, selection.start.character);
-            const { isVueAttr, attrInfo } = utils.checkVueTemplateAttr(document, position);
             
-            // 确定替换范围
-            let range;
-            if (isVueAttr && attrInfo) {
-                // Vue模板属性，替换整个属性
-                range = new vscode.Range(
-                    document.positionAt(attrInfo.start),
-                    document.positionAt(attrInfo.end)
-                );
-            } else {
-                // 普通文本，只替换选中部分
-                range = selection;
-            }
-            
-            // 生成替换文本
-            const replacement = utils.generateReplacementText(
-                selectedText,
+            // 使用统一的replaceFn方法处理替换逻辑
+            const replacementResult = utils.replaceFn(
+                textToFind,
                 i18nKey,
                 functionName,
-                quoteType,
+                codeQuote,
                 document,
                 position
             );
             
-            editBuilder.replace(range, replacement);
+            // 使用返回的范围和替换文本
+            let range = replacementResult.isVueAttr ? replacementResult.range : expandedSelection;
+            editBuilder.replace(range, replacementResult.replacementText);
         });
 
         vscode.window.showInformationMessage(

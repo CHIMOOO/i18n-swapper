@@ -321,18 +321,15 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
 
         // 生成替换文本
         let replacement;
-        if (hasQuotes) {
-            replacement = `${functionName}(${codeQuote}${item.i18nKey}${codeQuote})`;
-        } else {
-            replacement = utils.generateReplacementText(
-                item.text,
-                item.i18nKey,
-                functionName,
-                codeQuote,
-                document,
-                document.positionAt(item.start)
-            );
-        }
+        const replacementResult = utils.replaceFn(
+            item.text,
+            item.i18nKey,
+            functionName,
+            codeQuote,
+            document,
+            document.positionAt(item.start)
+        );
+        replacement = replacementResult.replacementText;
 
         return {
             ...item,
@@ -730,33 +727,20 @@ function registerCommands() {
             const quoteType = config.get('quoteType', 'single');
             const codeQuote = quoteType === 'single' ? "'" : '"';
 
-            // 检查是否在Vue模板属性中
+            // 使用统一的replaceFn方法处理替换逻辑
             const position = document.positionAt(item.start);
-            const {
-                isVueAttr,
-                attrInfo
-            } = utils.checkVueTemplateAttr(document, position);
-            let range = item.range
-            if (isVueAttr && attrInfo) {
-                // 如果是Vue模板属性，使用属性的完整范围
-                range = new vscode.Range(
-                    document.positionAt(attrInfo.start),
-                    document.positionAt(attrInfo.end)
-                );
-            }
-            // 根据是否在Vue模板中，确定使用的替换文本
-            let replacementText = item.replacement;
-            if (isVueAttr && attrInfo) {
-                // 重新生成替换文本，确保正确处理Vue属性
-                replacementText = utils.generateReplacementText(
-                    item.text,
-                    item.i18nKey,
-                    functionName,
-                    codeQuote,
-                    document,
-                    position
-                );
-            }
+            const replacementResult = utils.replaceFn(
+                item.text,
+                item.i18nKey,
+                functionName,
+                codeQuote,
+                document,
+                position
+            );
+            
+            // 使用replacementResult中的范围和替换文本
+            let range = replacementResult.isVueAttr ? replacementResult.range : item.range;
+            let replacementText = replacementResult.replacementText;
 
             // 执行替换
             await editor.edit(editBuilder => {
@@ -912,42 +896,32 @@ async function recalculateReplacementPositions(document) {
 
             // 检查是否在Vue模板属性中
             const position = document.positionAt(item.start);
-            const {
-                isVueAttr,
-                attrInfo
-            } = utils.checkVueTemplateAttr(document, position);
-
-            // 如果是Vue模板属性，更新范围和替换文本
-            if (isVueAttr && attrInfo) {
+            
+            // 使用统一的replaceFn方法处理替换逻辑
+            const replacementResult = utils.replaceFn(
+                item.text,
+                item.i18nKey,
+                functionName,
+                codeQuote,
+                document,
+                position
+            );
+            
+            // 更新替换项的属性
+            if (replacementResult.isVueAttr) {
                 item.isVueAttr = true;
-                item.attrInfo = attrInfo;
-
-                // 使用属性的完整范围
-                item.start = attrInfo.start;
-                item.end = attrInfo.end;
-
-                // 更新当前属性的文本
-                const attrText = document.getText(new vscode.Range(
-                    document.positionAt(attrInfo.start),
-                    document.positionAt(attrInfo.end)
-                ));
-                item.text = attrText;
-
-                // 更新范围对象
-                item.range = new vscode.Range(
-                    document.positionAt(attrInfo.start),
-                    document.positionAt(attrInfo.end)
-                );
-
-                // 关键：重新生成替换文本，确保应用Vue属性绑定规则
-                item.replacement = utils.generateReplacementText(
-                    item.text,
-                    item.i18nKey,
-                    functionName,
-                    codeQuote,
-                    document,
-                    position
-                );
+                item.attrInfo = replacementResult.attrInfo;
+                
+                // 使用完整的属性范围
+                item.start = replacementResult.attrInfo.start;
+                item.end = replacementResult.attrInfo.end;
+                
+                // 更新文本和范围
+                item.text = document.getText(replacementResult.range);
+                item.range = replacementResult.range;
+                
+                // 使用新生成的替换文本
+                item.replacement = replacementResult.replacementText;
             }
         } catch (error) {
             console.error('重新计算替换位置时出错:', error);
@@ -1060,28 +1034,23 @@ async function applyAllReplacements(editor) {
 
     const workspaceEdit = new vscode.WorkspaceEdit();
     for (const item of pendingReplacements) {
-        // 检查是否在Vue模板属性中
+        // 使用统一的replaceFn方法处理替换逻辑
         const position = editor.document.positionAt(item.start);
-        const {
-            isVueAttr,
-            attrInfo
-        } = utils.checkVueTemplateAttr(editor.document, position);
-
-        // 根据是否在Vue模板中，确定使用的替换文本
-        let replacementText = item.replacement;
-        if (isVueAttr && attrInfo) {
-            // 重新生成替换文本，确保正确处理Vue属性
-            replacementText = utils.generateReplacementText(
-                item.text,
-                item.i18nKey,
-                functionName,
-                codeQuote,
-                editor.document,
-                position
-            );
-        }
-
-        workspaceEdit.replace(editor.document.uri, item.range, replacementText);
+        const replacementResult = utils.replaceFn(
+            item.text,
+            item.i18nKey,
+            functionName,
+            codeQuote,
+            editor.document,
+            position
+        );
+        
+        // 使用replacementResult中的范围和替换文本
+        workspaceEdit.replace(
+            editor.document.uri, 
+            replacementResult.isVueAttr ? replacementResult.range : item.range, 
+            replacementResult.replacementText
+        );
     }
 
     await vscode.workspace.applyEdit(workspaceEdit);
