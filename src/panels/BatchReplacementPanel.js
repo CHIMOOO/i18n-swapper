@@ -47,8 +47,13 @@ class BatchReplacementPanel {
     this.translatedItems = [];
     this.selectedIndexes = [];
     this.isConfigExpanded = false; // 默认折叠
-    this.scanMode = 'pending'; // 新增：扫描模式，默认为待转义
-    this.existingI18nCalls = []; // 新增：存储已转义的国际化调用
+    this.scanMode = 'pending'; // 扫描模式，默认为待转义
+    this.scanAllFiles = false; // 添加扫描所有文件标志
+    this.existingI18nCalls = []; // 存储已转义的国际化调用
+    this.allFilesResults = {    // 存储所有文件的扫描结果
+      replacements: [],
+      existingCalls: []
+    };
 
     // 加载配置
     this._loadConfiguration();
@@ -304,6 +309,9 @@ class BatchReplacementPanel {
           break;
         case 'removeExcludePattern':
           this.removeExcludePattern(data.pattern);
+          break;
+        case 'toggleScanAllFiles':
+          await this.toggleScanAllFiles(data.scanAllFiles);
           break;
         default:
           console.log(`未处理的命令: ${command}`);
@@ -1548,7 +1556,7 @@ class BatchReplacementPanel {
   async replaceSingleItem(data) {
     try {
       const index = data.index;
-
+      
       // 获取正确的数据源
       let items = [];
       if (this.scanMode === 'pending') {
@@ -1558,21 +1566,21 @@ class BatchReplacementPanel {
       } else if (this.scanMode === 'all') {
         items = [...this.replacements, ...this.existingI18nCalls];
       }
-
+      
       // 检查索引是否有效
       if (index < 0 || index >= items.length) {
         vscode.window.showWarningMessage('无效的项目索引');
         return;
       }
-
+      
       const item = items[index];
-
+      
       // 检查项目是否有国际化键
       if (!item.i18nKey) {
         vscode.window.showWarningMessage('无法替换：该项目没有国际化键');
         return;
       }
-
+      
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: '正在替换项目...',
@@ -1583,26 +1591,35 @@ class BatchReplacementPanel {
         const functionName = config.get('functionName', 't');
         const quoteType = config.get('quoteType', 'single');
         const quote = quoteType === 'single' ? "'" : '"';
-
-        // 获取当前编辑的文档
-        const document = this.document;
-        if (!document) {
-          throw new Error('未找到关联的文档');
+        
+        // 确定要编辑的文档
+        let document;
+        let editor;
+        
+        if (this.scanAllFiles && item.fileUri) {
+          // 如果是全局扫描模式，打开对应的文件
+          document = await vscode.workspace.openTextDocument(item.fileUri);
+          editor = await vscode.window.showTextDocument(document);
+        } else {
+          // 使用当前文档
+          document = this.document;
+          if (!document) {
+            throw new Error('未找到关联的文档');
+          }
+          
+          editor = vscode.window.visibleTextEditors.find(
+            e => e.document.uri.toString() === document.uri.toString()
+          );
         }
-
-        // 获取编辑器
-        const editor = vscode.window.visibleTextEditors.find(
-          editor => editor.document.uri.toString() === document.uri.toString()
-        );
-
+        
         if (!editor) {
           throw new Error('未找到关联的编辑器');
         }
-
+        
         progress.report({
           message: '正在替换...'
         });
-
+        
         // 创建编辑对象
         await editor.edit(editBuilder => {
           const position = document.positionAt(item.start);
@@ -1614,7 +1631,7 @@ class BatchReplacementPanel {
             document,
             position
           );
-
+          
           // 使用返回的范围和替换文本
           editBuilder.replace(
             replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
@@ -1624,10 +1641,16 @@ class BatchReplacementPanel {
             replacementResult.replacementText
           );
         });
-
+        
         // 重新分析文档，更新所有项目的位置信息
-        await this.analyzeAndLoadPanel();
-
+        if (this.scanAllFiles) {
+          // 简单刷新当前项目，而不是重新扫描整个工作区
+          item.replaced = true;
+          await this.updatePanelContent();
+        } else {
+          await this.analyzeAndLoadPanel();
+        }
+        
         vscode.window.showInformationMessage('项目替换成功');
       });
     } catch (error) {
@@ -1778,6 +1801,148 @@ class BatchReplacementPanel {
     excludeFiles = excludeFiles.filter(p => p !== pattern);
     await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
     this.refreshPanel();
+  }
+
+  /**
+   * 切换扫描所有文件模式
+   * @param {boolean} scanAll 是否扫描所有文件
+   */
+  async toggleScanAllFiles(scanAll) {
+    if (this.scanAllFiles === scanAll) return;
+    
+    this.scanAllFiles = scanAll;
+    
+    // 显示进度
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: scanAll ? "扫描工作区所有文件..." : "扫描当前文件...",
+      cancellable: false
+    }, async (progress) => {
+      // 清空已有结果
+      this.selectedIndexes = [];
+      
+      if (scanAll) {
+        // 扫描所有文件
+        progress.report({ message: "正在扫描工作区..." });
+        await this.scanAllWorkspaceFiles(progress);
+      } else {
+        // 仅扫描当前文件
+        progress.report({ message: "正在扫描当前文件..." });
+        await this.analyzeAndLoadPanel();
+      }
+    });
+  }
+
+  /**
+   * 扫描工作区中的所有文件
+   * @param {vscode.Progress} progress 进度对象
+   */
+  async scanAllWorkspaceFiles(progress) {
+    try {
+      // 获取工作区根目录
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders || workspaceFolders.length === 0) {
+        throw new Error('未找到工作区文件夹');
+      }
+      
+      // 获取配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
+      const excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
+      const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
+      
+      // 创建排除模式
+      const excludeGlobs = excludeFiles.map(pattern => {
+        // 确保模式格式正确，添加**/*前缀和*后缀
+        if (!pattern.startsWith('**/')) {
+          pattern = `**/${pattern}`;
+        }
+        if (!pattern.endsWith('/**') && !pattern.includes('*.')) {
+          pattern = `${pattern}/**`;
+        }
+        return pattern;
+      });
+      
+      // 查找所有支持的文件
+      const supportedExtensions = ['.js', '.jsx', '.ts', '.tsx', '.vue', '.html'];
+      const includePattern = `**/*.{${supportedExtensions.map(ext => ext.substring(1)).join(',')}}`;
+      
+      progress.report({ message: "查找文件中..." });
+      
+      // 使用vscode API查找文件
+      const files = await vscode.workspace.findFiles(
+        includePattern,
+        `{${excludeGlobs.join(',')},**/node_modules/**}`
+      );
+      
+      // 初始化结果
+      this.allFilesResults = {
+        replacements: [],
+        existingCalls: []
+      };
+      
+      // 分析每个文件
+      const totalFiles = files.length;
+      for (let i = 0; i < totalFiles; i++) {
+        const file = files[i];
+        progress.report({ 
+          message: `分析文件 ${i+1}/${totalFiles}: ${vscode.workspace.asRelativePath(file)}`,
+          increment: 100 / totalFiles 
+        });
+        
+        try {
+          // 读取文件内容
+          const document = await vscode.workspace.openTextDocument(file);
+          const text = document.getText();
+          const fileExtension = file.fsPath.substring(file.fsPath.lastIndexOf('.'));
+          
+          // 分析文档，查找待替换的文本
+          const fileReplacements = await analyzeDocument(
+            text, fileExtension, scanPatterns, localesPaths, document
+          );
+          
+          // 标记文件信息
+          fileReplacements.forEach(item => {
+            item.filePath = file.fsPath;
+            item.fileUri = file;
+            item.relativePath = vscode.workspace.asRelativePath(file);
+          });
+          
+          // 添加到总结果
+          this.allFilesResults.replacements.push(...fileReplacements);
+          
+          // 分析已转义内容
+          const fileExistingCalls = await this.analyzeExistingI18nCalls(text, document);
+          
+          // 标记文件信息
+          fileExistingCalls.forEach(item => {
+            item.filePath = file.fsPath;
+            item.fileUri = file;
+            item.relativePath = vscode.workspace.asRelativePath(file);
+          });
+          
+          // 添加到总结果
+          this.allFilesResults.existingCalls.push(...fileExistingCalls);
+        } catch (error) {
+          console.error(`分析文件 ${file.fsPath} 时出错:`, error);
+          // 继续处理下一个文件
+        }
+      }
+      
+      // 更新当前显示的结果
+      if (this.scanAllFiles) {
+        this.replacements = this.allFilesResults.replacements;
+        this.existingI18nCalls = this.allFilesResults.existingCalls;
+      }
+      
+      // 更新面板
+      await this.updatePanelContent();
+      
+      vscode.window.showInformationMessage(`扫描完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`);
+    } catch (error) {
+      console.error('扫描工作区文件时出错:', error);
+      vscode.window.showErrorMessage(`扫描工作区失败: ${error.message}`);
+    }
   }
 }
 

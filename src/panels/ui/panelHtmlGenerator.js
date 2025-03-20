@@ -31,7 +31,7 @@ const defaultsConfig = require('../../config/defaultsConfig'); // 引入默认�
  * @param {Array} languageMappings 语言映射配置
  * @param {Array} existingI18nCalls 已存在的国际化调用
  */
-function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = []) {
+function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = [], scanAllFiles = false) {
   // 获取配置
   const config = vscode.workspace.getConfiguration('i18n-swapper');
   const decorationStyle = context.decorationStyle || config.get('decorationStyle', 'suffix');
@@ -534,6 +534,24 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         .text-highlight-trigger:hover {
           background-color: rgba(64, 158, 255, 0.1);
         }
+
+        /* 添加扫描所有文件开关样式 */
+        .scan-all-files-toggle {
+          display: flex;
+          align-items: center;
+          margin-left: auto;
+          padding-right: 10px;
+        }
+        
+        .scan-all-files-toggle input {
+          margin-right: 5px;
+        }
+        
+        .scan-status {
+          font-size: 12px;
+          color: var(--vscode-descriptionForeground);
+          margin-left: 5px;
+        }
       </style>
     </head>
     <body>
@@ -551,6 +569,13 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           <button class="mode-button ${scanMode === 'all' ? 'active' : ''}" data-mode="all">
             全部 (${replacements.length + existingI18nCalls.length})
           </button>
+          
+          <!-- 添加扫描所有文件开关 -->
+          <div class="scan-all-files-toggle">
+            <input type="checkbox" id="scan-all-files" ${scanAllFiles ? 'checked' : ''}>
+            <label for="scan-all-files">扫描所有文件</label>
+            <span class="scan-status">${scanAllFiles ? '(工作区)' : '(当前文件)'}</span>
+          </div>
         </div>
         
     <div class="toolbar">
@@ -1639,6 +1664,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             });
           });
         }
+
+        // 扫描所有文件切换
+        document.getElementById('scan-all-files').addEventListener('change', function() {
+          vscode.postMessage({
+            command: 'toggleScanAllFiles',
+            data: { scanAllFiles: this.checked }
+          });
+        });
       </script>
     </body>
     </html>
