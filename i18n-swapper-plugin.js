@@ -2,7 +2,9 @@ const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
 const utils = require('../utils');
-
+const {
+  analyzeDocument
+} = require('./src/panels/services/documentAnalyzer');
 /**
  * 递归查找对象中指定值的路径
  * @param {Object} obj 要搜索的对象
@@ -155,7 +157,7 @@ class BatchReplacementPanel {
     const localesPaths = config.get('localesPaths', []);
     
     // 分析当前文档
-    this.replacements = await this.analyzeDocument(
+    this.replacements = await analyzeDocument(
       text, fileExtension, scanPatterns, localesPaths
     );
 
@@ -199,55 +201,6 @@ class BatchReplacementPanel {
   }
 
 
-  /**
-   * 分析文档，找出可能需要国际化的文本
-   * @param {string} text 文档文本
-   * @param {string} fileExtension 文件扩展名
-   * @param {string[]} scanPatterns 要扫描的属性模式
-   * @param {string[]} localesPaths 国际化文件路径
-   * @returns {Promise<Array>} 找到的替换项
-   */
-  async analyzeDocument(text, fileExtension, scanPatterns, localesPaths) {
-    // 检查国际化文件是否存在
-    if (!localesPaths || localesPaths.length === 0 || (localesPaths.length === 1 && !localesPaths[0])) {
-      // 使用辅助函数选择文件
-      localesPaths = await checkAndSelectLocaleFile();
-      if (localesPaths.length === 0) {
-        vscode.window.showInformationMessage('操作已取消，未配置国际化文件');
-        return [];
-      }
-    }
-
-    // 收集替换项
-    const replacements = [];
-    
-    // 当 scanPatterns 为空且文件不是 JSON 时，提供默认推荐模式
-    let patternsToUse = scanPatterns;
-    if (patternsToUse.length === 0 && fileExtension !== '.json') {
-      patternsToUse = ['label', 'value', 'placeholder', 'title', 'message', 'text'];
-    }
-    
-    try {
-      // 基于文件类型选择不同的分析策略
-      if (fileExtension === '.vue') {
-        // 分析 Vue 文件
-        this.analyzeVueFile(text, patternsToUse, replacements);
-      } else if (fileExtension === '.js' || fileExtension === '.ts' || fileExtension === '.jsx' || fileExtension === '.tsx') {
-        // 分析 JS/TS 文件
-        this.analyzeJsFile(text, patternsToUse, replacements);
-      } else if (fileExtension === '.json') {
-        // 分析 JSON 文件
-        this.analyzeJsonFile(text, replacements);
-      }
-      
-      // 尝试在国际化文件中查找匹配项
-      await this.findI18nMatches(replacements, localesPaths);
-    } catch (error) {
-      console.error('分析文档时出错:', error);
-    }
-    
-    return replacements;
-  }
 
   /**
    * 分析 Vue 文件
