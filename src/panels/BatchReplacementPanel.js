@@ -559,7 +559,9 @@ class BatchReplacementPanel {
    * 更新面板内容
    */
   async updatePanelContent() {
-    if (!this.panel) return;
+    if (!this.panel) {
+      return;
+    }
 
     try {
       // 获取当前配置
@@ -587,7 +589,7 @@ class BatchReplacementPanel {
         suffixStyle,
         inlineStyle,
         showFullFormInEditMode,
-        scanMode: this.scanMode // 新增：传递扫描模式
+        scanMode: this.scanMode // 传递扫描模式
       };
 
       // 生成面板HTML
@@ -598,11 +600,15 @@ class BatchReplacementPanel {
         context,
         this.isConfigExpanded,
         languageMappings || [],
-        this.existingI18nCalls || [] // 新增：传递已转义的国际化调用
+        this.existingI18nCalls || [],
+        this.scanAllFiles  // 添加扫描所有文件状态
       );
 
       // 更新面板内容
       this.panel.webview.html = html;
+      
+      // 刷新高亮
+      await this.refreshHighlighting();
     } catch (error) {
       console.error('更新面板内容时出错:', error);
       vscode.window.showErrorMessage(`更新面板内容失败: ${error.message}`);
