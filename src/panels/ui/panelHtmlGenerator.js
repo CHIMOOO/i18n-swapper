@@ -573,6 +573,22 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           margin-left: 5px;
           cursor: help;
         }
+
+        // 在 style 标签中添加
+        .file-path-cell {
+          max-width: 200px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: 0.9em;
+          color: var(--vscode-descriptionForeground);
+        }
+
+        .file-path-cell:hover {
+          text-overflow: clip;
+          white-space: normal;
+          word-break: break-all;
+        }
       </style>
     </head>
     <body>
@@ -625,11 +641,12 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           <table>
             <thead>
               <tr>
-                <th class="checkbox-cell"></th>
-                <th>序号</th>
-                ${scanMode === 'all' ? '<th>类型</th>' : (scanMode === 'pending'?'<th>文本</th>':'')}
-                ${scanMode === 'translated' ? '<th>源语言值</th>' :(scanMode === 'all' ? '<th>文本</th>':'')}
-                <th>国际化键</th>
+                <td class="checkbox-cell"></td>
+                <td>序号</td>
+                ${scanMode === 'all' ? '<td>类型</td>' : (scanMode === 'pending'?'<td>文本</td>':'')}
+                ${scanMode === 'translated' ? '<td>源语言值</td>' :(scanMode === 'all' ? '<td>文本</td>':'')}
+                <td>国际化键</td>
+                ${scanAllFiles ? '<td>文件路径</td>' : ''} <!-- 添加文件路径列 -->
               </tr>
             </thead>
             <tbody>
@@ -667,6 +684,11 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                         </button>`
                       }
                     </td>
+                    ${scanAllFiles ? `
+                      <td class="file-path-cell" title="${escapeHtml(item.filePath || '')}">
+                        ${escapeHtml(item.filePath || '')}
+                      </td>
+                    ` : ''}
                   </tr>`;
                 
                 // 只有当项有i18nKey且languageMappings存在时才添加状态行

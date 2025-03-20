@@ -273,7 +273,8 @@ class BatchReplacementPanel {
           await this.highlightService.updateMissingKeyStyles(data);
           break;
         case 'highlightSourceText':
-          await this.highlightSourceText(data.start, data.end, data.index);
+          const { start, end, index, filePath } = data;
+          await this.highlightSourceText(start, end, index, filePath);
           break;
         case 'replaceSingleItem':
           await this.replaceSingleItem(data);
@@ -1548,31 +1549,30 @@ class BatchReplacementPanel {
    * @param {number} start 开始位置
    * @param {number} end 结束位置
    * @param {number} index 项目索引
+   * @param {string} filePath 文件路径
    */
-  async highlightSourceText(start, end, index) {
- 
+  async highlightSourceText(start, end, index, filePath) {
     try {
-      if (!this.document) {
-        vscode.window.showWarningMessage('没有打开的文档');
-        return;
+      // 如果提供了文件路径，先打开该文件
+      let document;
+      if (filePath) {
+        const uri = vscode.Uri.file(filePath);
+        document = await vscode.workspace.openTextDocument(uri);
+        // 显示文档但不切换焦点
+        await vscode.window.showTextDocument(document, {
+          preserveFocus: false, // 切换焦点到新窗口
+          preview: false // 在新标签页打开
+        });
+      } else {
+        document = this.document;
       }
 
-      // 获取要高亮的项目
-      let item = null;
-      if (this.scanMode === 'pending') {
-        item = this.replacements[index];
-      } else if (this.scanMode === 'translated') {
-        item = this.existingI18nCalls[index];
-      } else if (this.scanMode === 'all') {
-        // 在合并数组中查找
-        const allItems = [...this.replacements, ...this.existingI18nCalls];
-        item = allItems[index];
+      // 使用高亮服务高亮文本
+      if (document) {
+        await this.highlightService.highlightSourceText(document, start, end);
       }
-
-      // 委托给高亮服务处理
-      await this.highlightService.highlightSourceText(this.document, start, end, item);
     } catch (error) {
-      console.error('高亮源文本出错:', error);
+      console.error('高亮源文本时出错:', error);
       vscode.window.showErrorMessage(`高亮文本失败: ${error.message}`);
     }
   }
