@@ -917,89 +917,267 @@ class BatchReplacementPanel {
   }
 
   /**
-   * 翻译并替换所选项目
+   * 执行选中项替换
    */
   async performSelectedReplacements() {
     try {
+      // 获取选中的项目
       const selectedItems = this.getSelectedItems();
-
-      console.log(`获取到 ${selectedItems.length} 个选中项目`);
-
+      
       if (selectedItems.length === 0) {
-        vscode.window.showInformationMessage('没有选中的项目');
+        vscode.window.showInformationMessage('未选中任何项，请先勾选要替换的项目');
+        return;
+      }
+      
+      // 检查是否是扫描所有文件模式
+      if (this.scanAllFiles) {
+        return await this._performSelectedMultiFileReplacements(selectedItems);
+      } else {
+        return await this._performSelectedSingleFileReplacements(selectedItems);
+      }
+    } catch (error) {
+      console.error('执行替换选中项时出错:', error);
+      vscode.window.showErrorMessage(`替换失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 在当前文件模式下执行选中项替换
+   * @private
+   * @param {Array} selectedItems 选中的替换项
+   */
+  async _performSelectedSingleFileReplacements(selectedItems) {
+    // 检查文档
+    if (!this.document) {
+      vscode.window.showWarningMessage('找不到文档，请重新打开面板');
+      return;
+    }
+
+    if (selectedItems.length === 0) {
+      vscode.window.showInformationMessage('没有选中任何项');
+      return;
+    }
+
+    // 显示进度条
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation.Notification,
+      title: "执行选中项替换...",
+      cancellable: false
+    }, async (progress) => {
+      // 创建工作区编辑对象
+      const workspaceEdit = new vscode.WorkspaceEdit();
+      const totalItems = selectedItems.length;
+      const document = this.document;
+      
+      if (!document) {
+        throw new Error('未找到关联的文档');
+      }
+      
+      // 处理每个替换项
+      for (let i = 0; i < totalItems; i++) {
+        const item = selectedItems[i];
+        
+        // 更新进度
+        progress.report({
+          message: `替换第 ${i+1}/${totalItems} 项...`,
+          increment: 100 / totalItems
+        });
+        
+        // 获取配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const configQuoteType = config.get('quoteType', 'single');
+        const functionName = config.get('functionName', 't');
+        const codeQuote = configQuoteType === 'single' ? "'" : '"';
+        
+        // 使用统一的replaceFn方法处理替换逻辑
+        const position = document.positionAt(item.start);
+        const replacementResult = utils.replaceFn(
+          item.text,
+          item.i18nKey,
+          functionName,
+          codeQuote,
+          document,
+          position
+        );
+        
+        // 使用返回的范围和替换文本
+        workspaceEdit.replace(
+          document.uri, 
+          replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
+            document.positionAt(item.start),
+            document.positionAt(item.end)
+          ), 
+          replacementResult.replacementText
+        );
+      }
+
+      // 执行所有替换
+      const success = await vscode.workspace.applyEdit(workspaceEdit);
+
+      // 显示结果
+      if (success) {
+        vscode.window.showInformationMessage(`已替换 ${totalItems} 处文本`);
+
+        // 更新面板显示
+        if (this.panel) {
+          this.panel.webview.postMessage({
+            command: 'replacementComplete',
+            count: totalItems
+          });
+        }
+        
+        // 重新分析文档
+        await this.analyzeAndLoadPanel();
+      } else {
+        vscode.window.showErrorMessage('批量替换失败');
+      }
+    });
+  }
+
+  /**
+   * 在扫描所有文件模式下执行选中项替换
+   * @private
+   * @param {Array} selectedItems 选中的替换项
+   */
+  async _performSelectedMultiFileReplacements(selectedItems) {
+    try {
+      if (selectedItems.length === 0) {
+        vscode.window.showInformationMessage('没有选中任何项');
         return;
       }
 
+      // 创建编辑操作
+      const workspaceEdit = new vscode.WorkspaceEdit();
+      let totalItems = 0;
+
+      // 获取工作区根目录
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        throw new Error('未找到工作区文件夹');
+      }
+      const rootPath = workspaceFolders[0].uri.fsPath;
+
+      // 按文件分组处理替换项
+      const itemsByFile = {};
+      selectedItems.forEach(item => {
+        // 确保文件路径存在
+        if (!item.filePath) {
+          // 如果没有文件路径，使用当前文档的路径
+          if (this.document) {
+            item.filePath = this.document.uri.fsPath;
+          } else {
+            console.warn('项目缺少文件路径且没有当前文档');
+            return;
+          }
+        }
+        
+        // 规范化文件路径
+        let filePath = item.filePath;
+        if (!path.isAbsolute(filePath)) {
+          filePath = path.join(rootPath, filePath);
+        }
+        
+        if (!itemsByFile[filePath]) {
+          itemsByFile[filePath] = [];
+        }
+        itemsByFile[filePath].push(item);
+      });
+
+      // 处理每个文件的替换
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
-        title: '正在替换所选项目...',
+        title: "执行选中项替换...",
         cancellable: false
       }, async (progress) => {
-        // 获取配置
-        const config = vscode.workspace.getConfiguration('i18n-swapper');
-        const functionName = config.get('functionName', 't');
-        const quoteType = config.get('quoteType', 'single');
-        const quote = quoteType === 'single' ? "'" : '"';
-
-        // 获取当前编辑的文档
-        const document = this.document;
-        if (!document) {
-          throw new Error('未找到关联的文档');
-        }
-
-        // 获取编辑器
-        const editor = vscode.window.visibleTextEditors.find(
-          editor => editor.document.uri.toString() === document.uri.toString()
-        );
-
-        if (!editor) {
-          throw new Error('未找到关联的编辑器');
-        }
-
-        progress.report({
-          message: `准备替换 ${selectedItems.length} 项...`
-        });
-
-        // 按从后往前的顺序排序
-        const sortedItems = selectedItems.sort((a, b) => b.start - a.start);
-
-        await editor.edit(editBuilder => {
-          for (const item of sortedItems) {
-            // 获取位置信息
-            const position = document.positionAt(item.start);
+        let processedFiles = 0;
+        const totalFiles = Object.keys(itemsByFile).length;
+        
+        // 处理每个文件的替换
+        for (const [filePath, fileItems] of Object.entries(itemsByFile)) {
+          try {
+            progress.report({
+              message: `处理文件 ${processedFiles + 1}/${totalFiles}...`,
+              increment: 100 / totalFiles
+            });
             
-            // 使用统一的replaceFn方法处理替换逻辑
-            const replacementResult = utils.replaceFn(
+            console.log(`处理文件: ${filePath}`);
+            
+            if (!fs.existsSync(filePath)) {
+              throw new Error(`文件不存在: ${filePath}`);
+            }
+            
+            // 获取文件内容
+            const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
+            
+            // 从后向前替换，避免位置变化
+            fileItems.sort((a, b) => b.start - a.start);
+            
+            // 获取配置
+            const config = vscode.workspace.getConfiguration('i18n-swapper');
+            const functionName = config.get('functionName', 't');
+            const quoteType = config.get('quoteType', 'single');
+            const quote = quoteType === 'single' ? "'" : '"';
+            
+            // 处理每个替换项
+            for (const item of fileItems) {
+              if (!item.i18nKey) continue;
+              
+              // 获取位置信息
+              const position = document.positionAt(item.start);
+              
+              // 使用统一的replaceFn方法处理替换逻辑
+              const replacementResult = utils.replaceFn(
                 item.text,
                 item.i18nKey,
                 functionName,
                 quote,
                 document,
                 position
-            );
-            
-            // 使用返回的范围和替换文本
-            editBuilder.replace(
+              );
+              
+              // 使用返回的范围和替换文本
+              workspaceEdit.replace(
+                document.uri,
                 replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
-                    document.positionAt(item.start),
-                    document.positionAt(item.end)
-                ), 
+                  document.positionAt(item.start),
+                  document.positionAt(item.end)
+                ),
                 replacementResult.replacementText
-            );
+              );
+              
+              totalItems++;
+            }
+            
+            processedFiles++;
+          } catch (error) {
+            console.error(`处理文件 ${filePath} 时出错:`, error);
+            vscode.window.showErrorMessage(`处理文件 ${filePath} 时出错: ${error.message}`);
           }
-        });
-
-        // 更新已替换的项目状态
-        // 标记已替换的项目
-        const replacedIndexes = selectedItems.map(item => item.index);
-
-        // 重新分析文档，更新所有项目的位置信息
-        await this.analyzeAndLoadPanel();
-
-        vscode.window.showInformationMessage(`已替换 ${selectedItems.length} 项`);
+        }
       });
+
+      // 执行所有替换
+      const success = await vscode.workspace.applyEdit(workspaceEdit);
+
+      // 显示结果
+      if (success) {
+        vscode.window.showInformationMessage(`已替换 ${totalItems} 处文本`);
+
+        // 更新面板显示
+        if (this.panel) {
+          this.panel.webview.postMessage({
+            command: 'replacementComplete',
+            count: totalItems
+          });
+        }
+        
+        // 刷新面板
+        await this.refreshPanel();
+      } else {
+        vscode.window.showErrorMessage('批量替换失败');
+      }
     } catch (error) {
-      console.error('替换所选项目出错:', error);
+      console.error('执行选中项替换时出错:', error);
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
     }
   }
@@ -1027,10 +1205,21 @@ class BatchReplacementPanel {
    */
   async _performMultiFileReplacements() {
     try {
-      // 获取所有替换项
-      const items = this.getSelectedItems();
-      if (items.length === 0) {
-        vscode.window.showInformationMessage('没有选中任何项');
+      // 获取所有有国际化键的项目（不依赖用户选择）
+      let allItems = [];
+      if (this.scanMode === 'translated') {
+        allItems = this.existingI18nCalls.filter(item => item.i18nKey && item.text);
+      } else if (this.scanMode === 'pending') {
+        allItems = this.replacements.filter(item => item.i18nKey && item.text);
+      } else if (this.scanMode === 'all') {
+        allItems = [
+          ...this.replacements.filter(item => item.i18nKey && item.text),
+          ...this.existingI18nCalls.filter(item => item.i18nKey && item.text)
+        ];
+      }
+
+      if (allItems.length === 0) {
+        vscode.window.showInformationMessage('没有可替换的项目，请确保至少一个项目有国际化键');
         return;
       }
 
@@ -1047,7 +1236,7 @@ class BatchReplacementPanel {
 
       // 按文件分组处理替换项
       const itemsByFile = {};
-      items.forEach(item => {
+      allItems.forEach(item => {
         // 确保文件路径存在
         if (!item.filePath) {
           // 如果没有文件路径，使用当前文档的路径
@@ -1185,26 +1374,25 @@ class BatchReplacementPanel {
     const validItems = this.replacements.filter(item => item.i18nKey);
 
     if (validItems.length === 0) {
-      vscode.window.showInformationMessage('没有有效的替换项');
+      vscode.window.showInformationMessage('没有有效的替换项，请确保至少一个项目有国际化键');
       return;
     }
-
-    // 获取当前编辑器，但不尝试打开新窗口
-    const editor = vscode.window.activeTextEditor;
 
     // 显示进度条
     await vscode.window.withProgress({
       location: vscode.ProgressLocation.Notification,
-      title: "执行批量替换...",
+      title: "执行所有项替换...",
       cancellable: false
     }, async (progress) => {
       // 创建工作区编辑对象
       const workspaceEdit = new vscode.WorkspaceEdit();
       const totalItems = validItems.length;
       const document = this.document;
+      
       if (!document) {
         throw new Error('未找到关联的文档');
       }
+      
       // 处理每个替换项
       for (let i = 0; i < totalItems; i++) {
         const item = validItems[i];
@@ -1224,22 +1412,22 @@ class BatchReplacementPanel {
         // 使用统一的replaceFn方法处理替换逻辑
         const position = document.positionAt(item.start);
         const replacementResult = utils.replaceFn(
-            item.text,
-            item.i18nKey,
-            functionName,
-            codeQuote,
-            document,
-            position
+          item.text,
+          item.i18nKey,
+          functionName,
+          codeQuote,
+          document,
+          position
         );
         
         // 使用返回的范围和替换文本
         workspaceEdit.replace(
-            this.document.uri, 
-            replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
-                document.positionAt(item.start),
-                document.positionAt(item.end)
-            ), 
-            replacementResult.replacementText
+          document.uri, 
+          replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
+            document.positionAt(item.start),
+            document.positionAt(item.end)
+          ), 
+          replacementResult.replacementText
         );
       }
 

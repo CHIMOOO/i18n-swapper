@@ -622,10 +622,10 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         
     <div class="toolbar">
           <div class="tools-group">
-            <button id="replace-selected" class="action-button replace-btn">
+            <button id="replace-selected" class="action-button replace-btn" title="仅替换已选中的项目">
               替换选中项
             </button>
-            <button id="replace-all" class="action-button replace-all-btn">
+            <button id="replace-all" class="action-button replace-all-btn" title="替换所有有国际化键的项目（无需选中）">
               替换所有项
             </button>
             <button id="refresh-panel">刷新</button>
