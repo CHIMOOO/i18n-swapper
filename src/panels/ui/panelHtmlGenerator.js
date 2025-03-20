@@ -923,6 +923,31 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               </div>
             </div>
           </div>
+
+          <!-- 添加扫描排除配置 -->
+          <div class="config-row">
+            <h4>8、扫描排除配置</h4>
+            <div class="style-config-container">
+              <div class="config-item">
+                <label>排除的文件或目录模式：</label>
+                <div id="exclude-patterns" class="locale-paths-list">
+                  ${(config.get('excludeFiles', defaultsConfig.excludeFiles) || []).map(pattern => `
+                    <div class="function-name-item locale-path-item">
+                      <span>${escapeHtml(pattern)}</span>
+                      <button class="remove-exclude-pattern remove-pattern remove-locale-path" data-pattern="${escapeHtml(pattern)}"> <svg class="del-svg" data-slot="icon" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path clip-rule="evenodd" fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"></path>
+                  </svg></button>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="new-function-input">
+                  <input type="text" id="new-exclude-pattern" placeholder="输入要排除的文件或目录模式">
+                  <button id="add-exclude-pattern">添加</button>
+                </div>
+                <span class="help-text">定义扫描时要排除的文件或目录模式，例如：**/node_modules/**, **/*.test.js</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       
@@ -1448,6 +1473,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               });
             });
           }
+
+          // 绑定排除模式事件
+          bindExcludePatternEvents();
         }
 
         // 调用绑定函数
@@ -1581,6 +1609,36 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             });
           }
         });
+
+        // 添加排除模式事件绑定
+        function bindExcludePatternEvents() {
+          const addBtn = document.getElementById('add-exclude-pattern');
+          if (addBtn) {
+            addBtn.addEventListener('click', function() {
+              const input = document.getElementById('new-exclude-pattern');
+              const pattern = input.value.trim();
+              
+              if (pattern) {
+                vscode.postMessage({
+                  command: 'addExcludePattern',
+                  data: { pattern }
+                });
+                
+                input.value = '';
+              }
+            });
+          }
+          
+          document.querySelectorAll('.remove-exclude-pattern').forEach(btn => {
+            btn.addEventListener('click', function() {
+              const pattern = this.getAttribute('data-pattern');
+              vscode.postMessage({
+                command: 'removeExcludePattern',
+                data: { pattern }
+              });
+            });
+          });
+        }
       </script>
     </body>
     </html>

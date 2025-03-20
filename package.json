@@ -336,6 +336,17 @@
           "type": "boolean",
           "default": true,
           "description": "在Vue模板中自动为属性添加冒号绑定"
+        },
+        "i18n-swapper.excludeFiles": {
+          "type": "array",
+          "default": [
+            "node_modules",
+            "dist",
+            "build",
+            ".git",
+            "vendor",
+            ".history"],
+          "description": "扫描时要排除的文件或目录模式"
         }
       }
     }

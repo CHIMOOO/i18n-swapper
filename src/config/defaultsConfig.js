@@ -61,4 +61,14 @@ module.exports = {
     missingKeyBorderStyle: 'solid',
     missingKeyBorderColor: '#ff6900',
     missingKeyBorderSpacing: '2px',
+    
+    // 新增: 默认排除的文件模式
+    excludeFiles: [
+    "node_modules",
+    "dist",
+    "build",
+    ".git",
+    "vendor",
+    ".history"
+    ]
 }; 

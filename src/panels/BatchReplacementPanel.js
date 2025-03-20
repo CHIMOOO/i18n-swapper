@@ -299,6 +299,12 @@ class BatchReplacementPanel {
             vscode.window.showErrorMessage(`更新输出国际化函数名称失败: ${error.message}`);
           }
           break;
+        case 'addExcludePattern':
+          this.addExcludePattern(data.pattern);
+          break;
+        case 'removeExcludePattern':
+          this.removeExcludePattern(data.pattern);
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -1750,6 +1756,28 @@ class BatchReplacementPanel {
     if (this.panel) {
       this.panel.dispose();
     }
+  }
+
+  // 添加排除模式
+  async addExcludePattern(pattern) {
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
+    
+    if (!excludeFiles.includes(pattern)) {
+      excludeFiles.push(pattern);
+      await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
+      this.refreshPanel();
+    }
+  }
+
+  // 删除排除模式
+  async removeExcludePattern(pattern) {
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    let excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
+    
+    excludeFiles = excludeFiles.filter(p => p !== pattern);
+    await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
+    this.refreshPanel();
   }
 }
 
