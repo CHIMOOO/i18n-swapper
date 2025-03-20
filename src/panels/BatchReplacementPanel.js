@@ -31,6 +31,7 @@ const {
 const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
 const HighlightService = require('./services/highlightService'); // 新增：引入高亮服务
 const I18nKeyStatusService = require('./services/i18nKeyStatusService'); // 新增：引入i18n键状态服务
+const workspaceScannerService = require('./services/workspaceScannerService');
 
 /**
  * 批量替换面板类
@@ -1822,127 +1823,38 @@ class BatchReplacementPanel {
       this.selectedIndexes = [];
       
       if (scanAll) {
-        // 扫描所有文件
+        // 使用工作区扫描服务扫描所有文件
         progress.report({ message: "正在扫描工作区..." });
-        await this.scanAllWorkspaceFiles(progress);
+        
+        try {
+          // 使用分析现有i18n调用的绑定函数
+          const analyzeExistingI18nCallsBound = this.analyzeExistingI18nCalls.bind(this);
+          
+          // 调用工作区扫描服务
+          this.allFilesResults = await workspaceScannerService.scanAllWorkspaceFiles(
+            analyzeExistingI18nCallsBound,
+            progress
+          );
+          
+          // 更新当前显示的结果
+          this.replacements = this.allFilesResults.replacements;
+          this.existingI18nCalls = this.allFilesResults.existingCalls;
+          
+          // 更新面板
+          await this.updatePanelContent();
+          
+          vscode.window.showInformationMessage(
+            `扫描完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`
+          );
+        } catch (error) {
+          vscode.window.showErrorMessage(`扫描工作区失败: ${error.message}`);
+        }
       } else {
         // 仅扫描当前文件
         progress.report({ message: "正在扫描当前文件..." });
         await this.analyzeAndLoadPanel();
       }
     });
-  }
-
-  /**
-   * 扫描工作区中的所有文件
-   * @param {vscode.Progress} progress 进度对象
-   */
-  async scanAllWorkspaceFiles(progress) {
-    try {
-      // 获取工作区根目录
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders || workspaceFolders.length === 0) {
-        throw new Error('未找到工作区文件夹');
-      }
-      
-      // 获取配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
-      const excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
-      const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
-      
-      // 创建排除模式
-      const excludeGlobs = excludeFiles.map(pattern => {
-        // 确保模式格式正确，添加**/*前缀和*后缀
-        if (!pattern.startsWith('**/')) {
-          pattern = `**/${pattern}`;
-        }
-        if (!pattern.endsWith('/**') && !pattern.includes('*.')) {
-          pattern = `${pattern}/**`;
-        }
-        return pattern;
-      });
-      
-      // 查找所有支持的文件
-      const supportedExtensions = ['.js', '.jsx', '.ts', '.tsx', '.vue', '.html'];
-      const includePattern = `**/*.{${supportedExtensions.map(ext => ext.substring(1)).join(',')}}`;
-      
-      progress.report({ message: "查找文件中..." });
-      
-      // 使用vscode API查找文件
-      const files = await vscode.workspace.findFiles(
-        includePattern,
-        `{${excludeGlobs.join(',')},**/node_modules/**}`
-      );
-      
-      // 初始化结果
-      this.allFilesResults = {
-        replacements: [],
-        existingCalls: []
-      };
-      
-      // 分析每个文件
-      const totalFiles = files.length;
-      for (let i = 0; i < totalFiles; i++) {
-        const file = files[i];
-        progress.report({ 
-          message: `分析文件 ${i+1}/${totalFiles}: ${vscode.workspace.asRelativePath(file)}`,
-          increment: 100 / totalFiles 
-        });
-        
-        try {
-          // 读取文件内容
-          const document = await vscode.workspace.openTextDocument(file);
-          const text = document.getText();
-          const fileExtension = file.fsPath.substring(file.fsPath.lastIndexOf('.'));
-          
-          // 分析文档，查找待替换的文本
-          const fileReplacements = await analyzeDocument(
-            text, fileExtension, scanPatterns, localesPaths, document
-          );
-          
-          // 标记文件信息
-          fileReplacements.forEach(item => {
-            item.filePath = file.fsPath;
-            item.fileUri = file;
-            item.relativePath = vscode.workspace.asRelativePath(file);
-          });
-          
-          // 添加到总结果
-          this.allFilesResults.replacements.push(...fileReplacements);
-          
-          // 分析已转义内容
-          const fileExistingCalls = await this.analyzeExistingI18nCalls(text, document);
-          
-          // 标记文件信息
-          fileExistingCalls.forEach(item => {
-            item.filePath = file.fsPath;
-            item.fileUri = file;
-            item.relativePath = vscode.workspace.asRelativePath(file);
-          });
-          
-          // 添加到总结果
-          this.allFilesResults.existingCalls.push(...fileExistingCalls);
-        } catch (error) {
-          console.error(`分析文件 ${file.fsPath} 时出错:`, error);
-          // 继续处理下一个文件
-        }
-      }
-      
-      // 更新当前显示的结果
-      if (this.scanAllFiles) {
-        this.replacements = this.allFilesResults.replacements;
-        this.existingI18nCalls = this.allFilesResults.existingCalls;
-      }
-      
-      // 更新面板
-      await this.updatePanelContent();
-      
-      vscode.window.showInformationMessage(`扫描完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`);
-    } catch (error) {
-      console.error('扫描工作区文件时出错:', error);
-      vscode.window.showErrorMessage(`扫描工作区失败: ${error.message}`);
-    }
   }
 }
 

@@ -543,6 +543,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           padding-right: 10px;
         }
         
+        .scan-mode-info {
+          display: flex;
+          align-items: center;
+          background-color: var(--vscode-editorWidget-background);
+          padding: 3px 8px;
+          border-radius: 3px;
+        }
+        
         .scan-all-files-toggle input {
           margin-right: 5px;
         }
@@ -551,6 +559,20 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           font-size: 12px;
           color: var(--vscode-descriptionForeground);
           margin-left: 5px;
+        }
+        
+        .help-icon {
+          display: inline-block;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          background-color: var(--vscode-button-background);
+          color: var(--vscode-button-foreground);
+          text-align: center;
+          font-size: 10px;
+          line-height: 14px;
+          margin-left: 5px;
+          cursor: help;
         }
       </style>
     </head>
@@ -570,11 +592,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             全部 (${replacements.length + existingI18nCalls.length})
           </button>
           
-          <!-- 添加扫描所有文件开关 -->
+          <!-- 添加扫描所有文件开关，并增加更明确的描述 -->
           <div class="scan-all-files-toggle">
-            <input type="checkbox" id="scan-all-files" ${scanAllFiles ? 'checked' : ''}>
-            <label for="scan-all-files">扫描所有文件</label>
-            <span class="scan-status">${scanAllFiles ? '(工作区)' : '(当前文件)'}</span>
+            <div class="scan-mode-info">
+              <input type="checkbox" id="scan-all-files" ${scanAllFiles ? 'checked' : ''}>
+              <label for="scan-all-files">扫描所有文件</label>
+              <span class="scan-status">${scanAllFiles ? '(工作区)' : '(当前文件)'}</span>
+              <span class="help-icon" title="开启后将扫描整个工作区的文件，而不仅仅是当前文件。注意：这可能会较为耗时。">?</span>
+            </div>
           </div>
         </div>
         
