@@ -3,8 +3,10 @@
  * 负责扫描工作区中所有符合条件的文件并执行国际化分析
  */
 const vscode = require('vscode');
-const { analyzeDocument } = require('./documentAnalyzer');
+const path = require('path');
 const defaultsConfig = require('../../config/defaultsConfig');
+const { analyzeDocument } = require('./documentAnalyzer');
+const pathUtils = require('../../utils/path-utils');
 
 class WorkspaceScannerService {
   /**
@@ -66,34 +68,6 @@ class WorkspaceScannerService {
   }
 
   /**
-   * 创建排除文件的glob模式
-   * @param {Array} excludeFiles 排除文件配置
-   * @returns {Array} 格式化后的glob模式数组
-   * @private
-   */
-  _createExcludeGlobs(excludeFiles) {
-    return excludeFiles.map(pattern => {
-      // 确保模式格式正确，添加**/*前缀和*后缀
-      if (!pattern.startsWith('**/')) {
-        pattern = `**/${pattern}`;
-      }
-      if (!pattern.endsWith('/**') && !pattern.includes('*.')) {
-        pattern = `${pattern}/**`;
-      }
-      return pattern;
-    });
-  }
-
-  /**
-   * 创建包含文件的glob模式
-   * @returns {string} 格式化后的glob模式
-   * @private
-   */
-  _createIncludePattern() {
-    return `**/*.{${this.supportedExtensions.map(ext => ext.substring(1)).join(',')}}`;
-  }
-
-  /**
    * 分析所有匹配的文件
    * @param {Array} files 文件URI数组
    * @param {vscode.Progress} progress 进度对象
@@ -108,8 +82,10 @@ class WorkspaceScannerService {
     
     for (let i = 0; i < totalFiles; i++) {
       const file = files[i];
+      const relativePath = pathUtils.getFileRelativePath(file);
+      
       progress.report({ 
-        message: `分析文件 ${i+1}/${totalFiles}: ${vscode.workspace.asRelativePath(file)}`,
+        message: `分析文件 ${i+1}/${totalFiles}: ${relativePath}`,
         increment: 100 / totalFiles 
       });
       
@@ -117,7 +93,7 @@ class WorkspaceScannerService {
         // 读取文件内容
         const document = await vscode.workspace.openTextDocument(file);
         const text = document.getText();
-        const fileExtension = file.fsPath.substring(file.fsPath.lastIndexOf('.'));
+        const fileExtension = path.extname(file.fsPath).toLowerCase();
         
         // 分析文档，查找待替换的文本
         const fileReplacements = await analyzeDocument(
@@ -146,17 +122,35 @@ class WorkspaceScannerService {
   }
 
   /**
-   * 为扫描结果项添加文件信息
-   * @param {Array} items 扫描结果项
+   * 为替换项和已存在调用添加文件信息
+   * @param {Array} items 项目数组
    * @param {vscode.Uri} file 文件URI
    * @private
    */
   _attachFileInfo(items, file) {
+    const relativePath = pathUtils.getFileRelativePath(file);
     items.forEach(item => {
-      item.filePath = file.fsPath;
-      item.fileUri = file;
-      item.relativePath = vscode.workspace.asRelativePath(file);
+      item.filePath = relativePath;
     });
+  }
+
+  /**
+   * 创建排除模式
+   * @param {Array} excludeFiles 排除文件列表
+   * @returns {Array} 排除模式数组
+   * @private
+   */
+  _createExcludeGlobs(excludeFiles) {
+    return excludeFiles.map(pattern => `**/${pattern}/**`);
+  }
+
+  /**
+   * 创建包含模式
+   * @returns {string} 包含模式
+   * @private
+   */
+  _createIncludePattern() {
+    return '**/*.{js,jsx,ts,tsx,vue,html}';
   }
 }
 

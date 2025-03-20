@@ -687,8 +687,8 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                       }
                     </td>
                     ${scanAllFiles ? `
-                      <td class="file-path-cell" title="${escapeHtml(item.filePath || '')}">
-                        ${escapeHtml(item.filePath || '')}
+                      <td class="file-path-cell" title="${escapeHtml(item.displayPath || item.filePath || '')}">
+                        ${escapeHtml(item.displayPath || item.filePath || '')}
                       </td>
                     ` : ''}
                   </tr>`;

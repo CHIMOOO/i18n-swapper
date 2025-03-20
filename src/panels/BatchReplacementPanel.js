@@ -32,6 +32,7 @@ const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配�
 const HighlightService = require('./services/highlightService'); // 新增：引入高亮服务
 const I18nKeyStatusService = require('./services/i18nKeyStatusService'); // 新增：引入i18n键状态服务
 const workspaceScannerService = require('./services/workspaceScannerService');
+const pathUtils = require('../utils/path-utils');
 
 /**
  * 批量替换面板类
@@ -506,7 +507,7 @@ class BatchReplacementPanel {
 
           for (const mapping of languageMappings) {
             try {
-              const filePath = path.join(rootPath, mapping.filePath);
+              const filePath = pathUtils.getAbsolutePath(mapping.filePath);
               if (!fs.existsSync(filePath)) continue;
 
               const localeData = utils.loadLocaleFile(filePath);
@@ -558,13 +559,9 @@ class BatchReplacementPanel {
       }
 
       // 添加到结果时转换为相对路径
-      if (sourceFile) {
-        sourceFile = this.getRelativePath(sourceFile);
-      }
-
       existingCalls.forEach(item => {
         if (item.i18nFile) {
-          item.i18nFile = this.getRelativePath(item.i18nFile);
+          item.i18nFile = pathUtils.getRelativePath(item.i18nFile);
         }
       });
     } catch (error) {
@@ -578,27 +575,17 @@ class BatchReplacementPanel {
    * 更新面板内容
    */
   async updatePanelContent() {
-    if (!this.panel) {
-      return;
-    }
+    if (!this.panel) return;
 
     try {
-      // 获取当前配置
+      // 获取当前文件路径
+      const currentFilePath = this.document ? pathUtils.getFileRelativePath(this.document.uri) : '';
+
+      // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
       const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
-      const decorationStyle = config.get('decorationStyle', defaultsConfig.decorationStyle);
-      const suffixStyle = config.get('suffixStyle', defaultsConfig.suffixStyle);
-      const inlineStyle = config.get('inlineStyle', defaultsConfig.inlineStyle);
-
-      // 获取编辑模式预览配置
-      const showFullFormInEditMode = config.get('showFullFormInEditMode', defaultsConfig.showFullFormInEditMode);
-
-      // 获取语言映射配置
-      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
-
-      // 获取当前文件路径
-      const currentFilePath = this.document ? this.getRelativePath(this.document.fileName) : '';
+      const languageMappings = config.get('tencentTranslation.languageMappings', []);
 
       // 提前加载每个I18n键的翻译值信息
       if (languageMappings && languageMappings.length > 0) {
@@ -609,11 +596,11 @@ class BatchReplacementPanel {
       // 处理 replacements 的路径
       if (this.replacements && this.replacements.length > 0) {
         this.replacements.forEach(item => {
-          if (item.filePath) {
-            item.displayPath = this.getRelativePath(item.filePath);
+          if (item.filePath && !item.displayPath) {
+            item.displayPath = item.filePath;
           }
-          if (item.i18nFile) {
-            item.displayI18nPath = this.getRelativePath(item.i18nFile);
+          if (item.i18nFile && !item.displayI18nPath) {
+            item.displayI18nPath = item.i18nFile;
           }
         });
       }
@@ -621,11 +608,11 @@ class BatchReplacementPanel {
       // 处理 existingI18nCalls 的路径
       if (this.existingI18nCalls && this.existingI18nCalls.length > 0) {
         this.existingI18nCalls.forEach(item => {
-          if (item.i18nFile) {
-            item.displayI18nPath = this.getRelativePath(item.i18nFile);
+          if (item.i18nFile && !item.displayI18nPath) {
+            item.displayI18nPath = item.i18nFile;
           }
-          if (item.fileUri) {
-            item.displayPath = this.getRelativePath(item.fileUri.fsPath);
+          if (!item.displayPath && item.filePath) {
+            item.displayPath = item.filePath;
           }
         });
       }
@@ -633,46 +620,40 @@ class BatchReplacementPanel {
       // 处理语言映射的路径
       if (languageMappings && languageMappings.length > 0) {
         languageMappings.forEach(mapping => {
-          if (mapping.filePath) {
-            mapping.displayPath = this.getRelativePath(mapping.filePath);
+          if (mapping.filePath && !mapping.displayPath) {
+            mapping.displayPath = mapping.filePath;
           }
         });
       }
-      
-      // 处理本地化路径
-      const displayLocalesPaths = localesPaths.map(p => this.getRelativePath(p));
 
-      // 构建传递给面板的上下文
-      const context = {
-        decorationStyle,
-        suffixStyle,
-        inlineStyle,
-        showFullFormInEditMode,
-        scanMode: this.scanMode // 传递扫描模式
-      };
-
-      // 生成面板HTML
+      // 生成HTML内容
       const html = getPanelHtml(
-        scanPatterns || [],
-        this.replacements || [],
-        displayLocalesPaths || [], // 使用处理后的路径
-        context,
+        scanPatterns,
+        this.replacements,
+        localesPaths,
+        {
+          decorationStyle: config.get('decorationStyle', 'suffix'),
+          showFullFormInEditMode: config.get('showFullFormInEditMode', true),
+          suffixStyle: config.get('suffixStyle', {}),
+          inlineStyle: config.get('inlineStyle', {}),
+          autoGenerateKeyFromText: config.get('autoGenerateKeyFromText', true),
+          autoGenerateKeyPrefix: config.get('autoGenerateKeyPrefix', '_iw'),
+          autoTranslateAllLanguages: config.get('autoTranslateAllLanguages', true),
+          outputI18nFunctionName: config.get('functionName', 't'),
+          scanMode: this.scanMode
+        },
         this.isConfigExpanded,
-        languageMappings || [],
-        this.existingI18nCalls || [],
-        this.scanAllFiles,  // 添加扫描所有文件状态
-        currentFilePath // 添加当前文件路径
+        languageMappings,
+        this.existingI18nCalls,
+        this.scanAllFiles,
+        currentFilePath
       );
 
       // 更新面板内容
       this.panel.webview.html = html;
-      
-      // 面板内容更新后，尝试刷新高亮
-      // 这个调用是与面板更新分开的，即使失败也不会影响面板内容
-      await this.refreshCodeHighlighting();
     } catch (error) {
       console.error('更新面板内容时出错:', error);
-      vscode.window.showErrorMessage(`更新面板内容失败: ${error.message}`);
+      vscode.window.showErrorMessage('更新面板内容时出错: ' + error.message);
     }
   }
 
@@ -1904,152 +1885,52 @@ class BatchReplacementPanel {
    * @param {boolean} scanAll 是否扫描所有文件
    */
   async toggleScanAllFiles(scanAll) {
-    if (this.scanAllFiles === scanAll) return;
-    
-    this.scanAllFiles = scanAll;
-    
-    // 显示进度
-    await vscode.window.withProgress({
-      location: vscode.ProgressLocation.Notification,
-      title: scanAll ? "扫描工作区所有文件..." : "扫描当前文件...",
-      cancellable: false
-    }, async (progress) => {
-      // 清空已有结果
-      this.selectedIndexes = [];
+    try {
+      // 更新扫描模式
+      this.scanAllFiles = scanAll;
       
-      if (scanAll) {
-        // 使用工作区扫描服务扫描所有文件
-        progress.report({ message: "正在扫描工作区..." });
-        
-        try {
-          // 使用分析现有i18n调用的绑定函数
-          const analyzeExistingI18nCallsBound = this.analyzeExistingI18nCalls.bind(this);
-          
-          // 调用工作区扫描服务
-          this.allFilesResults = await workspaceScannerService.scanAllWorkspaceFiles(
-            analyzeExistingI18nCallsBound,
-            progress
-          );
-          
-          // 更新当前显示的结果
-          this.replacements = this.allFilesResults.replacements;
-          this.existingI18nCalls = this.allFilesResults.existingCalls;
-          
-          // 更新面板
-          await this.updatePanelContent();
-          
-          vscode.window.showInformationMessage(
-            `扫描完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`
-          );
-        } catch (error) {
-          vscode.window.showErrorMessage(`扫描工作区失败: ${error.message}`);
-        }
-      } else {
-        // 仅扫描当前文件
-        progress.report({ message: "正在扫描当前文件..." });
+      // 如果切换到扫描所有文件且当前有打开的面板
+      if (scanAll && this.panel) {
+        await vscode.window.withProgress({
+          location: vscode.ProgressLocation.Notification,
+          title: "扫描所有文件中...",
+          cancellable: false
+        }, async (progress) => {
+          try {
+            // 使用工作区扫描服务扫描所有文件
+            const results = await workspaceScannerService.scanAllWorkspaceFiles(
+              this.analyzeExistingI18nCalls.bind(this),
+              progress
+            );
+            
+            // 替换当前的扫描结果
+            this.replacements = results.replacements;
+            this.existingI18nCalls = results.existingCalls;
+            
+            // 更新面板内容
+            await this.updatePanelContent();
+            
+            vscode.window.showInformationMessage(`扫描完成，找到 ${this.replacements.length} 个待替换项和 ${this.existingI18nCalls.length} 个已转义项`);
+          } catch (error) {
+            console.error('扫描所有文件时出错:', error);
+            vscode.window.showErrorMessage('扫描所有文件时出错: ' + error.message);
+          }
+        });
+      } else if (!scanAll && this.document) {
+        // 如果切换到仅扫描当前文件，并且存在当前文档
+        // 重新分析当前文档
         await this.analyzeAndLoadPanel();
       }
-    });
-  }
-
-  /**
-   * 刷新代码高亮
-   */
-  async refreshCodeHighlighting() {
-    try {
-      // 如果没有文档或高亮服务，则退出
-      if (!this.document || !this.highlightService) {
-        return;
-      }
       
-      // 根据当前模式选择要高亮的项目
-      let itemsToHighlight = [];
-      if (this.scanMode === 'pending') {
-        itemsToHighlight = this.replacements || [];
-      } else if (this.scanMode === 'translated') {
-        itemsToHighlight = this.existingI18nCalls || [];
-      } else if (this.scanMode === 'all') {
-        itemsToHighlight = [...(this.replacements || []), ...(this.existingI18nCalls || [])];
-      }
-      
-      // 使用try-catch专门处理高亮错误，避免影响面板更新
-      try {
-        // 调用highlightService的方法
-        // 使用直接方法调用而不是调用refreshHighlights
-        this.applyHighlightingToDocument(this.document, itemsToHighlight);
-
-        
-      } catch (error) {
-        console.error('应用高亮时出错:', error);
-        // 这里不抛出异常，以避免影响面板更新
-      }
+      // // 更新配置
+      // await vscode.workspace.getConfiguration('i18n-swapper').update(
+      //   'scanAllFilesMode',
+      //   scanAll,
+      //   vscode.ConfigurationTarget.Global
+      // );
     } catch (error) {
-      console.error('刷新代码高亮时出错:', error);
-      // 这里不抛出异常，以避免影响主流程
-    }
-  }
-
-  /**
-   * 将高亮应用到文档
-   * @param {vscode.TextDocument} document 文档对象
-   * @param {Array} items 需要高亮的项目
-   */
-  applyHighlightingToDocument(document, items) {
-    // 如果没有文档或项目，则退出
-    if (!document || !items || items.length === 0) {
-      return;
-    }
-    
-    // 获取可见编辑器
-    const visibleEditors = vscode.window.visibleTextEditors;
-    const targetEditor = visibleEditors.find(
-      editor => editor.document.uri.toString() === document.uri.toString()
-    );
-    
-    // 如果找不到对应的编辑器，则退出
-    if (!targetEditor) {
-      return;
-    }
-    
-    // 清除之前的高亮
-    targetEditor.setDecorations(this.highlightService.highlightDecorationType, []);
-    
-    // 如果处于全局扫描模式，可能不需要高亮显示所有项目
-    // 这里只处理当前可见文档的项目
-    const documentItems = items.filter(item => 
-      !item.fileUri || item.fileUri.toString() === document.uri.toString()
-    );
-    
-    // 如果没有项目需要高亮，则退出
-    if (documentItems.length === 0) {
-      return;
-    }
-    
-    // 创建高亮范围
-    const ranges = documentItems
-      .filter(item => !item.replaced && typeof item.start === 'number' && typeof item.end === 'number')
-      .map(item => {
-        const startPos = document.positionAt(item.start);
-        const endPos = document.positionAt(item.end);
-        return new vscode.Range(startPos, endPos);
-      });
-    
-    // 设置高亮装饰
-    if (ranges.length > 0) {
-      targetEditor.setDecorations(this.highlightService.highlightDecorationType, ranges);
-      
-      // 清除之前的定时器（如果存在）
-      if (this.highlightService.highlightTimer) {
-        clearTimeout(this.highlightService.highlightTimer);
-      }
-      
-      // 2秒后自动清除高亮
-      this.highlightService.highlightTimer = setTimeout(() => {
-        if (targetEditor) {
-          targetEditor.setDecorations(this.highlightService.highlightDecorationType, []);
-        }
-        this.highlightService.highlightTimer = null;
-      }, 2000);
+      console.error('切换扫描模式时出错:', error);
+      vscode.window.showErrorMessage('切换扫描模式时出错: ' + error.message);
     }
   }
 
@@ -2060,20 +1941,7 @@ class BatchReplacementPanel {
    */
   getRelativePath(absolutePath) {
     try {
-      // 获取工作区根目录
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) {
-        return absolutePath;
-      }
-      const rootPath = workspaceFolders[0].uri.fsPath;
-      
-      // 计算相对路径
-      let relativePath = path.relative(rootPath, absolutePath);
-      
-      // 确保使用正斜杠
-      relativePath = relativePath.replace(/\\/g, '/');
-      
-      return relativePath;
+      return pathUtils.getRelativePath(absolutePath);
     } catch (error) {
       console.error('计算相对路径时出错:', error);
       return absolutePath;
