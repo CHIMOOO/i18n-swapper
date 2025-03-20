@@ -1550,6 +1550,7 @@ class BatchReplacementPanel {
    * @param {number} index 项目索引
    */
   async highlightSourceText(start, end, index) {
+ 
     try {
       if (!this.document) {
         vscode.window.showWarningMessage('没有打开的文档');
@@ -1884,8 +1885,7 @@ class BatchReplacementPanel {
   }
 
   /**
-   * 刷新代码高亮显示
-   * 独立于面板内容更新，专门处理代码高亮
+   * 刷新代码高亮
    */
   async refreshCodeHighlighting() {
     try {
@@ -1909,6 +1909,8 @@ class BatchReplacementPanel {
         // 调用highlightService的方法
         // 使用直接方法调用而不是调用refreshHighlights
         this.applyHighlightingToDocument(this.document, itemsToHighlight);
+
+        
       } catch (error) {
         console.error('应用高亮时出错:', error);
         // 这里不抛出异常，以避免影响面板更新
@@ -1967,6 +1969,19 @@ class BatchReplacementPanel {
     // 设置高亮装饰
     if (ranges.length > 0) {
       targetEditor.setDecorations(this.highlightService.highlightDecorationType, ranges);
+      
+      // 清除之前的定时器（如果存在）
+      if (this.highlightService.highlightTimer) {
+        clearTimeout(this.highlightService.highlightTimer);
+      }
+      
+      // 2秒后自动清除高亮
+      this.highlightService.highlightTimer = setTimeout(() => {
+        if (targetEditor) {
+          targetEditor.setDecorations(this.highlightService.highlightDecorationType, []);
+        }
+        this.highlightService.highlightTimer = null;
+      }, 2000);
     }
   }
 }

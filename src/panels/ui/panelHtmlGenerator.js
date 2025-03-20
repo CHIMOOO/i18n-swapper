@@ -637,7 +637,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
               ${displayItems.length > 0 ? displayItems.map((item, index) => {
                 // 生成每一项的表格行，包括数据行和状态行
                 const dataRow = `
-                  <tr>
+                  <tr data-filepath="${item.filePath || ''}" data-index="${index}">
                     <td class="checkbox-cell">
                       <input type="checkbox" class="item-checkbox" data-index="${index}" ${item.selected ? 'checked' : ''}>
                     </td>
@@ -653,6 +653,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                         data-start="${item.start}" 
                         data-end="${item.end}" 
                         data-index="${index}" 
+                        data-filepath="${item.filePath || ''}"
                         title="点击定位到代码位置">${item.translationValue ? `<span class="translation-preview">${escapeHtml(item.translationValue)}</span>` : `${escapeHtml(item.text)}`}</td>
                     <td>
                       ${ `<input type="text" class="i18n-key-input" data-index="${index}" 
@@ -1610,13 +1611,19 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
             const end = parseInt(item.getAttribute('data-end'));
             const index = parseInt(item.getAttribute('data-index'));
             
+            // 获取当前元素所在行
+            const row = item.closest('tr');
+            // 尝试获取文件路径 - 从数据行或状态行中获取
+            const filePath = row.getAttribute('data-filepath') || '';
+            
             // 发送消息时包含完整信息
             vscode.postMessage({
               command: 'highlightSourceText',
               data: {
                 start: start,
                 end: end,
-                index: index
+                index: index,
+                filePath: filePath // 添加文件路径信息
               }
             });
           });

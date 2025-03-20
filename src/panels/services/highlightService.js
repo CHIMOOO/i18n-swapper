@@ -277,6 +277,33 @@ class HighlightService {
   }
 
   /**
+   * 清除指定文档的所有高亮
+   * @param {vscode.TextDocument} document 文档对象
+   */
+  clearHighlights(document) {
+    try {
+      // 获取可见编辑器
+      const visibleEditors = vscode.window.visibleTextEditors;
+      const targetEditor = visibleEditors.find(
+        editor => editor.document.uri.toString() === document.uri.toString()
+      );
+
+      // 如果找到对应的编辑器，清除其高亮
+      if (targetEditor) {
+        targetEditor.setDecorations(this.highlightDecorationType, []);
+      }
+
+      // 清除定时器
+      if (this.highlightTimer) {
+        clearTimeout(this.highlightTimer);
+        this.highlightTimer = null;
+      }
+    } catch (error) {
+      console.error('清除高亮时出错:', error);
+    }
+  }
+
+  /**
    * 销毁服务
    */
   dispose() {

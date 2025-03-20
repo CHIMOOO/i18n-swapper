@@ -1,0 +1,46 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+.svn
+dist.rar
+dist.zip
+*.zip
+*.rar
+*.local
+*.rar
+*.zip
+*.gz
+*.bz2
+*.7z
+*.dmg
+*.tar
+*.gz
+*.iso
+*.img
+*.apk
+*.xpi
+*.war
+.history
+.history/*
+.vite
+.vite/*
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
