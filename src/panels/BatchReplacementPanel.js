@@ -314,6 +314,9 @@ class BatchReplacementPanel {
         case 'toggleScanAllFiles':
           await this.toggleScanAllFiles(data.scanAllFiles);
           break;
+        case 'refresh-panel':
+          await this.refreshPanel();
+          break;
         default:
           console.log(`未处理的命令: ${command}`);
       }
@@ -607,8 +610,9 @@ class BatchReplacementPanel {
       // 更新面板内容
       this.panel.webview.html = html;
       
-      // 刷新高亮
-      await this.refreshHighlighting();
+      // 面板内容更新后，尝试刷新高亮
+      // 这个调用是与面板更新分开的，即使失败也不会影响面板内容
+      await this.refreshCodeHighlighting();
     } catch (error) {
       console.error('更新面板内容时出错:', error);
       vscode.window.showErrorMessage(`更新面板内容失败: ${error.message}`);
@@ -641,35 +645,51 @@ class BatchReplacementPanel {
    * 刷新面板
    */
   async refreshPanel() {
-    if (!this.panel) return;
-
     try {
-      // 获取配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
-      const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
-
-      // 重新分析文档
-      if (this.document) {
-        const text = this.document.getText();
-        const fileExtension = path.extname(this.document.fileName).toLowerCase();
-
-        // 分析文档内容 - 待转义内容
-        this.replacements = await analyzeDocument(
-          text, fileExtension, scanPatterns, localesPaths, this.document
+      this.selectedIndexes = []; // 清空选中项
+      
+      // 根据当前扫描模式选择刷新方法
+      if (this.scanAllFiles) {
+        // 如果当前是扫描所有文件模式，则使用工作区扫描服务重新扫描
+        await vscode.window.withProgress({
+          location: vscode.ProgressLocation.Notification,
+          title: "刷新工作区扫描结果...",
+          cancellable: false
+        }, async (progress) => {
+          try {
+            progress.report({ message: "重新扫描所有文件..." });
+            
+            // 使用分析现有i18n调用的绑定函数
+            const analyzeExistingI18nCallsBound = this.analyzeExistingI18nCalls.bind(this);
+            
+            // 调用工作区扫描服务
+            this.allFilesResults = await workspaceScannerService.scanAllWorkspaceFiles(
+              analyzeExistingI18nCallsBound,
+              progress
+            );
+            
+            // 更新当前显示的结果
+            this.replacements = this.allFilesResults.replacements;
+            this.existingI18nCalls = this.allFilesResults.existingCalls;
+            
+            // 更新面板内容
+            await this.updatePanelContent();
+          } catch (error) {
+            console.error('刷新工作区文件时出错:', error);
+            throw error;
+          }
+        });
+        
+        vscode.window.showInformationMessage(
+          `刷新完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`
         );
-
-        // 分析已转义内容
-        this.existingI18nCalls = await this.analyzeExistingI18nCalls(
-          text, this.document
-        );
+      } else {
+        // 如果是当前文件模式，则只刷新当前文件
+        await this.analyzeAndLoadPanel();
       }
-
-      // 更新面板
-      this.updatePanelContent();
     } catch (error) {
       console.error('刷新面板时出错:', error);
-      vscode.window.showErrorMessage(`刷新面板失败: ${error.message}`);
+      vscode.window.showErrorMessage(`刷新失败: ${error.message}`);
     }
   }
 
@@ -1861,6 +1881,93 @@ class BatchReplacementPanel {
         await this.analyzeAndLoadPanel();
       }
     });
+  }
+
+  /**
+   * 刷新代码高亮显示
+   * 独立于面板内容更新，专门处理代码高亮
+   */
+  async refreshCodeHighlighting() {
+    try {
+      // 如果没有文档或高亮服务，则退出
+      if (!this.document || !this.highlightService) {
+        return;
+      }
+      
+      // 根据当前模式选择要高亮的项目
+      let itemsToHighlight = [];
+      if (this.scanMode === 'pending') {
+        itemsToHighlight = this.replacements || [];
+      } else if (this.scanMode === 'translated') {
+        itemsToHighlight = this.existingI18nCalls || [];
+      } else if (this.scanMode === 'all') {
+        itemsToHighlight = [...(this.replacements || []), ...(this.existingI18nCalls || [])];
+      }
+      
+      // 使用try-catch专门处理高亮错误，避免影响面板更新
+      try {
+        // 调用highlightService的方法
+        // 使用直接方法调用而不是调用refreshHighlights
+        this.applyHighlightingToDocument(this.document, itemsToHighlight);
+      } catch (error) {
+        console.error('应用高亮时出错:', error);
+        // 这里不抛出异常，以避免影响面板更新
+      }
+    } catch (error) {
+      console.error('刷新代码高亮时出错:', error);
+      // 这里不抛出异常，以避免影响主流程
+    }
+  }
+
+  /**
+   * 将高亮应用到文档
+   * @param {vscode.TextDocument} document 文档对象
+   * @param {Array} items 需要高亮的项目
+   */
+  applyHighlightingToDocument(document, items) {
+    // 如果没有文档或项目，则退出
+    if (!document || !items || items.length === 0) {
+      return;
+    }
+    
+    // 获取可见编辑器
+    const visibleEditors = vscode.window.visibleTextEditors;
+    const targetEditor = visibleEditors.find(
+      editor => editor.document.uri.toString() === document.uri.toString()
+    );
+    
+    // 如果找不到对应的编辑器，则退出
+    if (!targetEditor) {
+      return;
+    }
+    
+    // 清除之前的高亮
+    targetEditor.setDecorations(this.highlightService.highlightDecorationType, []);
+    
+    // 如果处于全局扫描模式，可能不需要高亮显示所有项目
+    // 这里只处理当前可见文档的项目
+    const documentItems = items.filter(item => 
+      !item.fileUri || item.fileUri.toString() === document.uri.toString()
+    );
+    
+    // 如果没有项目需要高亮，则退出
+    if (documentItems.length === 0) {
+      return;
+    }
+    
+    // 创建高亮范围
+    const ranges = documentItems
+      .filter(item => !item.replaced && typeof item.start === 'number' && typeof item.end === 'number')
+      .map(item => {
+        const startPos = document.positionAt(item.start);
+        const endPos = document.positionAt(item.end);
+        return new vscode.Range(startPos, endPos);
+      });
+    
+    // 设置高亮装饰
+    if (ranges.length > 0) {
+      targetEditor.setDecorations(this.highlightService.highlightDecorationType, ranges);
+    }
   }
 }
 

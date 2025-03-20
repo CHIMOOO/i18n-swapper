@@ -221,6 +221,62 @@ class HighlightService {
   }
 
   /**
+   * 刷新代码高亮
+   * @param {vscode.TextDocument} document 文档对象
+   * @param {Array} items 需要高亮的项目列表
+   */
+  async refreshHighlights(document, items) {
+    // 如果没有文档或项目，则不需要高亮
+    if (!document || !items || items.length === 0) {
+      return;
+    }
+
+    try {
+      // 获取可见编辑器
+      const visibleEditors = vscode.window.visibleTextEditors;
+      const targetEditor = visibleEditors.find(
+        editor => editor.document.uri.toString() === document.uri.toString()
+      );
+
+      // 如果找不到对应的编辑器，则退出
+      if (!targetEditor) {
+        return;
+      }
+
+      // 清除之前的高亮
+      targetEditor.setDecorations(this.highlightDecorationType, []);
+
+      // 如果处于全局扫描模式，可能不需要高亮显示所有项目
+      // 这里只处理当前可见文档的项目
+      const documentItems = items.filter(item => 
+        !item.fileUri || item.fileUri.toString() === document.uri.toString()
+      );
+
+      // 如果没有项目需要高亮，则退出
+      if (documentItems.length === 0) {
+        return;
+      }
+
+      // 创建高亮范围
+      const ranges = documentItems
+        .filter(item => !item.replaced && typeof item.start === 'number' && typeof item.end === 'number')
+        .map(item => {
+          const startPos = document.positionAt(item.start);
+          const endPos = document.positionAt(item.end);
+          return new vscode.Range(startPos, endPos);
+        });
+
+      // 设置高亮装饰
+      if (ranges.length > 0) {
+        targetEditor.setDecorations(this.highlightDecorationType, ranges);
+      }
+    } catch (error) {
+      console.error('刷新高亮时出错:', error);
+      // 这里不抛出异常，以避免影响面板更新
+    }
+  }
+
+  /**
    * 销毁服务
    */
   dispose() {
