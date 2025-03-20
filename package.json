@@ -347,6 +347,11 @@
             "vendor",
             ".history"],
           "description": "扫描时要排除的文件或目录模式"
+        },
+        "i18n-swapper.scanAllFilesMode": {
+          "type": "boolean",
+          "default": false,
+          "description": "是否扫描工作区中的所有文件（而不仅仅是当前文件）"
         }
       }
     }

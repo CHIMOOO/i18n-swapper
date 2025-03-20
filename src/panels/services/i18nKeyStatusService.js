@@ -254,22 +254,65 @@ class I18nKeyStatusService {
       // 尝试定位到键
       if (key) {
         const text = document.getText();
-        const regex = new RegExp(`["']${key.replace(/\./g, '\\.')}["']`, 'g');
-        const match = regex.exec(text);
         
-        if (match) {
-          const pos = document.positionAt(match.index);
+        // 处理嵌套键
+        const keyParts = key.split('.');
+        let searchPosition = 0;
+        let currentPart = 0;
+        
+        while (currentPart < keyParts.length && searchPosition !== -1) {
+          const part = keyParts[currentPart];
+          // 匹配模式: "key": 或 'key': 或 "key" : 等
+          const keyPattern = new RegExp(`["'](${this._escapeRegExp(part)})["']\\s*:`, 'g');
+          keyPattern.lastIndex = searchPosition;
+          
+          const match = keyPattern.exec(text);
+          if (match) {
+            searchPosition = match.index;
+            currentPart++;
+          } else {
+            searchPosition = -1;
+          }
+        }
+        
+        if (searchPosition !== -1) {
+          const pos = document.positionAt(searchPosition);
           editor.selection = new vscode.Selection(pos, pos);
           editor.revealRange(
             new vscode.Range(pos, pos),
             vscode.TextEditorRevealType.InCenter
           );
+        } else {
+          // 回退：尝试直接搜索完整键
+          const regex = new RegExp(`["']${this._escapeRegExp(key)}["']`, 'g');
+          const match = regex.exec(text);
+          
+          if (match) {
+            const pos = document.positionAt(match.index);
+            editor.selection = new vscode.Selection(pos, pos);
+            editor.revealRange(
+              new vscode.Range(pos, pos),
+              vscode.TextEditorRevealType.InCenter
+            );
+          } else {
+            vscode.window.showInformationMessage(`在文件中未找到键 "${key}"`);
+          }
         }
       }
     } catch (error) {
       console.error('打开语言文件时出错:', error);
       vscode.window.showErrorMessage(`打开文件失败: ${error.message}`);
     }
+  }
+
+  /**
+   * 转义正则表达式特殊字符
+   * @param {string} string 要转义的字符串
+   * @returns {string} 转义后的字符串
+   * @private
+   */
+  _escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 }
 
