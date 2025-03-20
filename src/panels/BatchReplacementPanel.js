@@ -29,6 +29,8 @@ const {
   translateTextToAllLanguages
 } = require('../services/translationService');
 const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
+const HighlightService = require('./services/highlightService'); // 新增：引入高亮服务
+const I18nKeyStatusService = require('./services/i18nKeyStatusService'); // 新增：引入i18n键状态服务
 
 /**
  * 批量替换面板类
@@ -54,19 +56,14 @@ class BatchReplacementPanel {
     // 处理面板关闭和视图状态变更
     this._disposables = [];
 
-    // 添加高亮装饰器
-    this.highlightDecorationType = vscode.window.createTextEditorDecorationType({
-      backgroundColor: 'rgba(255, 193, 7, 0.3)',
-      borderWidth: '1px',
-      borderStyle: 'solid',
-      borderColor: '#FFC107',
-      borderRadius: '3px',
-      overviewRulerColor: '#FFC107',
-      overviewRulerLane: vscode.OverviewRulerLane.Center
-    });
+    // 初始化高亮服务
+    this.highlightService = new HighlightService();
 
-    // 高亮定时器
-    this.highlightTimer = null;
+    // 初始化i18n键状态服务
+    this.i18nKeyStatusService = new I18nKeyStatusService();
+
+    // 高亮定时器（移除，现在由highlightService处理）
+    // this.highlightTimer = null;
   }
 
   /**
@@ -205,13 +202,13 @@ class BatchReplacementPanel {
           await this.updatePanelContent();
           break;
         case 'updateDecorationStyle':
-          await this._updateDecorationStyle(data.style);
+          await this.highlightService.updateDecorationStyle(data.style);
           break;
         case 'updateDecorationStyles':
-          await this.updateDecorationStyles(data);
+          await this.highlightService.updateDecorationStyles(data);
           break;
         case 'updateShowPreviewInEdit':
-          await this._updateShowPreviewInEdit(data.showPreview);
+          await this.highlightService.updateShowPreviewInEdit(data.showPreview);
           break;
         case 'updateKey':
           this.updateI18nKey(data.index, data.key);
@@ -267,27 +264,7 @@ class BatchReplacementPanel {
           }
           break;
         case 'updateMissingKeyStyles':
-          // 获取缺失键样式配置
-          const {
-            missingKeyBorderWidth, missingKeyBorderStyle, missingKeyBorderColor, missingKeyBorderSpacing
-          } = message.data;
-
-          // 更新配置
-          const config = vscode.workspace.getConfiguration('i18n-swapper');
-
-          // 逐项更新配置
-          config.update('missingKeyBorderWidth', missingKeyBorderWidth, vscode.ConfigurationTarget.Workspace);
-          config.update('missingKeyBorderStyle', missingKeyBorderStyle, vscode.ConfigurationTarget.Workspace);
-          config.update('missingKeyBorderColor', missingKeyBorderColor, vscode.ConfigurationTarget.Workspace);
-          config.update('missingKeyBorderSpacing', missingKeyBorderSpacing, vscode.ConfigurationTarget.Workspace);
-
-          // 通知用户
-          vscode.window.showInformationMessage('缺失键样式设置已保存，返回代码页面重新激活');
-
-          // 如果需要，刷新装饰器
-          if (this.decorator) {
-            this.decorator.updateDecorations();
-          }
+          await this.highlightService.updateMissingKeyStyles(data);
           break;
         case 'highlightSourceText':
           await this.highlightSourceText(data.start, data.end, data.index);
@@ -623,101 +600,17 @@ class BatchReplacementPanel {
    */
   async loadI18nKeysStatus(languageMappings) {
     try {
-      // 获取工作区根目录
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) return;
-      const rootPath = workspaceFolders[0].uri.fsPath;
       let searchKeys = [];
       if (this.scanMode === 'translated') {
-        searchKeys = this.existingI18nCalls
+        searchKeys = this.existingI18nCalls;
       } else if (this.scanMode === 'pending') {
-        searchKeys = this.replacements
+        searchKeys = this.replacements;
       } else if (this.scanMode === 'all') {
         searchKeys = this.replacements.concat(this.existingI18nCalls);
       }
-      // 为每个替换项加载翻译状态
-      for (const item of searchKeys) {
-        if (!item.i18nKey) continue;
-
-        // 如果不存在翻译状态对象，则创建一个
-        if (!item.i18nStatus) {
-          item.i18nStatus = {};
-        }
-
-        // 遍历每种语言，检查键是否存在
-        for (const mapping of languageMappings) {
-          try {
-            const fullPath = path.join(rootPath, mapping.filePath);
-
-            // 检查文件是否存在
-            if (!fs.existsSync(fullPath)) {
-              item.i18nStatus[mapping.languageCode] = {
-                exists: false,
-                value: null,
-                error: '文件不存在'
-              };
-              continue;
-            }
-
-            // 读取文件内容
-            const fileContent = fs.readFileSync(fullPath, 'utf8');
-            let i18nData;
-
-            // 解析文件内容
-            if (fullPath.endsWith('.json')) {
-              i18nData = JSON.parse(fileContent);
-            } else if (fullPath.endsWith('.js')) {
-              // 简单解析JS模块导出
-              const match = fileContent.match(/export\s+default\s+({[\s\S]*?});?$/m);
-              if (match && match[1]) {
-                i18nData = Function(`return ${match[1]}`)();
-              } else {
-                item.i18nStatus[mapping.languageCode] = {
-                  exists: false,
-                  value: null,
-                  error: '无法解析JS文件'
-                };
-                continue;
-              }
-            } else {
-              item.i18nStatus[mapping.languageCode] = {
-                exists: false,
-                value: null,
-                error: '不支持的文件类型'
-              };
-              continue;
-            }
-
-            // 获取嵌套键的值
-            const keyParts = item.i18nKey.split('.');
-            let value = i18nData;
-            let exists = true;
-
-            for (const part of keyParts) {
-              if (value && typeof value === 'object' && part in value) {
-                value = value[part];
-              } else {
-                exists = false;
-                value = null;
-                break;
-              }
-            }
-
-            // 保存状态
-            item.i18nStatus[mapping.languageCode] = {
-              exists,
-              value: exists ? value : null
-            };
-          } catch (error) {
-            console.error(`加载键 ${item.i18nKey} 的 ${mapping.languageCode} 翻译状态时出错:`, error);
-            item.i18nStatus[mapping.languageCode] = {
-              exists: false,
-              value: null,
-              error: error.message
-            };
-          }
-        }
-      }
+      
+      // 委托给i18n键状态服务处理
+      await this.i18nKeyStatusService.loadI18nKeysStatus(searchKeys, languageMappings);
     } catch (error) {
       console.error('加载国际化键状态时出错:', error);
     }
@@ -1387,290 +1280,6 @@ class BatchReplacementPanel {
   }
 
   /**
-   * 更新装饰风格设置
-   */
-  async _updateDecorationStyle(style) {
-    try {
-      // 更新配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      await config.update('decorationStyle', style, vscode.ConfigurationTarget.Workspace);
-
-      // 通知用户
-      const styleNames = {
-        'suffix': "t('key')(译文)",
-        'inline': "t(译文)"
-      };
-      vscode.window.showInformationMessage(`已将i18n装饰显示风格设置为: ${styleNames[style]}`);
-
-      // 发送命令刷新装饰
-      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
-    } catch (error) {
-      console.error('更新装饰风格设置时出错:', error);
-      vscode.window.showErrorMessage(`更新装饰风格出错: ${error.message}`);
-    }
-  }
-
-  /**
-   * 更新装饰样式设置
-   */
-  async updateDecorationStyles(data) {
-    try {
-      const {
-        decorationStyle,
-        suffixStyle,
-        inlineStyle
-      } = data;
-
-      // 使用VSCode API更新配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      await config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Workspace);
-      await config.update('suffixStyle', suffixStyle, vscode.ConfigurationTarget.Workspace);
-      await config.update('inlineStyle', inlineStyle, vscode.ConfigurationTarget.Workspace);
-
-      // 应用新的样式
-      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
-
-      // 提示用户
-      vscode.window.showInformationMessage('已更新装饰样式设置，手动返回代码页面激活生效。');
-    } catch (error) {
-      console.error('更新装饰样式设置时出错:', error);
-      vscode.window.showErrorMessage(`更新样式设置失败: ${error.message}`);
-    }
-  }
-
-  /**
-   * 更新内联模式编辑时显示译文预览设置
-   */
-  async _updateShowPreviewInEdit(showPreview) {
-    try {
-      // 使用VSCode API更新配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      await config.update('showFullFormInEditMode', showPreview, vscode.ConfigurationTarget.Workspace);
-
-      // 刷新装饰
-      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
-
-      vscode.window.showInformationMessage(
-        showPreview ?
-        '已启用内联模式编辑时显示译文预览' :
-        '已禁用内联模式编辑时显示译文预览'
-      );
-    } catch (error) {
-      console.error('更新译文预览设置时出错:', error);
-      vscode.window.showErrorMessage(`更新译文预览设置失败: ${error.message}`);
-    }
-  }
-
-  /**
-   * 检查单个国际化键在各语言中的状态
-   * @param {number} index 项的索引
-   * @param {string} key 要检查的国际化键
-   */
-  async checkI18nKeyStatus(index, key) {
-    if (index < 0 || index >= this.replacements.length || !key) return;
-
-    try {
-      // 获取语言映射配置
-      const config = vscode.workspace.getConfiguration('i18n-swapper');
-      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
-
-      if (!languageMappings || languageMappings.length === 0) return;
-
-      // 更新项的键值
-      this.replacements[index].i18nKey = key;
-
-      // 获取工作区根目录
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) return;
-      const rootPath = workspaceFolders[0].uri.fsPath;
-
-      // 初始化状态对象
-      if (!this.replacements[index].i18nStatus) {
-        this.replacements[index].i18nStatus = {};
-      }
-
-      // 检查每种语言中的状态
-      for (const mapping of languageMappings) {
-        try {
-          const fullPath = path.join(rootPath, mapping.filePath);
-
-          // 检查文件是否存在
-          if (!fs.existsSync(fullPath)) {
-            this.replacements[index].i18nStatus[mapping.languageCode] = {
-              exists: false,
-              value: null,
-              error: '文件不存在'
-            };
-            continue;
-          }
-
-          // 读取文件内容
-          const fileContent = fs.readFileSync(fullPath, 'utf8');
-          let i18nData;
-
-          // 解析文件内容
-          if (fullPath.endsWith('.json')) {
-            i18nData = JSON.parse(fileContent);
-          } else if (fullPath.endsWith('.js')) {
-            // 简单解析JS模块导出
-            const match = fileContent.match(/export\s+default\s+({[\s\S]*?});?$/m);
-            if (match && match[1]) {
-              i18nData = Function(`return ${match[1]}`)();
-            } else {
-              this.replacements[index].i18nStatus[mapping.languageCode] = {
-                exists: false,
-                value: null,
-                error: '无法解析JS文件'
-              };
-              continue;
-            }
-          } else {
-            this.replacements[index].i18nStatus[mapping.languageCode] = {
-              exists: false,
-              value: null,
-              error: '不支持的文件类型'
-            };
-            continue;
-          }
-
-          // 获取嵌套键的值
-          const keyParts = key.split('.');
-          let value = i18nData;
-          let exists = true;
-
-          for (const part of keyParts) {
-            if (value && typeof value === 'object' && part in value) {
-              value = value[part];
-            } else {
-              exists = false;
-              value = null;
-              break;
-            }
-          }
-
-          // 保存状态
-          this.replacements[index].i18nStatus[mapping.languageCode] = {
-            exists,
-            value: exists ? value : null
-          };
-        } catch (error) {
-          console.error(`检查键 ${key} 的 ${mapping.languageCode} 状态时出错:`, error);
-          this.replacements[index].i18nStatus[mapping.languageCode] = {
-            exists: false,
-            value: null,
-            error: error.message
-          };
-        }
-      }
-
-      // 将更新的状态发送回面板
-      if (this.panel) {
-        this.panel.webview.postMessage({
-          command: 'updateI18nKeyStatus',
-          data: {
-            index,
-            status: this.replacements[index].i18nStatus,
-            key
-          }
-        });
-      }
-    } catch (error) {
-      console.error('检查国际化键状态时出错:', error);
-    }
-  }
-
-  /**
-   * 打开语言文件并定位到指定的键
-   * @param {string} filePath 文件路径
-   * @param {string} key 国际化键
-   * @param {string} languageCode 语言代码
-   */
-  async openLanguageFile(filePath, key, languageCode) {
-    try {
-      // 获取工作区根目录
-      const workspaceFolders = vscode.workspace.workspaceFolders;
-      if (!workspaceFolders) {
-        throw new Error('未找到工作区文件夹');
-      }
-      const rootPath = workspaceFolders[0].uri.fsPath;
-
-      // 构建完整文件路径
-      const fullPath = path.isAbsolute(filePath) ?
-        filePath :
-        path.join(rootPath, filePath);
-
-      // 检查文件是否存在
-      if (!fs.existsSync(fullPath)) {
-        throw new Error(`文件不存在: ${filePath}`);
-      }
-
-      // 打开文件
-      const document = await vscode.workspace.openTextDocument(fullPath);
-      const editor = await vscode.window.showTextDocument(document);
-
-      // 尝试在文件中查找键并定位光标
-      const content = document.getText();
-
-      // 根据文件类型选择不同的查找方式
-      let position = null;
-
-      if (fullPath.endsWith('.json')) {
-        // JSON文件查找格式: "key": 或 "nested.key":
-        const keyParts = key.split('.');
-        let searchKey = '';
-
-        // 处理嵌套键，生成搜索模式
-        if (keyParts.length === 1) {
-          // 单级键: "key":
-          searchKey = `"${key}"\\s*:`;
-        } else {
-          // 尝试直接查找最末级键
-          const lastKey = keyParts[keyParts.length - 1];
-          searchKey = `"${lastKey}"\\s*:`;
-        }
-
-        const regex = new RegExp(searchKey);
-        const text = document.getText();
-        const match = regex.exec(text);
-
-        if (match) {
-          const offset = match.index;
-          position = document.positionAt(offset);
-        }
-      } else if (fullPath.endsWith('.js') || fullPath.endsWith('.ts')) {
-        // JS/TS文件查找: key: 或 'key': 或 "key":
-        const keyParts = key.split('.');
-        const lastKey = keyParts[keyParts.length - 1];
-        const searchKey = `['\"]?${lastKey}['\"]?\\s*:`;
-
-        const regex = new RegExp(searchKey);
-        const text = document.getText();
-        const match = regex.exec(text);
-
-        if (match) {
-          const offset = match.index;
-          position = document.positionAt(offset);
-        }
-      }
-
-      // 如果找到位置，滚动到该位置
-      if (position) {
-        editor.selection = new vscode.Selection(position, position);
-        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-      } else {
-        // 未找到精确位置时，提示用户
-        vscode.window.showInformationMessage(`已打开 ${filePath}，但未找到键 "${key}" 的精确位置`);
-      }
-
-      // 无论是否找到位置，记录一条日志信息
-      console.log(`已打开文件 ${filePath} 查找键 ${key} [${languageCode}]`);
-    } catch (error) {
-      console.error('打开语言文件出错:', error);
-      vscode.window.showErrorMessage(`打开文件失败: ${error.message}`);
-    }
-  }
-
-  /**
    * 切换扫描模式
    * @param {string} mode 模式名称：'pending'、'translated' 或 'all'
    */
@@ -1906,41 +1515,6 @@ class BatchReplacementPanel {
         return;
       }
 
-      // 获取当前所有可见编辑器
-      const visibleEditors = vscode.window.visibleTextEditors;
-
-      // 查找包含目标文档的编辑器
-      let targetEditor = null;
-      for (const editor of visibleEditors) {
-        if (editor.document.uri.toString() === this.document.uri.toString()) {
-          targetEditor = editor;
-          break;
-        }
-      }
-
-      // 如果没找到目标编辑器，再尝试显示文档但不切换焦点
-      if (!targetEditor) {
-        // 使用preserveFocus:true保持面板焦点
-        await vscode.window.showTextDocument(this.document, {
-          preserveFocus: true,
-          viewColumn: vscode.ViewColumn.One // 强制使用第一个视图列
-        });
-
-        // 重新获取编辑器引用
-        for (const editor of vscode.window.visibleTextEditors) {
-          if (editor.document.uri.toString() === this.document.uri.toString()) {
-            targetEditor = editor;
-            break;
-          }
-        }
-      }
-
-      // 如果仍然没有找到目标编辑器，给出错误提示
-      if (!targetEditor) {
-        vscode.window.showErrorMessage('无法定位到源文档编辑器');
-        return;
-      }
-
       // 获取要高亮的项目
       let item = null;
       if (this.scanMode === 'pending') {
@@ -1953,37 +1527,8 @@ class BatchReplacementPanel {
         item = allItems[index];
       }
 
-      // 使用项目中原始的start和end，而不是参数中传入的
-      if (item && typeof item.start === 'number' && typeof item.end === 'number') {
-        start = item.start;
-        end = item.end;
-      }
-
-      // 创建位置范围
-      const startPos = this.document.positionAt(start);
-      const endPos = this.document.positionAt(end);
-      const range = new vscode.Range(startPos, endPos);
-
-      // 滚动到位置并居中显示
-      targetEditor.revealRange(range, vscode.TextEditorRevealType.InCenter);
-
-      // 添加高亮装饰
-      targetEditor.setDecorations(this.highlightDecorationType, [range]);
-
-      // 设置选择
-      targetEditor.selection = new vscode.Selection(startPos, endPos);
-
-      // 清除之前的定时器
-      if (this.highlightTimer) {
-        clearTimeout(this.highlightTimer);
-      }
-
-      // 5秒后自动清除高亮
-      this.highlightTimer = setTimeout(() => {
-        targetEditor.setDecorations(this.highlightDecorationType, []);
-        this.highlightTimer = null;
-      }, 5000);
-
+      // 委托给高亮服务处理
+      await this.highlightService.highlightSourceText(this.document, start, end, item);
     } catch (error) {
       console.error('高亮源文本出错:', error);
       vscode.window.showErrorMessage(`高亮文本失败: ${error.message}`);
@@ -2144,22 +1689,64 @@ class BatchReplacementPanel {
   }
 
   /**
+   * 检查单个国际化键在各语言中的状态
+   * @param {number} index 项的索引
+   * @param {string} key 要检查的国际化键
+   */
+  async checkI18nKeyStatus(index, key) {
+    if (index < 0 || index >= this.replacements.length || !key) return;
+
+    try {
+      // 获取语言映射配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
+
+      if (!languageMappings || languageMappings.length === 0) return;
+
+      // 委托给i18n键状态服务处理
+      const status = await this.i18nKeyStatusService.checkI18nKeyStatus(
+        this.replacements[index], 
+        key,
+        languageMappings
+      );
+
+      // 将更新的状态发送回面板
+      if (this.panel) {
+        this.panel.webview.postMessage({
+          command: 'updateI18nKeyStatus',
+          data: {
+            index,
+            status,
+            key
+          }
+        });
+      }
+    } catch (error) {
+      console.error('检查国际化键状态时出错:', error);
+    }
+  }
+
+  /**
+   * 打开语言文件并定位到指定的键
+   * @param {string} filePath 文件路径
+   * @param {string} key 国际化键
+   * @param {string} languageCode 语言代码
+   */
+  async openLanguageFile(filePath, key, languageCode) {
+    // 委托给i18n键状态服务处理
+    await this.i18nKeyStatusService.openLanguageFile(filePath, key, languageCode);
+  }
+
+  /**
    * 销毁面板时清理资源
    */
   dispose() {
-    // 清除高亮定时器
-    if (this.highlightTimer) {
-      clearTimeout(this.highlightTimer);
-      this.highlightTimer = null;
-    }
-
-    // 清除高亮装饰
-    if (this.highlightDecorationType) {
-      this.highlightDecorationType.dispose();
+    // 委托给高亮服务处理
+    if (this.highlightService) {
+      this.highlightService.dispose();
     }
 
     // 现有的清理代码...
-
     if (this.panel) {
       this.panel.dispose();
     }
