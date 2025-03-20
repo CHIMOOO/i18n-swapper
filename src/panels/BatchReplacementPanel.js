@@ -344,10 +344,14 @@ class BatchReplacementPanel {
         filePath :
         path.join(rootPath, filePath);
 
+      // 显示相对路径
+      const relativePath = this.getRelativePath(absolutePath);
+      console.log(`保存翻译到文件: ${relativePath}`);
+
       // 调用语言文件管理服务保存翻译
       await saveTranslationToFile(absolutePath, key, value);
 
-      vscode.window.showInformationMessage(`已保存翻译: ${key}`);
+      vscode.window.showInformationMessage(`已保存翻译: ${key} 到文件 ${relativePath}`);
 
       // 刷新面板
       await this.refreshPanel();
@@ -552,6 +556,17 @@ class BatchReplacementPanel {
           });
         }
       }
+
+      // 添加到结果时转换为相对路径
+      if (sourceFile) {
+        sourceFile = this.getRelativePath(sourceFile);
+      }
+
+      existingCalls.forEach(item => {
+        if (item.i18nFile) {
+          item.i18nFile = this.getRelativePath(item.i18nFile);
+        }
+      });
     } catch (error) {
       console.error('分析已存在的国际化调用时出错:', error);
     }
@@ -587,6 +602,43 @@ class BatchReplacementPanel {
         await this.loadI18nKeysStatus(languageMappings);
       }
 
+      // 确保处理所有路径信息
+      // 处理 replacements 的路径
+      if (this.replacements && this.replacements.length > 0) {
+        this.replacements.forEach(item => {
+          if (item.filePath) {
+            item.displayPath = this.getRelativePath(item.filePath);
+          }
+          if (item.i18nFile) {
+            item.displayI18nPath = this.getRelativePath(item.i18nFile);
+          }
+        });
+      }
+      
+      // 处理 existingI18nCalls 的路径
+      if (this.existingI18nCalls && this.existingI18nCalls.length > 0) {
+        this.existingI18nCalls.forEach(item => {
+          if (item.i18nFile) {
+            item.displayI18nPath = this.getRelativePath(item.i18nFile);
+          }
+          if (item.fileUri) {
+            item.displayPath = this.getRelativePath(item.fileUri.fsPath);
+          }
+        });
+      }
+      
+      // 处理语言映射的路径
+      if (languageMappings && languageMappings.length > 0) {
+        languageMappings.forEach(mapping => {
+          if (mapping.filePath) {
+            mapping.displayPath = this.getRelativePath(mapping.filePath);
+          }
+        });
+      }
+      
+      // 处理本地化路径
+      const displayLocalesPaths = localesPaths.map(p => this.getRelativePath(p));
+
       // 构建传递给面板的上下文
       const context = {
         decorationStyle,
@@ -600,7 +652,7 @@ class BatchReplacementPanel {
       const html = getPanelHtml(
         scanPatterns || [],
         this.replacements || [],
-        localesPaths || [],
+        displayLocalesPaths || [], // 使用处理后的路径
         context,
         this.isConfigExpanded,
         languageMappings || [],
@@ -1276,8 +1328,7 @@ class BatchReplacementPanel {
       // 将选择的文件路径转换为相对于工作区的路径
       const newPaths = fileUris.map(uri => {
         const absolutePath = uri.fsPath;
-        const relativePath = path.relative(rootPath, absolutePath);
-        return relativePath;
+        return this.getRelativePath(absolutePath);
       });
 
       if (newPaths.length > 0) {
@@ -1367,12 +1418,13 @@ class BatchReplacementPanel {
         return;
       }
 
-      // 执行打开文件命令
+      // 执行打开文件命令，指定在第一个窗口打开
       await vscode.commands.executeCommand('i18n-swapper.openLanguageFile', {
         filePath: item.i18nFile,
-        langCode: 'unknown', // 这里可能需要从文件名推断语言代码
+        langCode: 'unknown',
         i18nKey: item.i18nKey,
-        shouldLocateKey: true
+        shouldLocateKey: true,
+        viewColumn: vscode.ViewColumn.One // 添加这一行
       });
     } catch (error) {
       console.error('打开国际化文件时出错:', error);
@@ -1558,9 +1610,10 @@ class BatchReplacementPanel {
       if (filePath) {
         const uri = vscode.Uri.file(filePath);
         document = await vscode.workspace.openTextDocument(uri);
-        // 显示文档但不切换焦点
+        // 在第一个窗口中打开文件
         await vscode.window.showTextDocument(document, {
-          preserveFocus: false, // 切换焦点到新窗口
+          viewColumn: vscode.ViewColumn.One, // 指定在第一个窗口打开
+          preserveFocus: true, // 保持面板的焦点
           preview: false // 在新标签页打开
         });
       } else {
@@ -1625,9 +1678,15 @@ class BatchReplacementPanel {
         let editor;
         
         if (this.scanAllFiles && item.fileUri) {
-          // 如果是全局扫描模式，打开对应的文件
+          // 在日志中使用相对路径
+          const relativePath = this.getRelativePath(item.fileUri.fsPath);
+          console.log(`打开文件进行替换: ${relativePath}`);
+          
+          // 正常使用 URI 打开文档，但在第一个窗口中
           document = await vscode.workspace.openTextDocument(item.fileUri);
-          editor = await vscode.window.showTextDocument(document);
+          editor = await vscode.window.showTextDocument(document, {
+            viewColumn: vscode.ViewColumn.One // 指定在第一个窗口打开
+          });
         } else {
           // 使用当前文档
           document = this.document;
@@ -1790,8 +1849,13 @@ class BatchReplacementPanel {
    * @param {string} languageCode 语言代码
    */
   async openLanguageFile(filePath, key, languageCode) {
-    // 委托给i18n键状态服务处理
-    await this.i18nKeyStatusService.openLanguageFile(filePath, key, languageCode);
+    // 修改为在第一个窗口打开
+    await this.i18nKeyStatusService.openLanguageFile(
+      filePath, 
+      key, 
+      languageCode,
+      vscode.ViewColumn.One // 指定在第一个窗口打开
+    );
   }
 
   /**
@@ -1982,6 +2046,33 @@ class BatchReplacementPanel {
         }
         this.highlightService.highlightTimer = null;
       }, 2000);
+    }
+  }
+
+  /**
+   * 获取相对于工作区根目录的路径
+   * @param {string} absolutePath 绝对路径
+   * @returns {string} 相对路径
+   */
+  getRelativePath(absolutePath) {
+    try {
+      // 获取工作区根目录
+      const workspaceFolders = vscode.workspace.workspaceFolders;
+      if (!workspaceFolders) {
+        return absolutePath;
+      }
+      const rootPath = workspaceFolders[0].uri.fsPath;
+      
+      // 计算相对路径
+      let relativePath = path.relative(rootPath, absolutePath);
+      
+      // 确保使用正斜杠
+      relativePath = relativePath.replace(/\\/g, '/');
+      
+      return relativePath;
+    } catch (error) {
+      console.error('计算相对路径时出错:', error);
+      return absolutePath;
     }
   }
 }

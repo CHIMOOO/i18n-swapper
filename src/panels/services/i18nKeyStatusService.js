@@ -224,9 +224,9 @@ class I18nKeyStatusService {
    * @param {string} filePath 文件路径
    * @param {string} key 国际化键
    * @param {string} languageCode 语言代码
-   * @returns {Promise<void>}
+   * @param {vscode.ViewColumn} viewColumn 视图列，指定在哪个窗口打开
    */
-  async openLanguageFile(filePath, key, languageCode) {
+  async openLanguageFile(filePath, key, languageCode, viewColumn = vscode.ViewColumn.Active) {
     try {
       // 获取工作区根目录
       const workspaceFolders = vscode.workspace.workspaceFolders;
@@ -235,78 +235,39 @@ class I18nKeyStatusService {
       }
       const rootPath = workspaceFolders[0].uri.fsPath;
 
-      // 构建完整文件路径
-      const fullPath = path.isAbsolute(filePath) ?
+      // 构建绝对路径
+      const absolutePath = path.isAbsolute(filePath) ?
         filePath :
         path.join(rootPath, filePath);
 
-      // 检查文件是否存在
-      if (!fs.existsSync(fullPath)) {
-        throw new Error(`文件不存在: ${filePath}`);
-      }
-
       // 打开文件
-      const document = await vscode.workspace.openTextDocument(fullPath);
-      const editor = await vscode.window.showTextDocument(document);
+      const uri = vscode.Uri.file(absolutePath);
+      const document = await vscode.workspace.openTextDocument(uri);
+      
+      // 指定在特定窗口打开文件
+      const editor = await vscode.window.showTextDocument(document, {
+        viewColumn: viewColumn,
+        preserveFocus: false,
+        preview: false
+      });
 
-      // 尝试在文件中查找键并定位光标
-      const content = document.getText();
-
-      // 根据文件类型选择不同的查找方式
-      let position = null;
-
-      if (fullPath.endsWith('.json')) {
-        // JSON文件查找格式: "key": 或 "nested.key":
-        const keyParts = key.split('.');
-        let searchKey = '';
-
-        // 处理嵌套键，生成搜索模式
-        if (keyParts.length === 1) {
-          // 单级键: "key":
-          searchKey = `"${key}"\\s*:`;
-        } else {
-          // 尝试直接查找最末级键
-          const lastKey = keyParts[keyParts.length - 1];
-          searchKey = `"${lastKey}"\\s*:`;
-        }
-
-        const regex = new RegExp(searchKey);
+      // 尝试定位到键
+      if (key) {
         const text = document.getText();
+        const regex = new RegExp(`["']${key.replace(/\./g, '\\.')}["']`, 'g');
         const match = regex.exec(text);
-
+        
         if (match) {
-          const offset = match.index;
-          position = document.positionAt(offset);
-        }
-      } else if (fullPath.endsWith('.js') || fullPath.endsWith('.ts')) {
-        // JS/TS文件查找: key: 或 'key': 或 "key":
-        const keyParts = key.split('.');
-        const lastKey = keyParts[keyParts.length - 1];
-        const searchKey = `['\"]?${lastKey}['\"]?\\s*:`;
-
-        const regex = new RegExp(searchKey);
-        const text = document.getText();
-        const match = regex.exec(text);
-
-        if (match) {
-          const offset = match.index;
-          position = document.positionAt(offset);
+          const pos = document.positionAt(match.index);
+          editor.selection = new vscode.Selection(pos, pos);
+          editor.revealRange(
+            new vscode.Range(pos, pos),
+            vscode.TextEditorRevealType.InCenter
+          );
         }
       }
-
-      // 如果找到位置，滚动到该位置
-      if (position) {
-        editor.selection = new vscode.Selection(position, position);
-        editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-      } else {
-        // 未找到精确位置时，提示用户
-        vscode.window.showInformationMessage(`已打开 ${filePath}，但未找到键 "${key}" 的精确位置`);
-      }
-
-      // 无论是否找到位置，记录一条日志信息
-      console.log(`已打开文件 ${filePath} 查找键 ${key} [${languageCode}]`);
     } catch (error) {
-      console.error('打开语言文件出错:', error);
+      console.error('打开语言文件时出错:', error);
       vscode.window.showErrorMessage(`打开文件失败: ${error.message}`);
     }
   }
