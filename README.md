@@ -172,10 +172,11 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 
 - `src/panels/services/highlightService.js` - 处理代码高亮和装饰相关功能
 - `src/panels/services/i18nKeyStatusService.js` - 管理i18n键在不同语言文件中的状态
+- `src/panels/services/translationPanelService.js` - 处理面板中的翻译相关操作
 - `src/panels/services/documentAnalyzer.js` - 分析文档内容，识别可国际化的文本
 - `src/panels/services/languageFileManager.js` - 管理语言文件的创建和选择
 - `src/panels/services/replacementService.js` - 处理文本替换为国际化调用的逻辑
-- `src/panels/services/translationService.js` - 处理翻译相关功能
+- `src/panels/services/translationService.js` - 处理翻译API相关功能
 
 ## 界面相关
 
@@ -192,8 +193,16 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 该项目采用模块化设计，将功能分散到多个专门的服务中：
 
 1. **主控制器** - `BatchReplacementPanel.js` 作为主控制器，协调各个服务模块
-2. **服务模块** - 每个服务模块负责一个特定功能领域
+2. **服务模块** - 每个服务模块负责一个特定功能领域：
+   - 高亮服务 - 处理代码高亮和装饰
+   - i18n键状态服务 - 管理国际化键的状态
+   - 翻译面板服务 - 处理翻译相关操作
+   - 文档分析服务 - 分析文档内容
+   - 语言文件管理服务 - 处理语言文件
+   - 替换服务 - 执行文本替换操作
 3. **用户界面** - 界面生成与业务逻辑分离
+
+模块间通过回调函数或状态对象传递，确保功能完整性的同时实现代码模块化。
 
 这种设计具有以下优点：
 - 提高代码可维护性和可读性
