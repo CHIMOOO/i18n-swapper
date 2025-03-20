@@ -1491,6 +1491,7 @@ class BatchReplacementPanel {
       } else if (this.scanMode === 'translated') {
         currentItems = this.existingI18nCalls;
       } else if (this.scanMode === 'all') {
+        // 合并两个列表，并添加类型标记
         currentItems = [
           ...this.replacements.map(item => ({
             ...item,
@@ -1523,6 +1524,13 @@ class BatchReplacementPanel {
 
       // 更新面板内容
       await this.updatePanelContent();
+
+      // 发送消息到面板更新UI
+      this.panel?.webview.postMessage({
+        command: 'updateSelectionInUI',
+        selectedIndexes: this.selectedIndexes,
+        selectAll: !allSelected
+      });
     } catch (error) {
       console.error('切换全选状态时出错:', error);
       vscode.window.showErrorMessage(`操作失败: ${error.message}`);
@@ -1593,8 +1601,24 @@ class BatchReplacementPanel {
       // 如果提供了文件路径，先打开该文件
       let document;
       if (filePath) {
-        const uri = vscode.Uri.file(filePath);
+        // 获取工作区根目录
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        if (!workspaceFolders) {
+          throw new Error('未找到工作区文件夹');
+        }
+        const rootPath = workspaceFolders[0].uri.fsPath;
+
+        // 构建完整的文件路径
+        const fullPath = path.isAbsolute(filePath) ? filePath : path.join(rootPath, filePath);
+        
+        // 检查文件是否存在
+        if (!fs.existsSync(fullPath)) {
+          throw new Error(`文件不存在: ${filePath}`);
+        }
+
+        const uri = vscode.Uri.file(fullPath);
         document = await vscode.workspace.openTextDocument(uri);
+        
         // 在第一个窗口中打开文件
         await vscode.window.showTextDocument(document, {
           viewColumn: vscode.ViewColumn.One, // 指定在第一个窗口打开
