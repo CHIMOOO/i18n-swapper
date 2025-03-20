@@ -144,7 +144,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           width: 30px;
         }
         .text-cell {
-          max-width: 300px;
+          
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
@@ -522,7 +522,6 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         /* 改进文本单元格样式 */
         .text-cell {
           word-break: break-all;
-          max-width: 300px;
         }
 
         .text-highlight-trigger {
@@ -660,11 +659,11 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
                           value="${escapeHtml(item.i18nKey || '')}" placeholder="输入国际化键，用于翻译后自动插入">
                         <button class="translate-btn" data-index="${index}" title="翻译并保存到所有语言文件">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-                          翻译
+                          
                         </button>
                         <button class="replace-single-btn" data-index="${index}" title="替换此项">
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h8.5"/><path d="M13 3h8.5"/><path d="M18 7.5V12l2-2"/><path d="M18 7.5V3"/><path d="M16 6a4 4 0 0 0-4 4"/><path d="M11 10a4 4 0 0 0-4 4"/><path d="M14 22.5l-5.5-5.5 5.5-5.5c.59-.58.59-1.52 0-2.1-.58-.59-1.52-.59-2.1 0l-5.5 5.5c-.58.59-.58 1.53 0 2.12l5.5 5.5c.3.28.7.42 1.1.42.38 0 .77-.14 1.06-.42.56-.55.57-1.47-.06-2.04z"/></svg>
-                          替换
+                          
                         </button>`
                       }
                     </td>
