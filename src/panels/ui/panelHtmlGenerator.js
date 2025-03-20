@@ -1062,19 +1062,25 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
         const selectAllCheckbox = document.getElementById('select-all');
         selectAllCheckbox.addEventListener('change', function() {
           const isChecked = this.checked;
+          
+          // 在修改DOM前先通知后端状态变化
+          vscode.postMessage({
+            command: 'toggleSelectAll',
+            data: {}
+          });
+          
+          // 然后本地更新复选框状态
           document.querySelectorAll('.item-checkbox').forEach(checkbox => {
             checkbox.checked = isChecked;
-            
-            // 向VSCode发送消息
-            const index = parseInt(checkbox.getAttribute('data-index'));
-            vscode.postMessage({
-              command: 'toggleSelection',
-              data: {
-                index,
-                selected: isChecked
-              }
-            });
           });
+          
+          // 防止事件重复触发，设置一个标志
+          selectAllCheckbox.dataset.updating = "true";
+          
+          // 使用延时确保状态稳定
+          setTimeout(() => {
+            delete selectAllCheckbox.dataset.updating;
+          }, 100);
         });
         
         // 单项复选框
