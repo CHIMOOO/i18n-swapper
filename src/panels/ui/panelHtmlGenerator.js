@@ -30,8 +30,10 @@ const defaultsConfig = require('../../config/defaultsConfig'); // 引入默认�
  * @param {boolean} isConfigExpanded 配置部分是否展开
  * @param {Array} languageMappings 语言映射配置
  * @param {Array} existingI18nCalls 已存在的国际化调用
+ * @param {boolean} scanAllFiles 是否扫描所有文件
+ * @param {string} currentFilePath 当前文件路径
  */
-function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = [], scanAllFiles = false) {
+function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = [], scanAllFiles = false, currentFilePath = '') {
   // 获取配置
   const config = vscode.workspace.getConfiguration('i18n-swapper');
   const decorationStyle = context.decorationStyle || config.get('decorationStyle', 'suffix');
@@ -755,8 +757,9 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
           <div>
             扫描模式: ${scanPatterns.length > 0 ? escapeHtml(scanPatterns.join(', ')) : '默认模式'}
           </div>
+
           <div>
-            国际化文件: ${localesPaths.length > 0 ? escapeHtml(localesPaths.join(', ')) : '未设置'}
+            当前文件: ${currentFilePath ? escapeHtml(currentFilePath) : '未打开文件'}
           </div>
         </div>
         

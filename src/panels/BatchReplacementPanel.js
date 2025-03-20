@@ -597,6 +597,9 @@ class BatchReplacementPanel {
       // 获取语言映射配置
       const languageMappings = config.get('tencentTranslation.languageMappings', defaultsConfig.tencentTranslation.languageMappings);
 
+      // 获取当前文件路径
+      const currentFilePath = this.document ? this.getRelativePath(this.document.fileName) : '';
+
       // 提前加载每个I18n键的翻译值信息
       if (languageMappings && languageMappings.length > 0) {
         await this.loadI18nKeysStatus(languageMappings);
@@ -657,7 +660,8 @@ class BatchReplacementPanel {
         this.isConfigExpanded,
         languageMappings || [],
         this.existingI18nCalls || [],
-        this.scanAllFiles  // 添加扫描所有文件状态
+        this.scanAllFiles,  // 添加扫描所有文件状态
+        currentFilePath // 添加当前文件路径
       );
 
       // 更新面板内容
