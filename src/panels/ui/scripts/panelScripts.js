@@ -209,8 +209,9 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         dialogContent.style.color = 'var(--vscode-editor-foreground)';
         dialogContent.style.padding = '20px';
         dialogContent.style.borderRadius = '5px';
-        dialogContent.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.3)';
+        dialogContent.style.boxShadow = 'var(--vscode-button-background) 0px 0px 10px 10px';
         dialogContent.style.width = '300px';
+        dialogContent.style.border ='1px solid rgb(255 255 255 / 35%)';
         
         // 添加消息
         const messageElement = document.createElement('p');
