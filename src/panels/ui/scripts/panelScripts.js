@@ -39,48 +39,54 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     
     // 全选复选框
     const selectAllCheckbox = document.getElementById('select-all');
-    selectAllCheckbox.addEventListener('change', function() {
-      const isChecked = this.checked;
-      
-      // 获取当前可见项的索引（考虑筛选状态）
-      let visibleIndexes = [];
-      if (window.fileNameFilter && typeof window.fileNameFilter.getVisibleItemIndexes === 'function') {
-        visibleIndexes = window.fileNameFilter.getVisibleItemIndexes();
-      } else {
-        // 如果没有筛选功能，则选择所有项
-        document.querySelectorAll('.item-checkbox').forEach((checkbox, idx) => {
-          visibleIndexes.push(idx);
-        });
-      }
-      
-      // 在修改DOM前先通知后端状态变化，只更新可见项
-      vscode.postMessage({
-        command: 'toggleSelectVisible',
-        data: {
-          isChecked,
-          visibleIndexes
-        }
-      });
-      
-      // 然后本地更新复选框状态，只更新可见项的复选框
-      document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-        const index = parseInt(checkbox.getAttribute('data-index'));
-        const row = checkbox.closest('tr');
+    if (selectAllCheckbox) {
+      selectAllCheckbox.addEventListener('change', function() {
+        const isChecked = this.checked;
         
-        // 只更新可见行的复选框
-        if (row && row.getAttribute('data-filtered') !== 'hidden' && !row.classList.contains('hidden-row')) {
-          checkbox.checked = isChecked;
+        // 获取当前可见项的索引（考虑筛选状态）
+        let visibleIndexes = [];
+        const rows = document.querySelectorAll('#replacements-tbody tr:not(.i18n-status-row)');
+        
+        // 如果没有表格，尝试获取所有复选框
+        if (rows.length === 0) {
+          document.querySelectorAll('.item-checkbox').forEach((checkbox, idx) => {
+            const row = checkbox.closest('tr');
+            if (row && !row.classList.contains('hidden-row')) {
+              visibleIndexes.push(parseInt(checkbox.getAttribute('data-index')));
+            }
+          });
+        } else {
+          // 如果有表格，遍历行
+          for (let i = 0; i < rows.length; i++) {
+            if (!rows[i].classList.contains('hidden-row')) {
+              const index = parseInt(rows[i].getAttribute('data-index'));
+              if (!isNaN(index)) {
+                visibleIndexes.push(index);
+              }
+            }
+          }
         }
+        
+        console.log('全选/取消全选，可见索引:', visibleIndexes);
+        
+        // 在修改DOM前先通知后端状态变化，只更新可见项
+        vscode.postMessage({
+          command: 'toggleSelectVisible',
+          data: {
+            isChecked,
+            visibleIndexes
+          }
+        });
+        
+        // 然后本地更新复选框状态，只更新可见项的复选框
+        document.querySelectorAll('.item-checkbox').forEach(checkbox => {
+          const row = checkbox.closest('tr');
+          if (row && !row.classList.contains('hidden-row')) {
+            checkbox.checked = isChecked;
+          }
+        });
       });
-      
-      // 防止事件重复触发，设置一个标志
-      selectAllCheckbox.dataset.updating = "true";
-      
-      // 使用延时确保状态稳定
-      setTimeout(() => {
-        delete selectAllCheckbox.dataset.updating;
-      }, 100);
-    });
+    }
     
     // 单项复选框
     document.querySelectorAll('.item-checkbox').forEach(checkbox => {
@@ -141,7 +147,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     
     // 替换选中按钮点击事件
     document.getElementById('replace-selected').addEventListener('click', async function() {
-      const confirmed = await confirmAction('确定要替换选中的项目吗？此操作无法撤销。');
+      const confirmed = await confirmAction('确定要替换选中的项目吗？替换后仍需手动保存确认效果。');
       if (!confirmed) {
         return;
       }
@@ -154,7 +160,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
       for (let i = 0; i < checkboxes.length; i++) {
         // 检查是否选中且可见
         const row = checkboxes[i].closest('tr');
-        if (checkboxes[i].checked && !row.classList.contains('hidden')) {
+        if (checkboxes[i].checked && !row.classList.contains('hidden-row')) {
           selectedVisibleIndexes.push(i);
         }
       }
@@ -267,16 +273,16 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     
     // 替换按钮点击事件 - 替换所有
     document.getElementById('replace-all').addEventListener('click', async function() {
-      const confirmed = await confirmAction('确定要替换所有项目吗？替换后您仍需手动保存以确认效果。');
+      const confirmed = await confirmAction('确定要替换所有项目吗？替换后仍需手动保存确认效果。');
       if (!confirmed) {
         return;
       }
       
       // 获取当前可见的项目索引
       const visibleIndexes = [];
-      const rows = document.querySelectorAll('#replacement-table tbody tr:not(.i18n-status-row)');
+      const rows = document.querySelectorAll('#replacements-tbody tr:not(.i18n-status-row)');
       for (let i = 0; i < rows.length; i++) {
-        if (!rows[i].classList.contains('hidden')) {
+        if (!rows[i].classList.contains('hidden-row')) {
           visibleIndexes.push(parseInt(rows[i].getAttribute('data-index')));
         }
       }
