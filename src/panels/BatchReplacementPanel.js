@@ -150,177 +150,229 @@ class BatchReplacementPanel {
    * @param {Object} message 消息对象
    */
   async _handlePanelMessage(message) {
-    const {
-      command,
-      data
-    } = message;
+    console.log('收到面板消息:', message.command, message.data);
     try {
-      switch (command) {
-        case 'updateI18nKey':
-          this.updateI18nKey(data.index, data.key);
-          break;
-        case 'toggleSelection':
-          this.toggleItemSelection(data.index, data.selected);
-          break;
+      switch (message.command) {
         case 'toggleSelectAll':
-          await this.toggleSelectAll();
+          this.selectAllItems(true);
           break;
-        case 'performReplacements':
-          await this.performSelectedReplacements();
+          
+        case 'toggleSelectVisible':
+          // 处理可见项的全选/取消全选
+          if (message.data && Array.isArray(message.data.visibleIndexes)) {
+            this.selectVisibleItems(message.data.visibleIndexes, message.data.isChecked);
+          } else {
+            this.selectAllItems(true);
+          }
           break;
+          
+        case 'toggleSelection':
+          this.toggleItemSelection(message.data.index, message.data.selected);
+          break;
+          
+        case 'updateKey':
+        case 'updateI18nKey':
+          this.updateI18nKey(message.data.index, message.data.key);
+          break;
+          
+        case 'replaceSelected':
+          // 处理包含可见且选中的项
+          if (message.data && Array.isArray(message.data.selectedIndexes)) {
+            await this.performSelectedReplacements(message.data.selectedIndexes);
+          } else {
+            await this.performSelectedReplacements();
+          }
+          break;
+          
+        case 'replaceAll':
+        case 'replaceAllVisible':
+          // 处理可见项的替换
+          if (message.data && message.data.visibleOnly && Array.isArray(message.data.visibleIndexes)) {
+            await this.performVisibleReplacements(message.data.visibleIndexes);
+          } else {
+            await this.performAllReplacements();
+          }
+          break;
+          
         case 'refreshPanel':
           await this.refreshPanel();
           break;
+          
         case 'addPattern':
-          await this.addScanPattern(data.pattern);
+        case 'addScanPattern':
+          await this.addScanPattern(message.data.pattern);
           break;
+          
         case 'removePattern':
-          await this.removeScanPattern(data.pattern);
+        case 'removeScanPattern':
+          await this.removeScanPattern(message.data.pattern);
           break;
+          
         case 'selectLocalesFiles':
           await this.selectLocalesFiles();
           break;
+          
         case 'createLanguageFiles':
           await this.showLanguageSelector();
           break;
+          
         case 'saveTranslation':
-          await this.saveTranslation(data.filePath, data.key, data.value);
+          await this.saveTranslation(message.data.filePath, message.data.key, message.data.value);
           break;
+          
         case 'translateItem':
-          await this.translateItem(data.index, data.key);
+          await this.translateItem(message.data.index, message.data.key);
           break;
+          
         case 'openApiTranslation':
           await this.openApiTranslationConfig();
           break;
-        case 'addScanPattern':
-          await this.addScanPattern(data.pattern);
-          break;
-        case 'removeScanPattern':
-          await this.removeScanPattern(data.pattern);
-          break;
+          
         case 'selectLocaleFile':
           await this.selectLocaleFile();
           break;
+          
         case 'removeLocalePath':
-          await this.removeLocalePath(data.path);
+          await this.removeLocalePath(message.data.path);
           break;
+          
         case 'toggleConfig':
           this.isConfigExpanded = !this.isConfigExpanded;
           await this.updatePanelContent();
           break;
+          
         case 'updateDecorationStyle':
-          await this.highlightService.updateDecorationStyle(data.style);
+          await this.highlightService.updateDecorationStyle(message.data.style);
           break;
+          
         case 'updateDecorationStyles':
-          await this.highlightService.updateDecorationStyles(data);
+          await this.highlightService.updateDecorationStyles(message.data);
           break;
+          
         case 'updateShowPreviewInEdit':
-          await this.highlightService.updateShowPreviewInEdit(data.showPreview);
+          await this.highlightService.updateShowPreviewInEdit(message.data.showPreview);
           break;
-        case 'updateKey':
-          this.updateI18nKey(data.index, data.key);
-          break;
+          
         case 'checkI18nKeyStatus':
-          await this.checkI18nKeyStatus(data.index, data.key);
+          await this.checkI18nKeyStatus(message.data.index, message.data.key);
           break;
+          
         case 'openLanguageFile':
-          await this.openLanguageFile(data.filePath, data.key, data.languageCode);
+          await this.openLanguageFile(message.data.filePath, message.data.key, message.data.languageCode);
           break;
-        case 'replaceSelected':
-          await this.performSelectedReplacements();
-          break;
-        case 'replaceAll':
-          await this.performAllReplacements();
-          break;
+          
         case 'switchScanMode':
-          if (data.mode !== undefined) {
-            this.switchScanMode(data.mode);
+          if (message.data.mode !== undefined) {
+            this.switchScanMode(message.data.mode);
           } else {
             console.error('切换模式失败：未提供模式参数');
           }
           break;
+          
         case 'openI18nFile':
-          if (data.index !== undefined) {
-            await this.openI18nFile(data.index);
+          if (message.data.index !== undefined) {
+            await this.openI18nFile(message.data.index);
           } else {
             console.error('打开文件失败：未提供索引参数');
           }
           break;
+          
         case 'copyI18nKey':
-          if (data.index !== undefined) {
-            await this.copyI18nKey(data.index);
+          if (message.data.index !== undefined) {
+            await this.copyI18nKey(message.data.index);
           } else {
             console.error('复制键失败：未提供索引参数');
           }
           break;
+          
         case 'refreshScan':
           await this.refreshScan();
           break;
+          
         case 'updateConfig':
           await vscode.workspace.getConfiguration().update(
-            data.key,
-            data.value,
+            message.data.key,
+            message.data.value,
             vscode.ConfigurationTarget.Workspace
           );
-
+          
           // 如果是自动翻译相关设置，可能需要刷新
-          if (data.key.includes('autoGenerate') ||
-            data.key.includes('autoTranslate')) {
+          if (message.data.key.includes('autoGenerate') ||
+              message.data.key.includes('autoTranslate')) {
             // 更新内部缓存的配置
             this._loadConfiguration();
           }
           break;
+          
         case 'updateMissingKeyStyles':
-          await this.highlightService.updateMissingKeyStyles(data);
+          await this.highlightService.updateMissingKeyStyles(message.data);
           break;
+          
         case 'highlightSourceText':
-          const { start, end, index, filePath } = data;
+          const { start, end, index, filePath } = message.data;
           await this.highlightSourceText(start, end, index, filePath);
           break;
+          
         case 'replaceSingleItem':
-          await this.replaceSingleItem(data);
+          await this.replaceSingleItem(message.data);
           break;
+          
         case 'addI18nFunctionName':
-          await this.addI18nFunctionName(data.name);
+          await this.addI18nFunctionName(message.data.name);
           break;
+          
         case 'removeI18nFunctionName':
-          await this.removeI18nFunctionName(data.name);
+          await this.removeI18nFunctionName(message.data.name);
           break;
+          
         case 'updateOutputI18nFunctionName':
           try {
-            const {
-              functionName
-            } = data;
+            const functionName = message.data.functionName;
             if (functionName) {
               // 更新配置
               await vscode.workspace.getConfiguration('i18n-swapper').update('functionName', functionName, vscode.ConfigurationTarget.Workspace);
-
-              // 不要尝试更新上下文对象，它是不可扩展的
-              // this.context.outputI18nFunctionName = functionName; // 删除这行
-
-              // 更新内部状态（如果需要）
-              this.outputI18nFunctionName = functionName; // 使用实例变量而不是context
-
+              
+              // 更新内部状态
+              this.outputI18nFunctionName = functionName;
+              
               vscode.window.showInformationMessage(`已更新输出国际化函数名称为: ${functionName}`);
             }
           } catch (error) {
             vscode.window.showErrorMessage(`更新输出国际化函数名称失败: ${error.message}`);
           }
           break;
+          
         case 'addExcludePattern':
-          this.addExcludePattern(data.pattern);
+          this.addExcludePattern(message.data.pattern);
           break;
+          
         case 'removeExcludePattern':
-          this.removeExcludePattern(data.pattern);
+          this.removeExcludePattern(message.data.pattern);
           break;
+          
         case 'toggleScanAllFiles':
-          await this.toggleScanAllFiles(data.scanAllFiles);
+          await this.toggleScanAllFiles(message.data.scanAllFiles);
           break;
-        case 'refresh-panel':
-          await this.refreshPanel();
+          
+        case 'restoreFilterState':
+          // 处理筛选状态恢复
+          if (this.panel && message.data && message.data.filterValue) {
+            this.panel.webview.postMessage({
+              command: 'restoreFilterState',
+              data: {
+                filterValue: message.data.filterValue
+              }
+            });
+          }
           break;
+          
+        case 'updateFilterState':
+          // 处理筛选状态更新
+          console.log('筛选状态更新:', message.data);
+          break;
+          
         default:
-          console.log(`未处理的命令: ${command}`);
+          console.log(`未处理的命令: ${message.command}`);
       }
     } catch (error) {
       console.error('处理面板消息时出错:', error);

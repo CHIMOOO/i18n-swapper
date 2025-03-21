@@ -83,12 +83,16 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
       
       <script>
         // 确保面板模板中的fileNameFilter对象可在前端使用
-        window.fileNameFilter = ${JSON.stringify(fileNameFilter)};
-        
-        // 将fileNameFilter上的方法转换回函数
-        window.fileNameFilter.initialize = ${fileNameFilter.initialize.toString()};
-        window.fileNameFilter.handleFilter = ${fileNameFilter.handleFilter.toString()};
-        window.fileNameFilter.updateFilterInfo = ${fileNameFilter.updateFilterInfo.toString()};
+        window.fileNameFilter = {
+          currentFilterValue: ${JSON.stringify(fileNameFilter.currentFilterValue || '')},
+          initialize: ${fileNameFilter.initialize.toString()},
+          handleFilter: ${fileNameFilter.handleFilter.toString()},
+          updateFilterInfo: ${fileNameFilter.updateFilterInfo.toString()},
+          reapplyFilter: ${fileNameFilter.reapplyFilter.toString()},
+          getVisibleItemIndexes: ${fileNameFilter.getVisibleItemIndexes.toString()},
+          showFileNameDropdown: ${fileNameFilter.showFileNameDropdown.toString()},
+          hideFileNameDropdown: ${fileNameFilter.hideFileNameDropdown.toString()}
+        };
         
         ${scripts}
       </script>

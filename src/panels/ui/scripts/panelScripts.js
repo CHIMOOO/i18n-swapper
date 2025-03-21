@@ -42,15 +42,35 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     selectAllCheckbox.addEventListener('change', function() {
       const isChecked = this.checked;
       
-      // 在修改DOM前先通知后端状态变化
+      // 获取当前可见项的索引（考虑筛选状态）
+      let visibleIndexes = [];
+      if (window.fileNameFilter && typeof window.fileNameFilter.getVisibleItemIndexes === 'function') {
+        visibleIndexes = window.fileNameFilter.getVisibleItemIndexes();
+      } else {
+        // 如果没有筛选功能，则选择所有项
+        document.querySelectorAll('.item-checkbox').forEach((checkbox, idx) => {
+          visibleIndexes.push(idx);
+        });
+      }
+      
+      // 在修改DOM前先通知后端状态变化，只更新可见项
       vscode.postMessage({
-        command: 'toggleSelectAll',
-        data: {}
+        command: 'toggleSelectVisible',
+        data: {
+          isChecked,
+          visibleIndexes
+        }
       });
       
-      // 然后本地更新复选框状态
+      // 然后本地更新复选框状态，只更新可见项的复选框
       document.querySelectorAll('.item-checkbox').forEach(checkbox => {
-        checkbox.checked = isChecked;
+        const index = parseInt(checkbox.getAttribute('data-index'));
+        const row = checkbox.closest('tr');
+        
+        // 只更新可见行的复选框
+        if (row && row.getAttribute('data-filtered') !== 'hidden' && !row.classList.contains('hidden-row')) {
+          checkbox.checked = isChecked;
+        }
       });
       
       // 防止事件重复触发，设置一个标志
@@ -120,23 +140,173 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     }
     
     // 替换选中按钮点击事件
-    document.getElementById('replace-selected').addEventListener('click', () => {
+    document.getElementById('replace-selected').addEventListener('click', async function() {
+      const confirmed = await confirmAction('确定要替换选中的项目吗？此操作无法撤销。');
+      if (!confirmed) {
+        return;
+      }
+      
+      // 获取可见且选中的项目索引
+      const selectedVisibleIndexes = [];
+      
+      // 获取表格中所有可见行
+      const checkboxes = document.querySelectorAll('.item-checkbox');
+      for (let i = 0; i < checkboxes.length; i++) {
+        // 检查是否选中且可见
+        const row = checkboxes[i].closest('tr');
+        if (checkboxes[i].checked && !row.classList.contains('hidden')) {
+          selectedVisibleIndexes.push(i);
+        }
+      }
+      
+      if (selectedVisibleIndexes.length === 0) {
+        showToast('请先选择要替换的项目', 'warning');
+        return;
+      }
+      
+      // 发送替换选中项命令
       vscode.postMessage({
-        command: 'replaceSelected'
+        command: 'replaceSelected',
+        data: {
+          selectedIndexes: selectedVisibleIndexes
+        }
       });
     });
     
-    // 替换所有按钮点击事件
-    document.getElementById('replace-all').addEventListener('click', () => {
+    // 确认操作函数
+    function confirmAction(message) {
+      // 创建自定义确认对话框
+      return new Promise((resolve) => {
+        // 检查是否已存在确认框
+        let existingDialog = document.getElementById('custom-confirm-dialog');
+        if (existingDialog) {
+          existingDialog.remove();
+        }
+        
+        // 创建确认对话框容器
+        const dialog = document.createElement('div');
+        dialog.id = 'custom-confirm-dialog';
+        dialog.style.position = 'fixed';
+        dialog.style.top = '0';
+        dialog.style.left = '0';
+        dialog.style.right = '0';
+        dialog.style.bottom = '0';
+        dialog.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+        dialog.style.display = 'flex';
+        dialog.style.justifyContent = 'center';
+        dialog.style.alignItems = 'center';
+        dialog.style.zIndex = '9999';
+        
+        // 创建对话框内容
+        const dialogContent = document.createElement('div');
+        dialogContent.style.backgroundColor = 'var(--vscode-editor-background)';
+        dialogContent.style.color = 'var(--vscode-editor-foreground)';
+        dialogContent.style.padding = '20px';
+        dialogContent.style.borderRadius = '5px';
+        dialogContent.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.3)';
+        dialogContent.style.width = '300px';
+        
+        // 添加消息
+        const messageElement = document.createElement('p');
+        messageElement.textContent = message;
+        messageElement.style.marginBottom = '20px';
+        dialogContent.appendChild(messageElement);
+        
+        // 添加按钮容器
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.display = 'flex';
+        buttonContainer.style.justifyContent = 'flex-end';
+        
+        // 确认按钮
+        const confirmButton = document.createElement('button');
+        confirmButton.textContent = '确认';
+        confirmButton.style.backgroundColor = 'var(--vscode-button-background)';
+        confirmButton.style.color = 'var(--vscode-button-foreground)';
+        confirmButton.style.border = 'none';
+        confirmButton.style.padding = '5px 10px';
+        confirmButton.style.marginLeft = '10px';
+        confirmButton.style.cursor = 'pointer';
+        confirmButton.style.borderRadius = '3px';
+        
+        // 取消按钮
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = '取消';
+        cancelButton.style.backgroundColor = 'var(--vscode-button-secondaryBackground, #333)';
+        cancelButton.style.color = 'var(--vscode-button-secondaryForeground, #fff)';
+        cancelButton.style.border = 'none';
+        cancelButton.style.padding = '5px 10px';
+        cancelButton.style.cursor = 'pointer';
+        cancelButton.style.borderRadius = '3px';
+        
+        // 添加按钮事件
+        confirmButton.onclick = () => {
+          dialog.remove();
+          resolve(true);
+        };
+        
+        cancelButton.onclick = () => {
+          dialog.remove();
+          resolve(false);
+        };
+        
+        // 添加按钮到容器
+        buttonContainer.appendChild(cancelButton);
+        buttonContainer.appendChild(confirmButton);
+        dialogContent.appendChild(buttonContainer);
+        
+        // 添加内容到对话框
+        dialog.appendChild(dialogContent);
+        
+        // 添加对话框到文档
+        document.body.appendChild(dialog);
+        
+        // 聚焦确认按钮
+        confirmButton.focus();
+      });
+    }
+    
+    // 替换按钮点击事件 - 替换所有
+    document.getElementById('replace-all').addEventListener('click', async function() {
+      const confirmed = await confirmAction('确定要替换所有项目吗？替换后您仍需手动保存以确认效果。');
+      if (!confirmed) {
+        return;
+      }
+      
+      // 获取当前可见的项目索引
+      const visibleIndexes = [];
+      const rows = document.querySelectorAll('#replacement-table tbody tr:not(.i18n-status-row)');
+      for (let i = 0; i < rows.length; i++) {
+        if (!rows[i].classList.contains('hidden')) {
+          visibleIndexes.push(parseInt(rows[i].getAttribute('data-index')));
+        }
+      }
+      
+      // 判断是否有筛选
+      const hasFilter = window.fileNameFilter && window.fileNameFilter.currentFilterValue && window.fileNameFilter.currentFilterValue.trim() !== '';
+      
+      // 发送替换所有命令
       vscode.postMessage({
-        command: 'replaceAll'
+        command: 'replaceAll',
+        data: {
+          visibleOnly: hasFilter,
+          visibleIndexes: hasFilter ? visibleIndexes : []
+        }
       });
     });
     
     // 刷新按钮
     document.getElementById('refresh-panel').addEventListener('click', function() {
+      // 记录当前筛选状态，刷新后恢复
+      let currentFilter = '';
+      if (window.fileNameFilter) {
+        currentFilter = window.fileNameFilter.currentFilterValue || '';
+      }
+      
       vscode.postMessage({
-        command: 'refreshPanel'
+        command: 'refreshPanel',
+        data: {
+          currentFilter: currentFilter
+        }
       });
     });
     
@@ -346,12 +516,24 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
       if (message.command === 'updateSelection') {
         const { selectedIndexes } = message.data;
         
-        // 更新全选复选框状态
+        // 更新全选复选框状态（考虑筛选）
         const allItems = document.querySelectorAll('.item-checkbox');
-        const selectAll = selectedIndexes.length === allItems.length;
+        let visibleItems = [];
+        
+        // 获取当前可见项
+        allItems.forEach(checkbox => {
+          const row = checkbox.closest('tr');
+          if (row && row.getAttribute('data-filtered') !== 'hidden' && !row.classList.contains('hidden-row')) {
+            visibleItems.push(parseInt(checkbox.getAttribute('data-index')));
+          }
+        });
+        
+        // 检查所有可见项是否都被选中
+        const allVisibleSelected = visibleItems.length > 0 && 
+          visibleItems.every(index => selectedIndexes.includes(index));
         
         if (selectAllCheckbox) {
-          selectAllCheckbox.checked = selectAll;
+          selectAllCheckbox.checked = allVisibleSelected;
         }
         
         // 更新所有项的选中状态
@@ -362,6 +544,15 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
       } else if (message.command === 'updateI18nKeyStatus') {
         // 更新国际化键的状态
         updateI18nKeyStatusInUI(message.data);
+      } else if (message.command === 'restoreFilterState') {
+        // 恢复筛选状态
+        if (window.fileNameFilter && message.data && message.data.filterValue) {
+          window.fileNameFilter.currentFilterValue = message.data.filterValue;
+          // 延迟执行以确保DOM已更新
+          setTimeout(() => {
+            window.fileNameFilter.reapplyFilter();
+          }, 200);
+        }
       }
     });
     
@@ -704,9 +895,18 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
 
     // 扫描所有文件切换
     document.getElementById('scan-all-files').addEventListener('change', function() {
+      // 记录当前筛选状态，刷新后恢复
+      let currentFilter = '';
+      if (window.fileNameFilter) {
+        currentFilter = window.fileNameFilter.currentFilterValue || '';
+      }
+      
       vscode.postMessage({
         command: 'toggleScanAllFiles',
-        data: { scanAllFiles: this.checked }
+        data: { 
+          scanAllFiles: this.checked,
+          currentFilter: currentFilter
+        }
       });
     });
 
@@ -718,7 +918,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         window.fileNameFilter.initialize();
       }
     });
-
+    
     // 为了确保即使在DOMContentLoaded之后加载脚本，也能正确初始化
     // 如果DOM已经加载完成，则直接初始化
     if (document.readyState === 'complete' || document.readyState === 'loaded' || document.readyState === 'interactive') {
@@ -726,7 +926,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         window.fileNameFilter.initialize();
       }
     }
-
+    
     // 监听扫描所有文件模式切换，重新初始化筛选功能
     document.getElementById('scan-all-files').addEventListener('change', function() {
       // 延迟执行，确保DOM已更新
@@ -736,10 +936,28 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         }
       }, 500);
     });
-
+    
     // 监听模式切换按钮点击，重新初始化筛选功能
     document.querySelectorAll('.mode-button').forEach(button => {
       button.addEventListener('click', function() {
+        // 记录当前筛选状态
+        let currentFilter = '';
+        if (window.fileNameFilter) {
+          currentFilter = window.fileNameFilter.currentFilterValue || '';
+        }
+        
+        // 获取模式
+        const mode = this.getAttribute('data-mode');
+        if (mode) {
+          vscode.postMessage({
+            command: 'switchScanMode',
+            data: { 
+              mode: mode,
+              currentFilter: currentFilter
+            }
+          });
+        }
+        
         // 延迟执行，确保DOM已更新
         setTimeout(() => {
           if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
@@ -748,6 +966,60 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         }, 500);
       });
     });
+
+    // 显示提示信息
+    function showToast(message, type = 'info') {
+      // 创建或获取现有的toast容器
+      let toastContainer = document.getElementById('toast-container');
+      if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.id = 'toast-container';
+        toastContainer.style.position = 'fixed';
+        toastContainer.style.top = '10px';
+        toastContainer.style.right = '10px';
+        toastContainer.style.zIndex = '1000';
+        document.body.appendChild(toastContainer);
+      }
+      
+      // 创建新的toast
+      const toast = document.createElement('div');
+      toast.className = 'toast toast-' + type;
+      toast.innerHTML = message;
+      
+      // 设置toast样式
+      toast.style.backgroundColor = type === 'info' ? '#4CAF50' : type === 'warning' ? '#ff9800' : '#f44336';
+      toast.style.color = 'white';
+      toast.style.padding = '10px';
+      toast.style.borderRadius = '5px';
+      toast.style.marginBottom = '5px';
+      toast.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+      toast.style.minWidth = '200px';
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.5s';
+      
+      // 添加到容器
+      toastContainer.appendChild(toast);
+      
+      // 显示toast
+      setTimeout(() => {
+        toast.style.opacity = '1';
+      }, 10);
+      
+      // 3秒后移除
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => {
+          if (toastContainer.contains(toast)) {
+            toastContainer.removeChild(toast);
+          }
+          
+          // 如果没有更多toast，移除容器
+          if (toastContainer.children.length === 0) {
+            document.body.removeChild(toastContainer);
+          }
+        }, 500);
+      }, 3000);
+    }
   `;
 }
 
