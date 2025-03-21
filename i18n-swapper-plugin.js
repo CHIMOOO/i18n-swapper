@@ -539,7 +539,7 @@ class BatchReplacementPanel {
             margin-bottom: 10px;
             background-color: var(--vscode-input-background);
             color: var(--vscode-input-foreground);
-            border: 1px solid var(--vscode-input-border);
+            border: 1px solid var(--vscode-panel-border);
           }
           button {
             padding: 5px 10px;

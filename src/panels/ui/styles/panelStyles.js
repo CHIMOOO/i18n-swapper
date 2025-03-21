@@ -77,7 +77,7 @@ function getPanelStyles() {
     .i18n-key-input {
       background-color: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border);
+      border: 1px solid var(--vscode-panel-border);
       padding: 3px 5px;
       width: 120px;
     }
@@ -215,16 +215,20 @@ function getPanelStyles() {
       display: flex;
       flex-wrap: wrap;
     }
-     .pattern-list li,.locale-path-item span,#i18n-function-names .function-name-item {
+     .pattern-list li,.locale-path-item span,.function-name-item {
     padding: 0 0 0 8px;
         margin-right: 8px;
     }
+        .function-name-item.locale-path-item span{
+            padding-left:0;
+        }
+
        .pattern-list li button,.locale-path-item .remove-locale-path,#i18n-function-names .function-name-item button {
     background:oklch(0.396 0.141 25.723);
         padding: 5px 5px;
     }
-        #i18n-function-names .function-name-item{
-            border: 1px solid var(--vscode-input-border);
+       .function-name-item,.locale-path-item,.pattern-item{
+            border: 1px solid var(--vscode-panel-border);
 border-radius: 3px;
         }
      
@@ -233,15 +237,14 @@ border-radius: 3px;
 width: 16px;
 fill: #d6d6dd;
 }
-      .pattern-list li  span,#i18n-function-names .function-name-item span{
+      .pattern-list li  span,.function-name-item span{
           margin-right: 10px;
       }
     .pattern-item, .locale-path-item {
       display: flex;
       align-items: center;
       margin-bottom: 5px;
-      padding: 3px;
-      border: 1px solid var(--vscode-input-border);
+      border: 1px solid var(--vscode-panel-border);
       border-radius: 3px;
     }
     .pattern-item span, .locale-path-item span {
@@ -260,7 +263,7 @@ fill: #d6d6dd;
       padding: 3px 5px;
       background-color: var(--vscode-input-background);
       color: var(--vscode-input-foreground);
-      border: 1px solid var(--vscode-input-border);
+      border: 1px solid var(--vscode-panel-border);
     }
     .collapsible-section {
       cursor: pointer;

@@ -304,7 +304,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
           flex: 1;
           width:120px;
           padding: 6px 8px;
-          border: 1px solid var(--vscode-input-border);
+          border: 1px solid var(--vscode-panel-border);
           background-color: var(--vscode-input-background);
           color: var(--vscode-input-foreground);
           border-radius: 4px;
