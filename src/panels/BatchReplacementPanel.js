@@ -1087,8 +1087,6 @@ class BatchReplacementPanel {
         return;
       }
 
-      // 创建编辑操作
-      const workspaceEdit = new vscode.WorkspaceEdit();
       let totalItems = 0;
 
       // 获取工作区根目录
@@ -1159,6 +1157,10 @@ class BatchReplacementPanel {
             const quoteType = config.get('quoteType', 'single');
             const quote = quoteType === 'single' ? "'" : '"';
             
+            // 为每个文件创建独立的工作区编辑对象
+            const workspaceEdit = new vscode.WorkspaceEdit();
+            let fileItemCount = 0;
+            
             // 处理每个替换项
             for (const item of fileItems) {
               if (!item.i18nKey) continue;
@@ -1186,7 +1188,18 @@ class BatchReplacementPanel {
                 replacementResult.replacementText
               );
               
-              totalItems++;
+              fileItemCount++;
+            }
+            
+            // 为每个文件单独应用编辑，确保每个文件的操作可以独立撤销
+            if (fileItemCount > 0) {
+              const success = await vscode.workspace.applyEdit(workspaceEdit);
+              if (success) {
+                totalItems += fileItemCount;
+                vscode.window.showInformationMessage(`文件 ${path.basename(filePath)} 已替换 ${fileItemCount} 处文本`);
+              } else {
+                vscode.window.showWarningMessage(`文件 ${path.basename(filePath)} 替换失败`);
+              }
             }
             
             processedFiles++;
@@ -1197,12 +1210,9 @@ class BatchReplacementPanel {
         }
       });
 
-      // 执行所有替换
-      const success = await vscode.workspace.applyEdit(workspaceEdit);
-
-      // 显示结果
-      if (success) {
-        vscode.window.showInformationMessage(`已替换 ${totalItems} 处文本`);
+      // 显示总结果
+      if (totalItems > 0) {
+        vscode.window.showInformationMessage(`共替换了 ${totalItems} 处文本，跨 ${Object.keys(itemsByFile).length} 个文件`);
 
         // 更新面板显示
         if (this.panel) {
@@ -1215,7 +1225,7 @@ class BatchReplacementPanel {
         // 刷新面板
         await this.refreshPanel();
       } else {
-        vscode.window.showErrorMessage('批量替换失败');
+        vscode.window.showWarningMessage('没有成功替换任何文本');
       }
     } catch (error) {
       console.error('执行多文件替换时出错:', error);
@@ -2391,8 +2401,6 @@ class BatchReplacementPanel {
         return;
       }
 
-      // 创建编辑操作
-      const workspaceEdit = new vscode.WorkspaceEdit();
       let totalItems = 0;
 
       // 获取工作区根目录
@@ -2463,6 +2471,10 @@ class BatchReplacementPanel {
             const quoteType = config.get('quoteType', 'single');
             const quote = quoteType === 'single' ? "'" : '"';
             
+            // 为每个文件创建独立的工作区编辑对象
+            const workspaceEdit = new vscode.WorkspaceEdit();
+            let fileItemCount = 0;
+            
             // 处理每个替换项
             for (const item of fileItems) {
               if (!item.i18nKey) continue;
@@ -2490,26 +2502,36 @@ class BatchReplacementPanel {
                 replacementResult.replacementText
               );
               
-              totalItems++;
+              fileItemCount++;
+            }
+            
+            // 为每个文件单独应用编辑，确保每个文件的操作可以独立撤销
+            if (fileItemCount > 0) {
+              const success = await vscode.workspace.applyEdit(workspaceEdit);
+              if (success) {
+                totalItems += fileItemCount;
+                vscode.window.showInformationMessage(`文件 ${path.basename(filePath)} 已替换 ${fileItemCount} 处文本`);
+              } else {
+                vscode.window.showWarningMessage(`文件 ${path.basename(filePath)} 替换失败`);
+              }
             }
             
             processedFiles++;
           } catch (error) {
             console.error(`处理文件 ${filePath} 时出错:`, error);
-            throw new Error(`处理文件 ${path.basename(filePath)} 时出错: ${error.message}`);
+            vscode.window.showErrorMessage(`处理文件 ${path.basename(filePath)} 时出错: ${error.message}`);
           }
         }
       });
 
-      // 应用所有编辑
-      const success = await vscode.workspace.applyEdit(workspaceEdit);
-      if (success) {
-        vscode.window.showInformationMessage(`成功替换 ${totalItems} 个项目`);
+      // 显示总结果
+      if (totalItems > 0) {
+        vscode.window.showInformationMessage(`共替换了 ${totalItems} 处文本，跨 ${Object.keys(itemsByFile).length} 个文件`);
         // 刷新面板
         await this.refreshPanel();
         return true;
       } else {
-        vscode.window.showErrorMessage('无法应用替换编辑');
+        vscode.window.showWarningMessage('没有成功替换任何文本');
         return false;
       }
     } catch (error) {
