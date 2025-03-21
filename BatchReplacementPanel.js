@@ -194,189 +194,249 @@ class BatchReplacementPanel {
    * @param {Object} message 消息对象
    */
   async _handlePanelMessage(message) {
-    // console.log('面板消息:', message);
-    
+    console.log('收到面板消息:', message.command, message.data);
     try {
-      const { command, data } = message;
-      
-      switch (command) {
-        case 'addPattern':
-          await this.addScanPattern(data.pattern);
-          break;
-          
-        case 'removePattern':
-          await this.removeScanPattern(data.pattern);
-          break;
-          
-        case 'selectLocalesFile':
-          await this.selectLocaleFile();
-          break;
-          
-        case 'removeLocalePath':
-          await this.removeLocalePath(data.path);
-          break;
-          
-        case 'switchMode':
-          await this.switchScanMode(data.mode, data.currentFilter);
-          break;
-          
-        case 'switchScanMode':
-          await this.switchScanMode(data.mode, data.currentFilter);
-          break;
-          
-        case 'openI18nFile':
-          await this.openI18nFile(data.index);
-          break;
-          
-        case 'copyI18nKey':
-          await this.copyI18nKey(data.index);
-          break;
-          
-        case 'refreshScan':
-          await this.refreshScan();
-          break;
-          
-        case 'refreshPanel':
-          await this.refreshPanel(data.currentFilter);
-          break;
-          
+      switch (message.command) {
         case 'toggleSelectAll':
-          await this.toggleSelectAll();
+          this.selectAllItems(true);
           break;
           
+        case 'toggleSelectVisible':
+          // 处理可见项的全选/取消全选
+          if (message.data && Array.isArray(message.data.visibleIndexes)) {
+            this.selectVisibleItems(message.data.visibleIndexes, message.data.isChecked);
+          } else {
+            this.selectAllItems(true);
+          }
+          break;
+          
+        case 'toggleSelection':
+          this.toggleItemSelection(message.data.index, message.data.selected);
+          break;
+          
+        case 'updateKey':
         case 'updateI18nKey':
-          this.updateI18nKey(data.index, data.key);
-          break;
-          
-        case 'toggleItemSelection':
-          this.toggleItemSelection(data.index, data.selected);
-          break;
-          
-        case 'performSelectedReplacements':
-          await this.performSelectedReplacements(data.selectedIndexes);
+          this.updateI18nKey(message.data.index, message.data.key);
           break;
           
         case 'replaceSelected':
-          await this.performSelectedReplacements(data.selectedIndexes);
+          // 处理包含可见且选中的项
+          if (message.data && Array.isArray(message.data.selectedIndexes)) {
+            await this.performSelectedReplacements(message.data.selectedIndexes);
+          } else {
+            await this.performSelectedReplacements();
+          }
           break;
           
         case 'replaceAll':
-          if (data.visibleOnly && Array.isArray(data.visibleIndexes)) {
-            await this.performVisibleReplacements(data.visibleIndexes);
+        case 'replaceAllVisible':
+          // 处理可见项的替换
+          if (message.data && message.data.visibleOnly && Array.isArray(message.data.visibleIndexes)) {
+            await this.performVisibleReplacements(message.data.visibleIndexes);
           } else {
             await this.performAllReplacements();
           }
           break;
           
-        case 'performAllReplacements':
-          await this.performAllReplacements();
+        case 'refreshPanel':
+          await this.refreshPanel();
+          break;
+          
+        case 'addPattern':
+        case 'addScanPattern':
+          await this.addScanPattern(message.data.pattern);
+          break;
+          
+        case 'removePattern':
+        case 'removeScanPattern':
+          await this.removeScanPattern(message.data.pattern);
+          break;
+          
+        case 'selectLocalesFiles':
+          await this.selectLocalesFiles();
+          break;
+          
+        case 'createLanguageFiles':
+          await this.showLanguageSelector();
+          break;
+          
+        case 'saveTranslation':
+          await this.saveTranslation(message.data.filePath, message.data.key, message.data.value);
           break;
           
         case 'translateItem':
-          await this.translateItem(data.index, data.userInputKey);
-          break;
-          
-        case 'highlightSourceText':
-          await this.highlightSourceText(data.start, data.end, data.index, data.filePath);
-          break;
-          
-        case 'highlightText':
-          await this.highlightSourceText(data.start, data.end, data.index, data.filePath);
-          break;
-          
-        case 'applyReplacements':
-          await this.applyAllReplacements();
-          break;
-          
-        case 'replaceSingleItem':
-          await this.replaceSingleItem(data);
-          break;
-          
-        case 'updateConfiguration':
-          await this.updateConfiguration(data.config);
-          break;
-          
-        case 'updateGeneralConfig':
-          await this.updateGeneralConfig(data.config);
-          break;
-          
-        case 'addI18nFunctionName':
-          await this.addI18nFunctionName(data.name);
-          break;
-          
-        case 'removeI18nFunctionName':
-          await this.removeI18nFunctionName(data.name);
-          break;
-          
-        case 'toggleConfigExpand':
-          this.isConfigExpanded = data.expanded;
-          this.updatePanelContent();
-          break;
-          
-        case 'checkI18nKeyStatus':
-          await this.checkI18nKeyStatus(data.index, data.key);
-          break;
-          
-        case 'toggleScanAllFiles':
-          await this.toggleScanAllFiles(data.scanAllFiles);
-          break;
-          
-        case 'performVisibleReplacements':
-          await this.performVisibleReplacements(data.visibleIndexes);
-          break;
-          
-        case 'openLanguageFile':
-          await this.openLanguageFile(data.filePath, data.key, data.languageCode);
+          await this.translateItem(message.data.index, message.data.key);
           break;
           
         case 'openApiTranslation':
           await this.openApiTranslationConfig();
           break;
           
-        case 'updateStyleConfig':
-          await this.updateStyleConfiguration(data.config);
+        case 'selectLocaleFile':
+          await this.selectLocaleFile();
           break;
           
-        case 'updateMissingKeyStyle':
-          await this.updateMissingKeyStyle(data.config);
+        case 'removeLocalePath':
+          await this.removeLocalePath(message.data.path);
+          break;
+          
+        case 'toggleConfig':
+          this.isConfigExpanded = !this.isConfigExpanded;
+          await this.updatePanelContent();
+          break;
+          
+        case 'updateDecorationStyle':
+          await this.highlightService.updateDecorationStyle(message.data.style);
+          break;
+          
+        case 'updateDecorationStyles':
+          await this.highlightService.updateDecorationStyles(message.data);
+          break;
+          
+        case 'updateShowPreviewInEdit':
+          await this.highlightService.updateShowPreviewInEdit(message.data.showPreview);
+          break;
+          
+        case 'checkI18nKeyStatus':
+          await this.checkI18nKeyStatus(message.data.index, message.data.key);
+          break;
+          
+        case 'openLanguageFile':
+          await this.openLanguageFile(message.data.filePath, message.data.key, message.data.languageCode);
+          break;
+          
+        case 'switchScanMode':
+          if (message.data.mode !== undefined) {
+            await this.switchScanMode(message.data.mode, message.data.currentFilter);
+          } else {
+            console.error('切换模式失败：未提供模式参数');
+          }
+          break;
+          
+        case 'openI18nFile':
+          if (message.data.index !== undefined) {
+            await this.openI18nFile(message.data.index);
+          } else {
+            console.error('打开文件失败：未提供索引参数');
+          }
+          break;
+          
+        case 'copyI18nKey':
+          if (message.data.index !== undefined) {
+            await this.copyI18nKey(message.data.index);
+          } else {
+            console.error('复制键失败：未提供索引参数');
+          }
+          break;
+          
+        case 'refreshScan':
+          await this.refreshScan();
+          break;
+          
+        case 'updateConfig':
+          await vscode.workspace.getConfiguration().update(
+            message.data.key,
+            message.data.value,
+            vscode.ConfigurationTarget.Workspace
+          );
+          
+          // 如果是自动翻译相关设置，可能需要刷新
+          if (message.data.key.includes('autoGenerate') ||
+              message.data.key.includes('autoTranslate')) {
+            // 更新内部缓存的配置
+            this._loadConfiguration();
+          }
+          break;
+          
+        case 'updateMissingKeyStyles':
+          await this.highlightService.updateMissingKeyStyles(message.data);
+          break;
+          
+        case 'highlightSourceText':
+          const { start, end, index, filePath } = message.data;
+          await this.highlightSourceText(start, end, index, filePath);
+          break;
+          
+        case 'replaceSingleItem':
+          await this.replaceSingleItem(message.data);
+          break;
+          
+        case 'addI18nFunctionName':
+          await this.addI18nFunctionName(message.data.name);
+          break;
+          
+        case 'removeI18nFunctionName':
+          await this.removeI18nFunctionName(message.data.name);
+          break;
+          
+        case 'updateOutputI18nFunctionName':
+          try {
+            const functionName = message.data.functionName;
+            if (functionName) {
+              // 更新配置
+              await vscode.workspace.getConfiguration('i18n-swapper').update('functionName', functionName, vscode.ConfigurationTarget.Workspace);
+              
+              // 更新内部状态
+              this.outputI18nFunctionName = functionName;
+              
+              vscode.window.showInformationMessage(`已更新输出国际化函数名称为: ${functionName}`);
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(`更新输出国际化函数名称失败: ${error.message}`);
+          }
           break;
           
         case 'addExcludePattern':
-          await this.addExcludePattern(data.pattern);
+          this.addExcludePattern(message.data.pattern);
           break;
           
         case 'removeExcludePattern':
-          await this.removeExcludePattern(data.pattern);
+          this.removeExcludePattern(message.data.pattern);
           break;
           
-        case 'addIncludePattern':
-          await this.addIncludePattern(data.pattern);
-          break;
-          
-        case 'removeIncludePattern':
-          await this.removeIncludePattern(data.pattern);
+        case 'toggleScanAllFiles':
+          await this.toggleScanAllFiles(message.data.scanAllFiles);
           break;
           
         case 'selectIncludeFile':
-          await this.selectIncludeFile(false);
+          await this.selectIncludeFile();
           break;
           
-        case 'selectIncludeFolder':
-          await this.selectIncludeFile(true);
+        case 'addIncludePattern':
+          if (message.data && message.data.pattern) {
+            await this.addIncludePattern(message.data.pattern);
+          }
           break;
-        
-        case 'updateOutputFunctionName':
-          await this.updateOutputFunctionName(data.name);
+          
+        case 'removeIncludePattern':
+          if (message.data && message.data.pattern) {
+            await this.removeIncludePattern(message.data.pattern);
+          }
+          break;
+          
+        case 'restoreFilterState':
+          // 处理筛选状态恢复
+          if (this.panel && message.data && message.data.filterValue) {
+            this.panel.webview.postMessage({
+              command: 'restoreFilterState',
+              data: {
+                filterValue: message.data.filterValue
+              }
+            });
+          }
           break;
           
         case 'updateFilterState':
-          // 保存筛选状态到类属性，以便在更新面板时保持
-          this.filterState = data;
+          // 处理筛选状态更新
+          console.log('筛选状态更新:', message.data);
           break;
+          
+        default:
+          console.log(`未处理的命令: ${message.command}`);
       }
     } catch (error) {
       console.error('处理面板消息时出错:', error);
-      vscode.window.showErrorMessage(`处理面板操作时出错: ${error.message}`);
+      vscode.window.showErrorMessage(`处理操作失败: ${error.message}`);
     }
   }
 
@@ -718,9 +778,8 @@ class BatchReplacementPanel {
 
   /**
    * 刷新面板
-   * @param {string} currentFilter 当前的筛选值
    */
-  async refreshPanel(currentFilter) {
+  async refreshPanel() {
     try {
       this.selectedIndexes = []; // 清空选中项
       
@@ -750,20 +809,6 @@ class BatchReplacementPanel {
             
             // 更新面板内容
             await this.updatePanelContent();
-            
-            // 如果有筛选值，恢复筛选状态
-            if (currentFilter && this.panel) {
-              // 延迟发送恢复筛选状态的消息，确保面板内容已更新
-              setTimeout(() => {
-                console.log(`恢复筛选状态: ${currentFilter}`);
-                this.panel.webview.postMessage({
-                  command: 'restoreFilterState',
-                  data: {
-                    filterValue: currentFilter
-                  }
-                });
-              }, 200);
-            }
           } catch (error) {
             console.error('刷新工作区文件时出错:', error);
             throw error;
@@ -2153,7 +2198,7 @@ class BatchReplacementPanel {
     
     if (!excludeFiles.includes(pattern)) {
       excludeFiles.push(pattern);
-      await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
+      await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
       this.refreshPanel();
     }
   }
@@ -2164,7 +2209,7 @@ class BatchReplacementPanel {
     let excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
     
     excludeFiles = excludeFiles.filter(p => p !== pattern);
-    await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
+    await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
     this.refreshPanel();
   }
   
@@ -2175,7 +2220,7 @@ class BatchReplacementPanel {
     
     if (!includeFiles.includes(pattern)) {
       includeFiles.push(pattern);
-      await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
+      await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
       this.refreshPanel();
     }
   }
@@ -2186,7 +2231,7 @@ class BatchReplacementPanel {
     let includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
     
     includeFiles = includeFiles.filter(p => p !== pattern);
-    await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
+    await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
     this.refreshPanel();
   }
   
@@ -2216,16 +2261,15 @@ class BatchReplacementPanel {
   
   /**
    * 选择要包含的文件或文件夹
-   * @param {boolean} folderOnly 是否只选择文件夹
    */
-  async selectIncludeFile(folderOnly = false) {
+  async selectIncludeFile() {
     try {
       // 创建打开文件对话框选项
       const options = {
-        canSelectFiles: !folderOnly,
-        canSelectFolders: folderOnly,
+        canSelectFiles: true,
+        canSelectFolders: true,
         canSelectMany: true,
-        openLabel: folderOnly ? '选择要包含的文件夹' : '选择要包含的文件',
+        openLabel: '选择要包含的文件或文件夹',
         filters: {
           '所有文件': ['*']
         }
@@ -2240,47 +2284,24 @@ class BatchReplacementPanel {
         const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
         const updatedIncludeFiles = [...includeFiles]; // 创建新数组，避免直接修改原始数组
         
-        const fs = require('fs');
-        let addedFiles = 0;
-        let addedDirs = 0;
-        
         // 处理每个选中的文件/文件夹
         for (const uri of uris) {
-          try {
-            const isDirectory = folderOnly || fs.statSync(uri.fsPath).isDirectory();
-            
-            // 转换为相对路径
-            let relativePath = this.getRelativePath(uri.fsPath);
-            
-            // 如果是文件夹，确保路径以斜杠结尾
-            if (isDirectory && !relativePath.endsWith('/')) {
-              relativePath += '/';
-              addedDirs++;
-            } else if (!isDirectory) {
-              addedFiles++;
-            }
-            
-            // 如果不在列表中，则添加
-            if (!updatedIncludeFiles.includes(relativePath)) {
-              updatedIncludeFiles.push(relativePath);
-              console.log(`添加 ${isDirectory ? '目录' : '文件'}: ${relativePath}`);
-            }
-          } catch (error) {
-            console.error(`处理所选项时出错: ${uri.fsPath}`, error);
-            vscode.window.showWarningMessage(`处理 ${uri.fsPath} 时出错: ${error.message}`);
+          // 转换为相对路径
+          const relativePath = this.getRelativePath(uri.fsPath);
+          
+          // 如果不在列表中，则添加
+          if (!updatedIncludeFiles.includes(relativePath)) {
+            updatedIncludeFiles.push(relativePath);
           }
         }
         
         // 更新配置
-        await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Workspace);
+        await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Global);
         
         // 刷新面板
         this.refreshPanel();
         
-        const message = folderOnly ? 
-          `已添加 ${addedDirs} 个文件夹到扫描列表` :
-          `已添加 ${addedFiles} 个文件到扫描列表`;
-        vscode.window.showInformationMessage(message);
+        vscode.window.showInformationMessage(`已添加 ${uris.length} 个文件/文件夹到扫描列表`);
       }
     } catch (error) {
       console.error('选择包含文件/文件夹时出错:', error);
@@ -2290,15 +2311,15 @@ class BatchReplacementPanel {
 
   /**
    * 切换扫描所有文件模式
-   * @param {boolean} scanAllFiles 是否扫描所有文件
+   * @param {boolean} scanAll 是否扫描所有文件
    */
-  async toggleScanAllFiles(scanAllFiles) {
+  async toggleScanAllFiles(scanAll) {
     try {
       // 更新扫描模式
-      this.scanAllFiles = scanAllFiles;
+      this.scanAllFiles = scanAll;
       
       // 如果切换到扫描所有文件且当前有打开的面板
-      if (scanAllFiles && this.panel) {
+      if (scanAll && this.panel) {
         await vscode.window.withProgress({
           location: vscode.ProgressLocation.Notification,
           title: "扫描所有文件中...",
@@ -2324,7 +2345,7 @@ class BatchReplacementPanel {
             vscode.window.showErrorMessage('扫描所有文件时出错: ' + error.message);
           }
         });
-      } else if (!scanAllFiles && this.document) {
+      } else if (!scanAll && this.document) {
         // 如果切换到仅扫描当前文件，并且存在当前文档
         // 重新分析当前文档
         await this.analyzeAndLoadPanel();
@@ -2333,8 +2354,8 @@ class BatchReplacementPanel {
       // // 更新配置
       // await vscode.workspace.getConfiguration('i18n-swapper').update(
       //   'scanAllFilesMode',
-      //   scanAllFiles,
-      //   vscode.ConfigurationTarget.Workspace
+      //   scanAll,
+      //   vscode.ConfigurationTarget.Global
       // );
     } catch (error) {
       console.error('切换扫描模式时出错:', error);
