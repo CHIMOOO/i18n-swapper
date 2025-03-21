@@ -147,7 +147,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     
     // 替换选中按钮点击事件
     document.getElementById('replace-selected').addEventListener('click', async function() {
-      const confirmed = await confirmAction('确定要替换选中的项目吗？替换后仍需手动保存确认效果。');
+      const confirmed = await confirmAction('确定要替换选中的项目吗？替换后请手动保存确认。');
       if (!confirmed) {
         return;
       }
@@ -215,8 +215,16 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         // 添加消息
         const messageElement = document.createElement('p');
         messageElement.textContent = message;
-        messageElement.style.marginBottom = '20px';
+        messageElement.style.marginBottom = '10px';
         dialogContent.appendChild(messageElement);
+        
+        // 添加额外提示信息
+        const tipElement = document.createElement('p');
+        tipElement.textContent = '（无国际化键的数据无法替换）';
+        tipElement.style.fontSize = '12px';
+        tipElement.style.color = 'var(--vscode-descriptionForeground)';
+        tipElement.style.marginBottom = '20px';
+        dialogContent.appendChild(tipElement);
         
         // 添加按钮容器
         const buttonContainer = document.createElement('div');
@@ -273,7 +281,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     
     // 替换按钮点击事件 - 替换所有
     document.getElementById('replace-all').addEventListener('click', async function() {
-      const confirmed = await confirmAction('确定要替换所有项目吗？替换后仍需手动保存确认效果。');
+      const confirmed = await confirmAction('确定要替换所有项目吗？替换后请手动保存确认。');
       if (!confirmed) {
         return;
       }

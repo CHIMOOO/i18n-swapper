@@ -214,7 +214,22 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
           </button>
           <button id="refresh-panel">刷新</button>
           <button id="open-api-translation">API翻译配置</button>
+                        <!-- 添加文件名筛选功能，仅在扫描所有文件模式下显示 -->
+      ${scanAllFiles ? `
+      <div class="file-filter-container">
+        <div class="file-filter-input-container">
+          <input type="text" id="file-name-filter" placeholder="输入文件名进行筛选" class="file-filter-input">
+          <button id="clear-file-filter" class="clear-filter-btn" title="清除筛选">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
         </div>
+      </div>
+      ` : ''}
+        </div>
+
         <div class="tools-group">
           <div class="select-all-container">
             <input type="checkbox" id="select-all">
@@ -223,21 +238,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
         </div>
       </div>
       
-      <!-- 添加文件名筛选功能，仅在扫描所有文件模式下显示 -->
-      ${scanAllFiles ? `
-      <div class="file-filter-container">
-        <div class="file-filter-input-container">
-          <input type="text" id="file-name-filter" placeholder="输入文件名进行筛选（无需后缀）" class="file-filter-input">
-          <button id="clear-file-filter" class="clear-filter-btn" title="清除筛选">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18"></line>
-              <line x1="6" y1="6" x2="18" y2="18"></line>
-            </svg>
-          </button>
-        </div>
-        <span class="file-filter-info">筛选将匹配文件名（支持包含或不包含后缀）</span>
-      </div>
-      ` : ''}
+
       
       <div class="replacements-list">
         <table>
@@ -280,8 +281,6 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
       <!-- 在样式中添加筛选功能相关的CSS样式 -->
       <style>
         .file-filter-container {
-          margin: 10px 0;
-          padding: 8px;
           background-color: var(--vscode-editor-background);
           border: 1px solid var(--vscode-panel-border);
           border-radius: 4px;
