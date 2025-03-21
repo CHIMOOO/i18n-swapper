@@ -1090,10 +1090,7 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     // 选择文件或文件夹按钮
     const selectIncludeFileBtn = document.getElementById('select-include-file');
     if (selectIncludeFileBtn) {
-      selectIncludeFileBtn.addEventListener('click', function(event) {
-        // 阻止事件冒泡
-        event.stopPropagation();
-        
+      selectIncludeFileBtn.addEventListener('click', () => {
         vscode.postMessage({
           command: 'selectIncludeFile'
         });
@@ -1113,6 +1110,16 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         });
       });
     });
+
+    // 处理选择文件夹按钮
+    const selectIncludeFolderBtn = document.getElementById('select-include-folder');
+    if (selectIncludeFolderBtn) {
+      selectIncludeFolderBtn.addEventListener('click', () => {
+        vscode.postMessage({
+          command: 'selectIncludeFolder'
+        });
+      });
+    }
   `;
 }
 

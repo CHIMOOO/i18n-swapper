@@ -640,7 +640,10 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
                   </div>
                 `).join('')}
               </div>
-              <button id="select-include-file" class="primary-button" style="margin: 10px 0;">选择文件或文件夹</button>
+              <div class="button-group" style="margin: 10px 0;">
+                <button id="select-include-file" class="primary-button" style="margin-right: 10px;">选择文件</button>
+                <button id="select-include-folder" class="primary-button">选择文件夹</button>
+              </div>
               <span class="help-text">点击按钮选择要扫描的文件或文件夹</span>
             </div>
           </div>
