@@ -659,26 +659,25 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
       }
     });
 
-    // 模式切换按钮
+    // 模式切换按钮事件
     document.querySelectorAll('.mode-button').forEach(button => {
-      button.addEventListener('click', () => {
+      button.addEventListener('click', function() {
+        const mode = this.getAttribute('data-mode');
+        
         // 记录当前筛选状态
         let currentFilter = '';
         if (window.fileNameFilter) {
           currentFilter = window.fileNameFilter.currentFilterValue || '';
         }
         
-        // 获取模式
-        const mode = button.getAttribute('data-mode');
-        if (mode) {
-          vscode.postMessage({
-            command: 'switchScanMode',
-            data: { 
-              mode: mode,
-              currentFilter: currentFilter
-            }
-          });
-        }
+        // 发送切换命令，并提供当前筛选值
+        vscode.postMessage({
+          command: 'switchScanMode',
+          data: {
+            mode,
+            currentFilter
+          }
+        });
       });
     });
 
@@ -1038,6 +1037,20 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         }, 500);
       }, 3000);
     }
+
+    // 处理 restoreFilterState 消息
+    window.addEventListener('message', event => {
+      const message = event.data;
+      
+      if (message.command === 'restoreFilterState' && message.data && message.data.filterValue) {
+        const filterInput = document.getElementById('file-name-filter');
+        if (filterInput && window.fileNameFilter) {
+          filterInput.value = message.data.filterValue;
+          // 使用筛选器的处理函数应用筛选
+          window.fileNameFilter.handleFilter();
+        }
+      }
+    });
   `;
 }
 

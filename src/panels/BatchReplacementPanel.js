@@ -122,7 +122,7 @@ class BatchReplacementPanel {
   }
 
   /**
-   * 初始化面板
+   * 设置面板
    */
   _setupPanel() {
     // 设置面板图标
@@ -143,6 +143,48 @@ class BatchReplacementPanel {
       null,
       this._disposables
     );
+    
+    // 监听编辑器活动窗口变化
+    this._registerActiveEditorChangeListener();
+  }
+  
+  /**
+   * 注册编辑器活动窗口变化监听器
+   * 当用户切换到其他文件时，自动更新面板内容
+   */
+  _registerActiveEditorChangeListener() {
+    // 监听活动编辑器变化事件
+    this._activeEditorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(editor => {
+      if (editor && this.panel && !this.scanAllFiles) {
+        // 只有在非扫描所有文件模式下，才需要更新内容
+        if ((!this.document || this.document.uri.toString() !== editor.document.uri.toString())) {
+          console.log('编辑器切换，自动更新面板内容');
+          this.document = editor.document;
+          this.analyzeAndLoadPanel();
+        }
+      }
+    }, null, this.context.subscriptions);
+  }
+
+  /**
+   * 释放面板资源
+   */
+  _disposePanelResources() {
+    this.panel = null;
+
+    // 清理所有订阅
+    while (this._disposables.length) {
+      const disposable = this._disposables.pop();
+      if (disposable) {
+        disposable.dispose();
+      }
+    }
+    
+    // 释放活动编辑器变化监听器
+    if (this._activeEditorChangeDisposable) {
+      this._activeEditorChangeDisposable.dispose();
+      this._activeEditorChangeDisposable = null;
+    }
   }
 
   /**
@@ -411,21 +453,6 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('保存翻译出错:', error);
       throw error;
-    }
-  }
-
-  /**
-   * 释放面板资源
-   */
-  _disposePanelResources() {
-    this.panel = null;
-
-    // 清理所有订阅
-    while (this._disposables.length) {
-      const disposable = this._disposables.pop();
-      if (disposable) {
-        disposable.dispose();
-      }
     }
   }
 
@@ -1580,6 +1607,8 @@ class BatchReplacementPanel {
    */
   async switchScanMode(mode, currentFilter) {
     if (this.scanMode === mode) return;
+    
+    console.log(`切换扫描模式: ${this.scanMode} -> ${mode}，当前筛选值: ${currentFilter || '无'}`);
 
     this.scanMode = mode;
     this.selectedIndexes = []; // 切换模式时清空选择
@@ -1591,6 +1620,7 @@ class BatchReplacementPanel {
     if (currentFilter && this.panel) {
       // 延迟发送恢复筛选状态的消息，确保面板内容已更新
       setTimeout(() => {
+        console.log(`恢复筛选状态: ${currentFilter}`);
         this.panel.webview.postMessage({
           command: 'restoreFilterState',
           data: {
@@ -2143,21 +2173,6 @@ class BatchReplacementPanel {
     );
   }
 
-  /**
-   * 销毁面板时清理资源
-   */
-  dispose() {
-    // 委托给高亮服务处理
-    if (this.highlightService) {
-      this.highlightService.dispose();
-    }
-
-    // 现有的清理代码...
-    if (this.panel) {
-      this.panel.dispose();
-    }
-  }
-
   // 添加排除模式
   async addExcludePattern(pattern) {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
@@ -2499,6 +2514,27 @@ class BatchReplacementPanel {
       console.error('执行指定索引项单文件替换时出错:', error);
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
       return false;
+    }
+  }
+
+  /**
+   * 销毁面板时清理资源
+   */
+  dispose() {
+    // 委托给高亮服务处理
+    if (this.highlightService) {
+      this.highlightService.dispose();
+    }
+
+    // 释放活动编辑器变化监听器
+    if (this._activeEditorChangeDisposable) {
+      this._activeEditorChangeDisposable.dispose();
+      this._activeEditorChangeDisposable = null;
+    }
+
+    // 现有的清理代码...
+    if (this.panel) {
+      this.panel.dispose();
     }
   }
 }
