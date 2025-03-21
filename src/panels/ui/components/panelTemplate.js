@@ -198,7 +198,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
           <div class="scan-mode-info">
             <input type="checkbox" id="scan-all-files" ${scanAllFiles ? 'checked' : ''}>
             <label for="scan-all-files">扫描所有文件</label>
-            <span class="scan-status">${scanAllFiles ? '(工作区)' : '(当前文件)'}</span>
+            <span class="scan-status">${scanAllFiles ? (config.get('includeFiles', []).length > 0 ? '(指定范围搜索)' : '(工作区)') : '(当前文件)'}</span>
             <span class="help-icon" title="开启后将扫描整个工作区的文件，而不仅仅是当前文件。注意：这可能会较为耗时。">?</span>
           </div>
         </div>

@@ -2198,7 +2198,7 @@ class BatchReplacementPanel {
     
     if (!excludeFiles.includes(pattern)) {
       excludeFiles.push(pattern);
-      await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
+      await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
       this.refreshPanel();
     }
   }
@@ -2209,7 +2209,7 @@ class BatchReplacementPanel {
     let excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
     
     excludeFiles = excludeFiles.filter(p => p !== pattern);
-    await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
+    await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
     this.refreshPanel();
   }
   
@@ -2220,7 +2220,7 @@ class BatchReplacementPanel {
     
     if (!includeFiles.includes(pattern)) {
       includeFiles.push(pattern);
-      await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
+      await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
       this.refreshPanel();
     }
   }
@@ -2231,7 +2231,7 @@ class BatchReplacementPanel {
     let includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
     
     includeFiles = includeFiles.filter(p => p !== pattern);
-    await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
+    await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
     this.refreshPanel();
   }
   
@@ -2296,7 +2296,7 @@ class BatchReplacementPanel {
         }
         
         // 更新配置
-        await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Global);
+        await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Workspace);
         
         // 刷新面板
         this.refreshPanel();
@@ -2355,7 +2355,7 @@ class BatchReplacementPanel {
       // await vscode.workspace.getConfiguration('i18n-swapper').update(
       //   'scanAllFilesMode',
       //   scanAll,
-      //   vscode.ConfigurationTarget.Global
+      //   vscode.ConfigurationTarget.Workspace
       // );
     } catch (error) {
       console.error('切换扫描模式时出错:', error);
