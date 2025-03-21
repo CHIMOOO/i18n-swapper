@@ -35,13 +35,14 @@ class WorkspaceScannerService {
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const scanPatterns = config.get('scanPatterns', defaultsConfig.scanPatterns);
       const excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
+      const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
       const localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
       
       // 创建排除模式
       const excludeGlobs = this._createExcludeGlobs(excludeFiles);
       
       // 构建包含模式
-      const includePattern = this._createIncludePattern();
+      const includePattern = this._createIncludePattern(includeFiles);
       
       progress.report({ message: "查找文件中..." });
       
@@ -146,10 +147,30 @@ class WorkspaceScannerService {
 
   /**
    * 创建包含模式
+   * @param {Array} includeFiles 指定要包含的文件或文件夹列表
    * @returns {string} 包含模式
    * @private
    */
-  _createIncludePattern() {
+  _createIncludePattern(includeFiles = []) {
+    // 如果有指定的文件或文件夹，使用它们构建包含模式
+    if (includeFiles && includeFiles.length > 0) {
+      // 处理文件和文件夹路径，构建glob模式
+      const patterns = includeFiles.map(filePath => {
+        // 检查是否是目录
+        if (filePath.endsWith('/') || filePath.endsWith('\\')) {
+          // 如果是目录，匹配该目录下所有支持的文件类型
+          return `${filePath}**/*.{js,jsx,ts,tsx,vue,html}`;
+        } else {
+          // 如果是文件，直接包含
+          return filePath;
+        }
+      });
+      
+      // 将所有模式合并为一个逗号分隔的列表
+      return `{${patterns.join(',')}}`;
+    }
+    
+    // 默认包含所有支持的文件类型
     return '**/*.{js,jsx,ts,tsx,vue,html}';
   }
 }

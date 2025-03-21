@@ -34,6 +34,8 @@ const I18nKeyStatusService = require('./services/i18nKeyStatusService'); // 新�
 const workspaceScannerService = require('./services/workspaceScannerService');
 const pathUtils = require('../utils/path-utils');
 
+
+
 /**
  * 批量替换面板类
  */
@@ -394,6 +396,22 @@ class BatchReplacementPanel {
           
         case 'toggleScanAllFiles':
           await this.toggleScanAllFiles(message.data.scanAllFiles);
+          break;
+          
+        case 'selectIncludeFile':
+          await this.selectIncludeFile();
+          break;
+          
+        case 'addIncludePattern':
+          if (message.data && message.data.pattern) {
+            await this.addIncludePattern(message.data.pattern);
+          }
+          break;
+          
+        case 'removeIncludePattern':
+          if (message.data && message.data.pattern) {
+            await this.removeIncludePattern(message.data.pattern);
+          }
           break;
           
         case 'restoreFilterState':
@@ -2194,6 +2212,102 @@ class BatchReplacementPanel {
     await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Global);
     this.refreshPanel();
   }
+  
+  // 添加包含文件或文件夹
+  async addIncludePattern(pattern) {
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
+    
+    if (!includeFiles.includes(pattern)) {
+      includeFiles.push(pattern);
+      await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
+      this.refreshPanel();
+    }
+  }
+
+  // 删除包含文件或文件夹
+  async removeIncludePattern(pattern) {
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    let includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
+    
+    includeFiles = includeFiles.filter(p => p !== pattern);
+    await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Global);
+    this.refreshPanel();
+  }
+  
+  /**
+   * 获取相对路径
+   * @param {string} absolutePath 绝对路径
+   * @returns {string} 相对于工作区的路径
+   */
+  getRelativePath(absolutePath) {
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    if (!workspaceFolder) return absolutePath;
+    
+    const rootPath = workspaceFolder.uri.fsPath;
+    
+    // 确保路径使用一致的路径分隔符
+    const normalizedAbsolutePath = absolutePath.replace(/\\/g, '/');
+    const normalizedRootPath = rootPath.replace(/\\/g, '/');
+    
+    if (normalizedAbsolutePath.startsWith(normalizedRootPath)) {
+      // 去除开头的斜杠，保持相对路径格式
+      const relativePath = normalizedAbsolutePath.substring(normalizedRootPath.length);
+      return relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
+    }
+    
+    return absolutePath;
+  }
+  
+  /**
+   * 选择要包含的文件或文件夹
+   */
+  async selectIncludeFile() {
+    try {
+      // 创建打开文件对话框选项
+      const options = {
+        canSelectFiles: true,
+        canSelectFolders: true,
+        canSelectMany: true,
+        openLabel: '选择要包含的文件或文件夹',
+        filters: {
+          '所有文件': ['*']
+        }
+      };
+      
+      // 显示文件选择对话框
+      const uris = await vscode.window.showOpenDialog(options);
+      
+      if (uris && uris.length > 0) {
+        // 获取当前配置
+        const config = vscode.workspace.getConfiguration('i18n-swapper');
+        const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
+        const updatedIncludeFiles = [...includeFiles]; // 创建新数组，避免直接修改原始数组
+        
+        // 处理每个选中的文件/文件夹
+        for (const uri of uris) {
+          // 转换为相对路径
+          const relativePath = this.getRelativePath(uri.fsPath);
+          
+          // 如果不在列表中，则添加
+          if (!updatedIncludeFiles.includes(relativePath)) {
+            updatedIncludeFiles.push(relativePath);
+          }
+        }
+        
+        // 更新配置
+        await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Global);
+        
+        // 刷新面板
+        this.refreshPanel();
+        
+        vscode.window.showInformationMessage(`已添加 ${uris.length} 个文件/文件夹到扫描列表`);
+      }
+    } catch (error) {
+      console.error('选择包含文件/文件夹时出错:', error);
+      vscode.window.showErrorMessage('选择包含文件/文件夹时出错: ' + error.message);
+    }
+  }
 
   /**
    * 切换扫描所有文件模式
@@ -2246,20 +2360,6 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('切换扫描模式时出错:', error);
       vscode.window.showErrorMessage('切换扫描模式时出错: ' + error.message);
-    }
-  }
-
-  /**
-   * 获取相对于工作区根目录的路径
-   * @param {string} absolutePath 绝对路径
-   * @returns {string} 相对路径
-   */
-  getRelativePath(absolutePath) {
-    try {
-      return pathUtils.getRelativePath(absolutePath);
-    } catch (error) {
-      console.error('计算相对路径时出错:', error);
-      return absolutePath;
     }
   }
 

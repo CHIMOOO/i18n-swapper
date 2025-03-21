@@ -604,7 +604,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
 
         <!-- 添加扫描排除配置 -->
         <div class="config-row">
-          <h4>8、扫描排除配置</h4>
+          <h4>8、扫描全部文件配置</h4>
           <div class="style-config-container">
             <div class="config-item">
               <label>排除的文件或目录模式：</label>
@@ -623,6 +623,25 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
                 <button id="add-exclude-pattern">添加</button>
               </div>
               <span class="help-text">定义扫描时要排除的文件或目录模式，例如：**/node_modules/**, **/*.test.js</span>
+            </div>
+            
+            <div class="config-item" style="margin-top: 20px;">
+              <label>指定要扫描的文件或目录路径：</label>
+              <div class="help-text">当指定了扫描文件或目录时，只会扫描这些指定的路径，排除设置仍然有效</div>
+              <div id="include-patterns" class="locale-paths-list">
+                ${(config.get('includeFiles', []) || []).map(pattern => `
+                  <div class="function-name-item locale-path-item">
+                    <span>${escapeHtml(pattern)}</span>
+                    <button class="remove-include-pattern remove-pattern remove-locale-path" data-pattern="${escapeHtml(pattern)}">
+                      <svg class="del-svg" data-slot="icon" fill="currentColor" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path clip-rule="evenodd" fill-rule="evenodd" d="M5 3.25V4H2.75a.75.75 0 0 0 0 1.5h.3l.815 8.15A1.5 1.5 0 0 0 5.357 15h5.285a1.5 1.5 0 0 0 1.493-1.35l.815-8.15h.3a.75.75 0 0 0 0-1.5H11v-.75A2.25 2.25 0 0 0 8.75 1h-1.5A2.25 2.25 0 0 0 5 3.25Zm2.25-.75a.75.75 0 0 0-.75.75V4h3v-.75a.75.75 0 0 0-.75-.75h-1.5ZM6.05 6a.75.75 0 0 1 .787.713l.275 5.5a.75.75 0 0 1-1.498.075l-.275-5.5A.75.75 0 0 1 6.05 6Zm3.9 0a.75.75 0 0 1 .712.787l-.275 5.5a.75.75 0 0 1-1.498-.075l.275-5.5a.75.75 0 0 1 .786-.711Z"></path>
+                      </svg>
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+              <button id="select-include-file" class="primary-button" style="margin: 10px 0;">选择文件或文件夹</button>
+              <span class="help-text">点击按钮选择要扫描的文件或文件夹</span>
             </div>
           </div>
         </div>

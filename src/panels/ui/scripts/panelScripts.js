@@ -1051,6 +1051,68 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         }
       }
     });
+
+    // 删除排除模式
+    document.querySelectorAll('.remove-exclude-pattern').forEach(btn => {
+      btn.addEventListener('click', function(event) {
+        // 阻止事件冒泡
+        event.stopPropagation();
+        
+        const pattern = this.getAttribute('data-pattern');
+        vscode.postMessage({
+          command: 'removeExcludePattern',
+          data: { pattern }
+        });
+      });
+    });
+    
+    // 添加包含文件或文件夹按钮
+    const addIncludePatternBtn = document.getElementById('add-include-pattern');
+    if (addIncludePatternBtn) {
+      addIncludePatternBtn.addEventListener('click', function(event) {
+        // 阻止事件冒泡
+        event.stopPropagation();
+        
+        const input = document.getElementById('new-include-pattern');
+        const pattern = input.value.trim();
+        
+        if (pattern) {
+          vscode.postMessage({
+            command: 'addIncludePattern',
+            data: { pattern }
+          });
+          
+          input.value = '';
+        }
+      });
+    }
+    
+    // 选择文件或文件夹按钮
+    const selectIncludeFileBtn = document.getElementById('select-include-file');
+    if (selectIncludeFileBtn) {
+      selectIncludeFileBtn.addEventListener('click', function(event) {
+        // 阻止事件冒泡
+        event.stopPropagation();
+        
+        vscode.postMessage({
+          command: 'selectIncludeFile'
+        });
+      });
+    }
+    
+    // 删除包含文件或文件夹
+    document.querySelectorAll('.remove-include-pattern').forEach(btn => {
+      btn.addEventListener('click', function(event) {
+        // 阻止事件冒泡
+        event.stopPropagation();
+        
+        const pattern = this.getAttribute('data-pattern');
+        vscode.postMessage({
+          command: 'removeIncludePattern',
+          data: { pattern }
+        });
+      });
+    });
   `;
 }
 

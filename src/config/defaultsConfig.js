@@ -64,11 +64,14 @@ module.exports = {
     
     // 新增: 默认排除的文件模式
     excludeFiles: [
-    "node_modules",
-    "dist",
-    "build",
-    ".git",
-    "vendor",
-    ".history"
-    ]
+        "node_modules",
+        "dist",
+        "build",
+        ".git",
+        "vendor",
+        ".history"
+    ],
+    
+    // 新增: 指定要扫描的文件或文件夹路径
+    includeFiles: []
 }; 

@@ -348,6 +348,11 @@
             ".history"],
           "description": "扫描时要排除的文件或目录模式"
         },
+        "i18n-swapper.includeFiles": {
+          "type": "array",
+          "default": [],
+          "description": "指定要扫描的文件或文件夹路径（如果指定，则只扫描这些路径）"
+        },
         "i18n-swapper.scanAllFilesMode": {
           "type": "boolean",
           "default": false,
