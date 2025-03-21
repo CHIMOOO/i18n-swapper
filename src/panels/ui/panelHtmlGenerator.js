@@ -6,7 +6,7 @@ const vscode = require('vscode');
 const { escapeHtml } = require('./utils/htmlUtils');
 const { getPanelStyles } = require('./styles/panelStyles');
 const { getPanelScripts } = require('./scripts/panelScripts');
-const { generatePanelBody } = require('./components/panelTemplate');
+const { generatePanelBody, fileNameFilter } = require('./components/panelTemplate');
 const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
 const defaultsConfig = require('../../config/defaultsConfig');
 
@@ -59,7 +59,14 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
     scanMode
   };
 
-  // 完整的HTML页面
+  // 获取面板HTML主体
+  const panelBodyHtml = generatePanelBody(scanPatterns, replacements, localesPaths, updatedContext, isConfigExpanded, languageMappings, existingI18nCalls, scanAllFiles, currentFilePath, LANGUAGE_NAMES, config);
+
+  // 获取面板样式和脚本
+  const styles = getPanelStyles();
+  const scripts = getPanelScripts(languageMappings, LANGUAGE_NAMES);
+
+  // 生成完整的HTML
   return `
     <!DOCTYPE html>
     <html lang="zh-CN">
@@ -68,26 +75,22 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>批量替换国际化</title>
       <style>
-        ${getPanelStyles()}
+        ${styles}
       </style>
     </head>
     <body>
-      ${generatePanelBody(
-        scanPatterns, 
-        replacements, 
-        localesPaths, 
-        updatedContext, 
-        isConfigExpanded, 
-        languageMappings, 
-        existingI18nCalls, 
-        scanAllFiles, 
-        currentFilePath, 
-        LANGUAGE_NAMES,
-        config
-      )}
+      ${panelBodyHtml}
       
       <script>
-        ${getPanelScripts(languageMappings, LANGUAGE_NAMES)}
+        // 确保面板模板中的fileNameFilter对象可在前端使用
+        window.fileNameFilter = ${JSON.stringify(fileNameFilter)};
+        
+        // 将fileNameFilter上的方法转换回函数
+        window.fileNameFilter.initialize = ${fileNameFilter.initialize.toString()};
+        window.fileNameFilter.handleFilter = ${fileNameFilter.handleFilter.toString()};
+        window.fileNameFilter.updateFilterInfo = ${fileNameFilter.updateFilterInfo.toString()};
+        
+        ${scripts}
       </script>
     </body>
     </html>

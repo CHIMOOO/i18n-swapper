@@ -11,7 +11,7 @@ const { escapeHtml } = require('../utils/htmlUtils');
 function generateTableRow(item, index, scanMode, scanAllFiles) {
   // 生成数据行
   const dataRow = `
-    <tr data-filepath="${item.filePath || ''}" data-index="${index}">
+    <tr data-filepath="${item.filePath || ''}" data-index="${index}" data-filename="${item.fileName || ''}">
       <td class="checkbox-cell">
         <input type="checkbox" class="item-checkbox" data-index="${index}" ${item.selected ? 'checked' : ''}>
       </td>
@@ -156,6 +156,25 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
     ];
   }
 
+  // 预处理文件路径，提取文件名
+  if (scanAllFiles) {
+    displayItems = displayItems.map(item => {
+      if (item.filePath) {
+        // 从文件路径中提取文件名（不包含目录和后缀）
+        const pathParts = item.filePath.split(/[\/\\]/);
+        const fullFileName = pathParts[pathParts.length - 1]; // 最后一部分是文件名
+        const fileName = fullFileName.split('.')[0]; // 移除后缀
+        
+        return {
+          ...item,
+          fileName: fileName,
+          fullFileName: fullFileName
+        };
+      }
+      return item;
+    });
+  }
+
   // 获取输出国际化函数名称
   const outputI18nFunctionName = context.outputI18nFunctionName || config.get('functionName', 't');
 
@@ -204,6 +223,22 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
         </div>
       </div>
       
+      <!-- 添加文件名筛选功能，仅在扫描所有文件模式下显示 -->
+      ${scanAllFiles ? `
+      <div class="file-filter-container">
+        <div class="file-filter-input-container">
+          <input type="text" id="file-name-filter" placeholder="输入文件名进行筛选（无需后缀）" class="file-filter-input">
+          <button id="clear-file-filter" class="clear-filter-btn" title="清除筛选">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <span class="file-filter-info">筛选将匹配文件名（支持包含或不包含后缀）</span>
+      </div>
+      ` : ''}
+      
       <div class="replacements-list">
         <table>
           <thead>
@@ -216,7 +251,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
               ${scanAllFiles ? '<td>文件路径</td>' : ''} <!-- 添加文件路径列 -->
             </tr>
           </thead>
-          <tbody>
+          <tbody id="replacements-tbody">
             ${displayItems.length > 0 ? displayItems.map((item, index) => {
               return generateTableRowWithStatus(item, index, scanMode, scanAllFiles, languageMappings, LANGUAGE_NAMES);
             }).join('') : `
@@ -241,6 +276,60 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
           当前文件: ${currentFilePath ? escapeHtml(currentFilePath) : '未打开文件'}
         </div>
       </div>
+      
+      <!-- 在样式中添加筛选功能相关的CSS样式 -->
+      <style>
+        .file-filter-container {
+          margin: 10px 0;
+          padding: 8px;
+          background-color: var(--vscode-editor-background);
+          border: 1px solid var(--vscode-panel-border);
+          border-radius: 4px;
+        }
+
+        .file-filter-input-container {
+          display: flex;
+          align-items: center;
+        }
+
+        .file-filter-input {
+          flex: 1;
+          padding: 6px 8px;
+          border: 1px solid var(--vscode-input-border);
+          background-color: var(--vscode-input-background);
+          color: var(--vscode-input-foreground);
+          border-radius: 4px;
+          font-size: 13px;
+        }
+
+        .file-filter-info {
+          display: block;
+          font-size: 12px;
+          color: var(--vscode-descriptionForeground);
+          margin-top: 4px;
+        }
+
+        .clear-filter-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: var(--vscode-button-foreground);
+          margin-left: 5px;
+          padding: 4px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 4px;
+        }
+
+        .clear-filter-btn:hover {
+          background-color: var(--vscode-button-hoverBackground);
+        }
+
+        .hidden-row {
+          display: none;
+        }
+      </style>
       
       <!-- 配置面板（位于底部） -->
       <div class="${isConfigExpanded ? 'config-section expanded' : 'config-section'}" id="config-section-header" style="display: flex;position: sticky;top: 0;">
@@ -505,5 +594,140 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
 module.exports = {
   generatePanelBody,
   generateTableRow,
-  generateTableRowWithStatus
+  generateTableRowWithStatus,
+  
+  /**
+   * 文件名筛选工具对象
+   * 用于在前端处理文件名筛选功能
+   */
+  fileNameFilter: {
+    /**
+     * 初始化筛选功能
+     * 为筛选输入框和清除按钮添加事件监听器
+     */
+    initialize: function() {
+      const filterInput = document.getElementById('file-name-filter');
+      const clearButton = document.getElementById('clear-file-filter');
+      
+      if (filterInput) {
+        // 添加输入事件监听器
+        filterInput.addEventListener('input', this.handleFilter.bind(this));
+        
+        // 添加按键事件，支持按ESC键清除
+        filterInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            filterInput.value = '';
+            this.handleFilter();
+          }
+        });
+      }
+      
+      if (clearButton) {
+        // 添加清除按钮事件
+        clearButton.addEventListener('click', () => {
+          if (filterInput) {
+            filterInput.value = '';
+            this.handleFilter();
+            // 清除后让输入框重新获得焦点
+            filterInput.focus();
+          }
+        });
+      }
+    },
+    
+    /**
+     * 处理筛选
+     * 根据输入的文件名筛选表格行
+     */
+    handleFilter: function() {
+      const filterInput = document.getElementById('file-name-filter');
+      if (!filterInput) return;
+      
+      const filterValue = filterInput.value.trim().toLowerCase();
+      const tbody = document.getElementById('replacements-tbody');
+      
+      if (!tbody) return;
+      
+      // 获取所有表格行
+      const rows = tbody.querySelectorAll('tr:not(.i18n-status-row)');
+      let visibleCount = 0;
+      
+      // 遍历所有行，根据文件名筛选
+      rows.forEach(row => {
+        // 获取行的数据属性
+        const filename = row.getAttribute('data-filename') || '';
+        const filepath = row.getAttribute('data-filepath') || '';
+        
+        // 如果没有文件名，可能是从文件路径中提取
+        let match = false;
+        
+        if (filterValue === '') {
+          // 如果筛选值为空，显示所有行
+          match = true;
+        } else {
+          // 从文件路径中提取文件名（支持带后缀和不带后缀）
+          const pathParts = filepath.split(/[\/\\]/);
+          const fullFileName = pathParts[pathParts.length - 1]; // 最后一部分是文件名
+          
+          // 1. 检查完整文件名（含后缀）是否匹配
+          if (fullFileName.toLowerCase() === filterValue) {
+            match = true;
+          } 
+          // 2. 检查文件名（不含后缀）是否匹配
+          else if (filename.toLowerCase() === filterValue) {
+            match = true;
+          }
+          // 3. 检查输入值是否已包含后缀，且与完整文件名匹配
+          else if (filterValue.includes('.') && fullFileName.toLowerCase() === filterValue) {
+            match = true;
+          }
+        }
+        
+        // 根据匹配结果显示或隐藏行
+        if (match) {
+          row.classList.remove('hidden-row');
+          visibleCount++;
+          
+          // 如果有关联的状态行，也显示它
+          const index = row.getAttribute('data-index');
+          if (index) {
+            const statusRow = tbody.querySelector(`.i18n-status-row[data-index="${index}"]`);
+            if (statusRow) {
+              statusRow.classList.remove('hidden-row');
+            }
+          }
+        } else {
+          row.classList.add('hidden-row');
+          
+          // 隐藏关联的状态行
+          const index = row.getAttribute('data-index');
+          if (index) {
+            const statusRow = tbody.querySelector(`.i18n-status-row[data-index="${index}"]`);
+            if (statusRow) {
+              statusRow.classList.add('hidden-row');
+            }
+          }
+        }
+      });
+      
+      // 更新筛选信息
+      this.updateFilterInfo(visibleCount, rows.length);
+    },
+    
+    /**
+     * 更新筛选信息
+     * @param {number} visibleCount 可见行数
+     * @param {number} totalCount 总行数
+     */
+    updateFilterInfo: function(visibleCount, totalCount) {
+      const infoSpan = document.querySelector('.file-filter-info');
+      if (infoSpan) {
+        if (visibleCount < totalCount) {
+          infoSpan.textContent = `筛选中: 显示 ${visibleCount}/${totalCount} 项结果`;
+        } else {
+          infoSpan.textContent = `筛选将匹配文件名（支持包含或不包含后缀）`;
+        }
+      }
+    }
+  }
 }; 

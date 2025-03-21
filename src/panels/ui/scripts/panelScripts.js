@@ -709,6 +709,45 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         data: { scanAllFiles: this.checked }
       });
     });
+
+    // 初始化文件名筛选功能
+    // 检测DOM是否加载完成
+    document.addEventListener('DOMContentLoaded', function() {
+      // 如果存在fileNameFilter模块，则初始化筛选功能
+      if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
+        window.fileNameFilter.initialize();
+      }
+    });
+
+    // 为了确保即使在DOMContentLoaded之后加载脚本，也能正确初始化
+    // 如果DOM已经加载完成，则直接初始化
+    if (document.readyState === 'complete' || document.readyState === 'loaded' || document.readyState === 'interactive') {
+      if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
+        window.fileNameFilter.initialize();
+      }
+    }
+
+    // 监听扫描所有文件模式切换，重新初始化筛选功能
+    document.getElementById('scan-all-files').addEventListener('change', function() {
+      // 延迟执行，确保DOM已更新
+      setTimeout(() => {
+        if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
+          window.fileNameFilter.initialize();
+        }
+      }, 500);
+    });
+
+    // 监听模式切换按钮点击，重新初始化筛选功能
+    document.querySelectorAll('.mode-button').forEach(button => {
+      button.addEventListener('click', function() {
+        // 延迟执行，确保DOM已更新
+        setTimeout(() => {
+          if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
+            window.fileNameFilter.initialize();
+          }
+        }, 500);
+      });
+    });
   `;
 }
 
