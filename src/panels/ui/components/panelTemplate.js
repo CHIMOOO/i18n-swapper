@@ -43,7 +43,12 @@ function generateTableRow(item, index, scanMode, scanAllFiles) {
         }
       </td>
       ${scanAllFiles ? `
-        <td class="file-path-cell" title="${escapeHtml(item.displayPath || item.filePath || '')}">
+        <td class="file-path-cell text-highlight-trigger" 
+          data-start="${item.start}" 
+          data-end="${item.end}" 
+          data-index="${index}" 
+          data-filepath="${item.filePath || ''}"
+          title="点击定位到代码位置">
           ${escapeHtml(item.displayPath || item.filePath || '')}
         </td>
       ` : ''}
