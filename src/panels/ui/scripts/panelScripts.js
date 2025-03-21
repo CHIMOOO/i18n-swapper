@@ -661,11 +661,21 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
     // 模式切换按钮
     document.querySelectorAll('.mode-button').forEach(button => {
       button.addEventListener('click', () => {
+        // 记录当前筛选状态
+        let currentFilter = '';
+        if (window.fileNameFilter) {
+          currentFilter = window.fileNameFilter.currentFilterValue || '';
+        }
+        
+        // 获取模式
         const mode = button.getAttribute('data-mode');
         if (mode) {
           vscode.postMessage({
             command: 'switchScanMode',
-            data: { mode: mode }
+            data: { 
+              mode: mode,
+              currentFilter: currentFilter
+            }
           });
         }
       });
@@ -971,13 +981,6 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
             }
           });
         }
-        
-        // 延迟执行，确保DOM已更新
-        setTimeout(() => {
-          if (window.fileNameFilter && typeof window.fileNameFilter.initialize === 'function') {
-            window.fileNameFilter.initialize();
-          }
-        }, 500);
       });
     });
 

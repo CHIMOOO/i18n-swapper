@@ -218,13 +218,15 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
       ${scanAllFiles ? `
       <div class="file-filter-container">
         <div class="file-filter-input-container">
-          <input type="text" id="file-name-filter" placeholder="输入文件名进行筛选" class="file-filter-input">
+        <label for="file-name-filter" class="file-name-filter-label">文件名：
+          <input  type="text" id="file-name-filter" placeholder="输入文件名进行筛选" class="file-filter-input">
           <button id="clear-file-filter" class="clear-filter-btn" title="清除筛选">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <line x1="18" y1="6" x2="6" y2="18"></line>
               <line x1="6" y1="6" x2="18" y2="18"></line>
             </svg>
           </button>
+          </label>
         </div>
       </div>
       ` : ''}
@@ -291,9 +293,15 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
           align-items: center;
           position: relative; /* 添加相对定位，用于下拉列表的绝对定位 */
         }
-
+        .file-name-filter-label{
+            width: 230px;
+    display: flex;
+    align-items: center;
+    padding-left: 5px;
+        }
         .file-filter-input {
           flex: 1;
+          width:120px;
           padding: 6px 8px;
           border: 1px solid var(--vscode-input-border);
           background-color: var(--vscode-input-background);

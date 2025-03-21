@@ -263,7 +263,7 @@ class BatchReplacementPanel {
           
         case 'switchScanMode':
           if (message.data.mode !== undefined) {
-            this.switchScanMode(message.data.mode);
+            await this.switchScanMode(message.data.mode, message.data.currentFilter);
           } else {
             console.error('切换模式失败：未提供模式参数');
           }
@@ -1575,9 +1575,10 @@ class BatchReplacementPanel {
 
   /**
    * 切换扫描模式
-   * @param {string} mode 模式名称：'pending'、'translated' 或 'all'
+   * @param {string} mode 扫描模式 'pending'|'translated'|'all'
+   * @param {string} currentFilter 当前的筛选值
    */
-  async switchScanMode(mode) {
+  async switchScanMode(mode, currentFilter) {
     if (this.scanMode === mode) return;
 
     this.scanMode = mode;
@@ -1585,6 +1586,19 @@ class BatchReplacementPanel {
 
     // 更新面板内容
     await this.updatePanelContent();
+    
+    // 如果有筛选值，恢复筛选状态
+    if (currentFilter && this.panel) {
+      // 延迟发送恢复筛选状态的消息，确保面板内容已更新
+      setTimeout(() => {
+        this.panel.webview.postMessage({
+          command: 'restoreFilterState',
+          data: {
+            filterValue: currentFilter
+          }
+        });
+      }, 200);
+    }
   }
 
   /**
