@@ -28,7 +28,11 @@ function getPanelStyles() {
     .tools-group {
       display: flex;
       gap: 5px;
+          flex-wrap: wrap;
+          width: 100%;
+         
     }
+    
     button {
       background-color: var(--vscode-button-background);
       color: var(--vscode-button-foreground);
@@ -90,8 +94,11 @@ function getPanelStyles() {
     .select-all-container {
       display: flex;
       align-items: center;
-      margin-bottom: 5px;
+      margin-left: auto;
     }
+      .select-all-container label{
+            white-space: nowrap;
+      }
     input[type="checkbox"] {
       margin-right: 5px;
     }

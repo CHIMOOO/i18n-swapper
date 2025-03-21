@@ -230,14 +230,15 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
         </div>
       </div>
       ` : ''}
-        </div>
-
-        <div class="tools-group">
+             
           <div class="select-all-container">
             <input type="checkbox" id="select-all">
             <label for="select-all">全选</label>
           </div>
+      
         </div>
+
+
       </div>
       
 
@@ -284,7 +285,7 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
       <style>
         .file-filter-container {
           background-color: var(--vscode-editor-background);
-          border: 1px solid var(--vscode-panel-border);
+          box-shadow: var(--vscode-panel-border) 0px 0px 0px 1px;
           border-radius: 4px;
         }
 
