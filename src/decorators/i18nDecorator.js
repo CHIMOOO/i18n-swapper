@@ -795,13 +795,52 @@ class I18nDecorator {
                 this.exitEditMode();
             }
         } else {
-            // 检查是否点击了装饰文本
+            // 检查是否点击了装饰文本或右括号后面
+            let foundDecoration = false;
+            
             for (const decoration of this.currentInlineDecorations) {
                 if (decoration.range.contains(selection.active)) {
                     // 找到了点击的装饰，进入编辑模式
                     this.enterEditMode(decoration.range, decoration.originalKey);
+                    foundDecoration = true;
                     break;
                 }
+                
+                // 检查光标是否在右括号后面
+                const document = this.activeEditor.document;
+                const text = document.getText();
+                const decorationEndOffset = document.offsetAt(decoration.range.end);
+                const positionOffset = document.offsetAt(selection.active);
+                
+                // 从装饰范围结束位置向后查找右括号位置
+                let rightParenPos = -1;
+                for (let i = decorationEndOffset; i < text.length; i++) {
+                    // 跳过空白字符
+                    if (text[i] === ' ' || text[i] === '\t' || text[i] === '\r' || text[i] === '\n') {
+                        continue;
+                    }
+                    
+                    // 找到右括号
+                    if (text[i] === ')') {
+                        rightParenPos = i;
+                        break;
+                    }
+                    
+                    // 如果遇到非空白且非右括号的字符，则停止查找
+                    break;
+                }
+                
+                // 如果找到右括号且光标位置紧邻右括号之后
+                if (rightParenPos !== -1 && positionOffset === rightParenPos + 1) {
+                    this.enterEditMode(decoration.range, decoration.originalKey);
+                    foundDecoration = true;
+                    break;
+                }
+            }
+            
+            // 如果当前在编辑模式且没有找到相关装饰，退出编辑模式
+            if (this.isInEditMode && !foundDecoration) {
+                this.exitEditMode();
             }
         }
     }
