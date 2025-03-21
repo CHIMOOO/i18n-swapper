@@ -644,6 +644,9 @@ module.exports = {
     // 存储当前筛选值
     currentFilterValue: '',
     
+    // 用于存储当前选中的下拉项索引
+    selectedDropdownIndex: -1,
+    
     /**
      * 初始化筛选功能
      * 为筛选输入框和清除按钮添加事件监听器
@@ -654,18 +657,60 @@ module.exports = {
       
       if (filterInput) {
         // 添加输入事件监听器
-        filterInput.addEventListener('input', this.handleFilter.bind(this));
+        filterInput.addEventListener('input', (e) => {
+          // 重置选中项索引
+          this.selectedDropdownIndex = -1;
+          // 显示匹配输入值的文件名下拉列表
+          this.showFileNameDropdown(e.target.value.trim().toLowerCase());
+          // 处理筛选
+          this.handleFilter();
+        });
         
-        // 添加按键事件，支持按ESC键清除
+        // 添加按键事件，支持ESC键清除和方向键导航
         filterInput.addEventListener('keydown', (e) => {
+          const dropdown = document.querySelector('.file-name-dropdown');
+          
           if (e.key === 'Escape') {
+            // ESC键清除输入并隐藏下拉列表
             filterInput.value = '';
+            this.hideFileNameDropdown();
             this.handleFilter();
+          } else if (dropdown) {
+            // 如果存在下拉列表，处理方向键导航
+            const items = dropdown.querySelectorAll('.file-dropdown-item');
+            
+            if (items.length > 0) {
+              if (e.key === 'ArrowDown') {
+                // 向下导航
+                e.preventDefault(); // 防止光标移动
+                this.selectedDropdownIndex = Math.min(this.selectedDropdownIndex + 1, items.length - 1);
+                this.highlightSelectedItem(items);
+              } else if (e.key === 'ArrowUp') {
+                // 向上导航
+                e.preventDefault(); // 防止光标移动
+                this.selectedDropdownIndex = Math.max(this.selectedDropdownIndex - 1, 0);
+                this.highlightSelectedItem(items);
+              } else if (e.key === 'Enter' && this.selectedDropdownIndex >= 0) {
+                // 回车选择当前项
+                e.preventDefault(); // 防止表单提交
+                const selectedItem = items[this.selectedDropdownIndex];
+                if (selectedItem) {
+                  filterInput.value = selectedItem.getAttribute('data-filename');
+                  this.hideFileNameDropdown();
+                  this.handleFilter();
+                }
+              }
+            }
           }
         });
         
         // 添加焦点事件，显示文件名下拉列表
-        filterInput.addEventListener('focus', this.showFileNameDropdown.bind(this));
+        filterInput.addEventListener('focus', () => {
+          // 重置选中项索引
+          this.selectedDropdownIndex = -1;
+          // 显示匹配当前输入值的文件名下拉列表
+          this.showFileNameDropdown(filterInput.value.trim().toLowerCase());
+        });
         
         // 点击文档其他位置时隐藏下拉列表
         document.addEventListener('click', (e) => {
@@ -680,6 +725,7 @@ module.exports = {
         clearButton.addEventListener('click', () => {
           if (filterInput) {
             filterInput.value = '';
+            this.hideFileNameDropdown();
             this.handleFilter();
             // 清除后让输入框重新获得焦点
             filterInput.focus();
@@ -692,8 +738,30 @@ module.exports = {
     },
     
     /**
+     * 高亮选中的下拉项
+     * @param {NodeList} items 下拉列表项
+     */
+    highlightSelectedItem: function(items) {
+      // 移除所有项的高亮
+      items.forEach((item, index) => {
+        if (index === this.selectedDropdownIndex) {
+          // 高亮选中项
+          item.style.backgroundColor = 'var(--vscode-list-activeSelectionBackground, #094771)';
+          item.style.color = 'var(--vscode-list-activeSelectionForeground, #ffffff)';
+          
+          // 确保选中项在可视区域内
+          item.scrollIntoView({ block: 'nearest' });
+        } else {
+          // 取消其他项的高亮
+          item.style.backgroundColor = '';
+          item.style.color = '';
+        }
+      });
+    },
+    
+    /**
      * 处理筛选
-     * 根据输入的文件名筛选表格行
+     * 根据输入的文件名或路径筛选表格行
      */
     handleFilter: function() {
       const filterInput = document.getElementById('file-name-filter');
@@ -708,35 +776,35 @@ module.exports = {
       const rows = tbody.querySelectorAll('tr:not(.i18n-status-row)');
       let visibleCount = 0;
       
-      // 遍历所有行，根据文件名筛选
+      // 遍历所有行，根据文件名或路径筛选
       rows.forEach(row => {
         // 获取行的数据属性
         const filename = row.getAttribute('data-filename') || '';
         const filepath = row.getAttribute('data-filepath') || '';
         
-        // 如果没有文件名，可能是从文件路径中提取
+        // 默认不匹配
         let match = false;
         
         if (filterValue === '') {
           // 如果筛选值为空，显示所有行
           match = true;
         } else {
-          // 从文件路径中提取文件名
-          const pathParts = filepath.split(/[\/\\]/);
-          const fullFileName = pathParts[pathParts.length - 1]; // 最后一部分是文件名
-          
           // 改进匹配逻辑
-          // 1. 检查文件名是否包含筛选值（包括带点的情况）
-          if (fullFileName.toLowerCase().includes(filterValue)) {
+          // 1. 检查完整文件路径是否包含筛选值
+          if (filepath.toLowerCase().includes(filterValue)) {
             match = true;
           }
-          // 2. 检查不含后缀的文件名是否包含筛选值
+          // 2. 检查文件名是否包含筛选值
           else if (filename.toLowerCase().includes(filterValue)) {
             match = true;
           }
-          // 3. 检查文件路径是否包含筛选值
-          else if (filepath.toLowerCase().includes(filterValue)) {
-            match = true;
+          // 3. 从文件路径中提取文件名并检查
+          else {
+            const pathParts = filepath.split(/[\/\\]/);
+            const fullFileName = pathParts[pathParts.length - 1]; // 最后一部分是文件名
+            if (fullFileName && fullFileName.toLowerCase().includes(filterValue)) {
+              match = true;
+            }
           }
         }
         
@@ -786,9 +854,6 @@ module.exports = {
           }
         });
       }
-      
-      // 隐藏下拉列表
-      this.hideFileNameDropdown();
     },
     
     /**
@@ -802,7 +867,7 @@ module.exports = {
         if (visibleCount < totalCount) {
           infoSpan.textContent = `筛选中: 显示 ${visibleCount}/${totalCount} 项结果`;
         } else {
-          infoSpan.textContent = `筛选将匹配文件名（支持包含或不包含后缀）`;
+          infoSpan.textContent = `筛选将匹配文件路径和文件名`;
         }
       }
     },
@@ -816,6 +881,7 @@ module.exports = {
       const filterInput = document.getElementById('file-name-filter');
       if (filterInput && this.currentFilterValue) {
         filterInput.value = this.currentFilterValue;
+        this.showFileNameDropdown(this.currentFilterValue);
         this.handleFilter();
       }
     },
@@ -845,49 +911,116 @@ module.exports = {
     
     /**
      * 显示文件名下拉列表
-     * 根据当前表格中的文件路径生成下拉列表
+     * 根据当前表格中的文件路径生成下拉列表，并根据输入值过滤
+     * @param {string} filterText 当前输入的过滤文本
      */
-    showFileNameDropdown: function() {
+    showFileNameDropdown: function(filterText = '') {
       // 移除已有的下拉列表
       this.hideFileNameDropdown();
+      
+      // 重置选中项索引
+      this.selectedDropdownIndex = -1;
       
       const tbody = document.getElementById('replacements-tbody');
       if (!tbody) return;
       
-      // 收集所有唯一的文件名
-      const fileNames = new Set();
+      // 收集所有唯一的文件路径
+      const filePaths = new Set();
       const rows = tbody.querySelectorAll('tr:not(.i18n-status-row)');
       
       rows.forEach(row => {
         const filepath = row.getAttribute('data-filepath') || '';
         if (filepath) {
-          const pathParts = filepath.split(/[\/\\]/);
-          const fileName = pathParts[pathParts.length - 1]; // 完整文件名（带后缀）
-          if (fileName) {
-            fileNames.add(fileName);
-          }
+          filePaths.add(filepath);
         }
       });
       
-      // 如果没有文件名，不显示下拉列表
-      if (fileNames.size === 0) return;
+      // 如果没有文件路径，不显示下拉列表
+      if (filePaths.size === 0) return;
+      
+      // 根据输入值过滤文件路径
+      const filteredFilePaths = [...filePaths].filter(filePath => {
+        // 如果没有过滤文本，显示所有文件路径
+        if (!filterText) return true;
+        // 否则只显示包含过滤文本的文件路径
+        return filePath.toLowerCase().includes(filterText);
+      });
+      
+      // 如果没有匹配的文件路径，不显示下拉列表
+      if (filteredFilePaths.length === 0) return;
       
       // 创建下拉列表容器
       const dropdown = document.createElement('div');
       dropdown.className = 'file-name-dropdown';
       
-      // 将文件名添加到下拉列表
-      [...fileNames].sort().forEach(fileName => {
+      // 添加下拉菜单样式
+      dropdown.style.position = 'absolute';
+      dropdown.style.zIndex = '1000';
+      dropdown.style.backgroundColor = 'var(--vscode-editor-background, #1e1e1e)';
+      dropdown.style.border = '1px solid var(--vscode-editorWidget-border, #454545)';
+      dropdown.style.borderRadius = '3px';
+      dropdown.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.4)';
+      dropdown.style.maxHeight = '200px';
+      dropdown.style.overflowY = 'auto';
+      dropdown.style.width = '100%';
+      dropdown.style.top = 'calc(100% + 2px)';
+      dropdown.style.left = '0';
+      
+      // 将过滤后的文件路径添加到下拉列表
+      filteredFilePaths.sort().forEach(filePath => {
         const item = document.createElement('div');
         item.className = 'file-dropdown-item';
-        item.textContent = fileName;
         
-        // 点击文件名时，设置筛选值并应用筛选
+        // 设置下拉项样式
+        item.style.padding = '5px 10px';
+        item.style.cursor = 'pointer';
+        item.style.whiteSpace = 'nowrap';
+        item.style.overflow = 'hidden';
+        item.style.textOverflow = 'ellipsis';
+        
+        // 存储原始文件路径，用于选择时读取
+        item.setAttribute('data-filename', filePath);
+        
+        // 添加悬停效果
+        item.addEventListener('mouseover', () => {
+          // 如果不是当前选中项，则显示悬停效果
+          if (this.selectedDropdownIndex === -1 || item !== dropdown.querySelectorAll('.file-dropdown-item')[this.selectedDropdownIndex]) {
+            item.style.backgroundColor = 'var(--vscode-list-hoverBackground, #2a2d2e)';
+          }
+        });
+        
+        item.addEventListener('mouseout', () => {
+          // 如果不是当前选中项，则移除悬停效果
+          if (this.selectedDropdownIndex === -1 || item !== dropdown.querySelectorAll('.file-dropdown-item')[this.selectedDropdownIndex]) {
+            item.style.backgroundColor = '';
+          }
+        });
+        
+        // 如果有过滤文本，高亮匹配部分
+        if (filterText) {
+          const lowerFilePath = filePath.toLowerCase();
+          const index = lowerFilePath.indexOf(filterText);
+          if (index !== -1) {
+            const beforeMatch = filePath.substring(0, index);
+            const match = filePath.substring(index, index + filterText.length);
+            const afterMatch = filePath.substring(index + filterText.length);
+            
+            // 增强高亮样式，使匹配部分更加突出
+            item.innerHTML = `${beforeMatch}<strong style="color: #ffffff; background-color: #ff6900; padding: 0 2px; border-radius: 2px; font-weight: bold;">${match}</strong>${afterMatch}`;
+          } else {
+            item.textContent = filePath;
+          }
+        } else {
+          item.textContent = filePath;
+        }
+        
+        // 点击文件路径时，设置筛选值并应用筛选
         item.addEventListener('click', () => {
           const filterInput = document.getElementById('file-name-filter');
           if (filterInput) {
-            filterInput.value = fileName;
+            filterInput.value = filePath;
             this.handleFilter();
+            this.hideFileNameDropdown();
           }
         });
         
