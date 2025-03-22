@@ -791,10 +791,47 @@ class I18nDecorator {
         if (this.isInEditMode) {
             // 如果已经在编辑模式，检查是否点击了其他区域
             if (!this.editModeRange.contains(selection.active)) {
-                // 用户点击了其他区域，退出编辑模式
-                this.exitEditMode();
+                // 检查是否点击了后缀翻译文本区域
+                let clickedOnIgnoredArea = false;
+                const document = this.activeEditor.document;
+                const positionOffset = document.offsetAt(selection.active);
+                
+                // 检查是否点击在装饰文本后缀上或相关区域
+                for (const [key, value] of this.decorationHoverMap.entries()) {
+                    // 只检查包含当前编辑内容的函数调用
+                    if (value.range.contains(this.editModeRange)) {
+                        const callRange = value.range;
+                        const suffixStart = document.offsetAt(callRange.end);
+                        const suffixEnd = suffixStart + value.suffixLength;
+                        
+                        // 检查是否点击在后缀翻译文本上
+                        if (positionOffset >= suffixStart && positionOffset <= suffixEnd) {
+                            clickedOnIgnoredArea = true;
+                            break;
+                        }
+                        
+                        // 检查函数调用区域内右括号
+                        const callText = document.getText(callRange);
+                        const rightParenIndex = callText.lastIndexOf(')');
+                        if (rightParenIndex !== -1) {
+                            const rightParenPos = document.offsetAt(callRange.start) + rightParenIndex;
+                            // 检查是否点击在右括号附近
+                            if (Math.abs(positionOffset - rightParenPos) <= 1) {
+                                clickedOnIgnoredArea = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                // 如果不是点击在需要忽略的区域，才退出编辑模式
+                if (!clickedOnIgnoredArea) {
+                    // 用户点击了其他区域，退出编辑模式
+                    this.exitEditMode();
+                }
             }
         } else {
+            console.log('检查是否点击了装饰文本或右括号后面');
             // 检查是否点击了装饰文本或右括号后面
             let foundDecoration = false;
             
