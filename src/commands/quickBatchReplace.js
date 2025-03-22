@@ -380,21 +380,21 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
                     width: 'auto',
                     fontStyle: 'normal',
                     color: '#e37933',
-                    border: '1px solid rgba(120, 200, 120, 0.4)',
+                    // border: '1px solid rgba(120, 200, 120, 0.4)',
                     borderRadius: '3px',
+                    boxSizing: 'border-box',
+                    fontStyle: 'normal',
+                    fontWeight: 'bold',
+                    backgroundColor: '#46b96cb3',
+
+                    margin: '0 0 0 auto',
+
+                    padding: '3px 3px 3px 10px',
+
+                    color: '#ffffff',
+                    borderRadius: '16px',
                 },
-                light: {
-                    after: {
-                        contentIconPath: undefined,
-                        backgroundColor: 'rgba(120, 200, 120, 0.2)',
-                    }
-                },
-                dark: {
-                    after: {
-                        contentIconPath: undefined,
-                        backgroundColor: 'rgba(120, 200, 120, 0.1)',
-                    }
-                }
+
             },
             hoverMessage: hoverMessage,
         };
@@ -427,7 +427,7 @@ function registerCodeLensActions(document) {
                 // 确认按钮
                 const acceptLens = new vscode.CodeLens(
                     item.range, {
-                        title: '✓ 接受',
+                        title: '✅ 接受',
                         command: 'i18n-swapper.confirmReplacement',
                         arguments: [{
                             index
@@ -438,7 +438,7 @@ function registerCodeLensActions(document) {
                 // 取消按钮
                 const cancelLens = new vscode.CodeLens(
                     item.range, {
-                        title: '✗ 取消',
+                        title: '❌ 取消',
                         command: 'i18n-swapper.cancelReplacement',
                         arguments: [{
                             index
@@ -494,12 +494,24 @@ function showGlobalActionPanel(editor, document, replacementCount) {
                         contentText: `找到 ${replacementCount} 处可替换的文本 （鼠标悬停可操作）`,
                         fontStyle: 'normal',
                         fontWeight: 'bold',
-                        color: '#e37933',
-                        backgroundColor: 'rgba(120, 200, 120, 0.2)',
+                        // color: '#e37933',
+                        // backgroundColor: 'rgba(120, 200, 120, 0.2)',
                         padding: '0px 10px',
                         margin: '0 0 0 auto',
-                        border: '1px solid rgba(120, 200, 120, 0.4)',
+                        // border: '1px solid rgba(120, 200, 120, 0.4)',
+                        // border: '1px solid rgba(255, 255, 255, 0.4)',
                         borderRadius: '4px',
+                        margin: '0 0 0 auto',
+                        // color: '#333333',
+                        // backgroundColor: '#ffd500',
+                        transform: 'rotate(2deg)',
+                        // borderRadius: '20% 12% 18% 18%',
+                        // padding: '5px 3px 12px 10px',
+                        // boxShadow: '0px 0px 15px 5px rgba(255, 213, 0, 0.6)',
+                        borderRadius: '16px',
+                        backgroundColor: '#7c86ff',
+                        padding: '5px 3px 5px 10px',
+                        color: '#ffffff',
                     }
                 },
                 hoverMessage: hoverMessage
@@ -737,7 +749,7 @@ function registerCommands() {
                 document,
                 position
             );
-            
+
             // 使用replacementResult中的范围和替换文本
             let range = replacementResult.isVueAttr ? replacementResult.range : item.range;
             let replacementText = replacementResult.replacementText;
@@ -896,7 +908,7 @@ async function recalculateReplacementPositions(document) {
 
             // 检查是否在Vue模板属性中
             const position = document.positionAt(item.start);
-            
+
             // 使用统一的replaceFn方法处理替换逻辑
             const replacementResult = utils.replaceFn(
                 item.text,
@@ -906,20 +918,20 @@ async function recalculateReplacementPositions(document) {
                 document,
                 position
             );
-            
+
             // 更新替换项的属性
             if (replacementResult.isVueAttr) {
                 item.isVueAttr = true;
                 item.attrInfo = replacementResult.attrInfo;
-                
+
                 // 使用完整的属性范围
                 item.start = replacementResult.attrInfo.start;
                 item.end = replacementResult.attrInfo.end;
-                
+
                 // 更新文本和范围
                 item.text = document.getText(replacementResult.range);
                 item.range = replacementResult.range;
-                
+
                 // 使用新生成的替换文本
                 item.replacement = replacementResult.replacementText;
             }
@@ -988,26 +1000,25 @@ function applyDecorations(editor) {
             renderOptions: {
                 after: {
                     contentText: contentText,
-                    backgroundColor: 'rgba(120, 200, 120, 0.2)',
+                    // backgroundColor: 'rgba(120, 200, 120, 0.2)',
                     margin: '0 0 0 10px',
                     width: 'auto',
                     fontStyle: 'normal',
                     color: '#e37933',
-                    border: '1px solid rgba(120, 200, 120, 0.4)',
+                    // border: '1px solid rgba(120, 200, 120, 0.4)',
                     borderRadius: '3px',
+                    boxSizing: 'border-box',
+                    fontStyle: 'normal',
+                    fontWeight: 'bold',
+                    backgroundColor: '#46b96cb3',
+                    borderRadius: '16px',
+                    margin: '0 0 0 auto',
+
+                    padding: '3px 3px 3px 10px',
+
+                    color: '#ffffff!important',
                 },
-                light: {
-                    after: {
-                        contentIconPath: undefined,
-                        backgroundColor: 'rgba(120, 200, 120, 0.2)',
-                    }
-                },
-                dark: {
-                    after: {
-                        contentIconPath: undefined,
-                        backgroundColor: 'rgba(120, 200, 120, 0.1)',
-                    }
-                }
+
             },
             hoverMessage: hoverMessage,
         };
@@ -1044,11 +1055,11 @@ async function applyAllReplacements(editor) {
             editor.document,
             position
         );
-        
+
         // 使用replacementResult中的范围和替换文本
         workspaceEdit.replace(
-            editor.document.uri, 
-            replacementResult.isVueAttr ? replacementResult.range : item.range, 
+            editor.document.uri,
+            replacementResult.isVueAttr ? replacementResult.range : item.range,
             replacementResult.replacementText
         );
     }

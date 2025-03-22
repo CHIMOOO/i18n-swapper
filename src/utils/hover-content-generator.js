@@ -103,8 +103,8 @@ function generateLanguageHoverContent(params) {
 
         htmlContent += `
             <div>
-                <a href="command:${confirmCommand}?${confirmParams}">✓ 接受此替换</a>
-                <a href="command:${cancelCommand}?${cancelParams}">✗ 取消此替换</a>
+                <a href="command:${confirmCommand}?${confirmParams}">✅ 接受此替换</a>
+                <a href="command:${cancelCommand}?${cancelParams}">❌ 取消此替换</a>
             </div>
         `;
     }
