@@ -124,6 +124,7 @@ class BatchReplacementPanel {
             this.panel.dispose();
             return;
           case 'addPattern':
+            console.log('addPattern', message.pattern);
             await this.addScanPattern(message.pattern);
             return;
           case 'removePattern':

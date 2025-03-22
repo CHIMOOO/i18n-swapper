@@ -54,7 +54,7 @@ class BatchReplacementPanel {
     this.scanMode = 'pending'; // 扫描模式，默认为待转义
     this.scanAllFiles = false; // 添加扫描所有文件标志
     this.existingI18nCalls = []; // 存储已转义的国际化调用
-    this.allFilesResults = {    // 存储所有文件的扫描结果
+    this.allFilesResults = { // 存储所有文件的扫描结果
       replacements: [],
       existingCalls: []
     };
@@ -145,11 +145,11 @@ class BatchReplacementPanel {
       null,
       this._disposables
     );
-    
+
     // 监听编辑器活动窗口变化
     this._registerActiveEditorChangeListener();
   }
-  
+
   /**
    * 注册编辑器活动窗口变化监听器
    * 当用户切换到其他文件时，自动更新面板内容
@@ -181,7 +181,7 @@ class BatchReplacementPanel {
         disposable.dispose();
       }
     }
-    
+
     // 释放活动编辑器变化监听器
     if (this._activeEditorChangeDisposable) {
       this._activeEditorChangeDisposable.dispose();
@@ -195,71 +195,77 @@ class BatchReplacementPanel {
    */
   async _handlePanelMessage(message) {
     // console.log('面板消息:', message);
-    
+
     try {
-      const { command, data } = message;
-      
+      const {
+        command,
+        data
+      } = message;
+
       switch (command) {
         case 'addPattern':
+        case 'addScanPattern':
           await this.addScanPattern(data.pattern);
           break;
-          
+
         case 'removePattern':
+        case 'removeScanPattern':
+          console.log('removeScanPattern', data.pattern);
           await this.removeScanPattern(data.pattern);
           break;
-          
+
         case 'selectLocalesFile':
           await this.selectLocaleFile();
           break;
-          
+
         case 'removeLocalePath':
           await this.removeLocalePath(data.path);
           break;
-          
+
         case 'switchMode':
           await this.switchScanMode(data.mode, data.currentFilter);
           break;
-          
+
         case 'switchScanMode':
           await this.switchScanMode(data.mode, data.currentFilter);
           break;
-          
+
         case 'openI18nFile':
           await this.openI18nFile(data.index);
           break;
-          
+
         case 'copyI18nKey':
           await this.copyI18nKey(data.index);
           break;
-          
+
         case 'refreshScan':
           await this.refreshScan();
           break;
-          
+
         case 'refreshPanel':
           await this.refreshPanel(data.currentFilter);
           break;
-          
+
         case 'toggleSelectAll':
           await this.toggleSelectAll();
           break;
-          
+
         case 'updateI18nKey':
           this.updateI18nKey(data.index, data.key);
           break;
-          
+
         case 'toggleItemSelection':
           this.toggleItemSelection(data.index, data.selected);
           break;
-          
+
         case 'performSelectedReplacements':
           await this.performSelectedReplacements(data.selectedIndexes);
           break;
-          
+
         case 'replaceSelected':
           await this.performSelectedReplacements(data.selectedIndexes);
           break;
-          
+
         case 'replaceAll':
           if (data.visibleOnly && Array.isArray(data.visibleIndexes)) {
             await this.performVisibleReplacements(data.visibleIndexes);
@@ -267,111 +273,142 @@ class BatchReplacementPanel {
             await this.performAllReplacements();
           }
           break;
-          
+
         case 'performAllReplacements':
           await this.performAllReplacements();
           break;
-          
+
         case 'translateItem':
           await this.translateItem(data.index, data.userInputKey);
           break;
-          
+
         case 'highlightSourceText':
           await this.highlightSourceText(data.start, data.end, data.index, data.filePath);
           break;
-          
+
         case 'highlightText':
           await this.highlightSourceText(data.start, data.end, data.index, data.filePath);
           break;
-          
+
         case 'applyReplacements':
           await this.applyAllReplacements();
           break;
-          
+
         case 'replaceSingleItem':
           await this.replaceSingleItem(data);
           break;
-          
-        case 'updateConfiguration':
-          await this.updateConfiguration(data.config);
+        case 'updateMissingKeyStyles':
+          await this.highlightService.updateMissingKeyStyles(message.data);
           break;
-          
+        case 'updateDecorationStyles':
+          await this.highlightService.updateDecorationStyles(message.data);
+          break;
         case 'updateGeneralConfig':
           await this.updateGeneralConfig(data.config);
           break;
-          
+
         case 'addI18nFunctionName':
           await this.addI18nFunctionName(data.name);
           break;
-          
+
         case 'removeI18nFunctionName':
           await this.removeI18nFunctionName(data.name);
           break;
-          
+        case 'updateOutputI18nFunctionName':
+          try {
+            const functionName = message.data.functionName;
+            if (functionName) {
+              // 更新配置
+              await vscode.workspace.getConfiguration('i18n-swapper').update('functionName', functionName, vscode.ConfigurationTarget.Workspace);
+
+              // 更新内部状态
+              this.outputI18nFunctionName = functionName;
+
+              vscode.window.showInformationMessage(`已更新输出国际化函数名称为: ${functionName}`);
+            }
+          } catch (error) {
+            vscode.window.showErrorMessage(`更新输出国际化函数名称失败: ${error.message}`);
+          }
+          break;
         case 'toggleConfigExpand':
           this.isConfigExpanded = data.expanded;
           this.updatePanelContent();
           break;
-          
+
         case 'checkI18nKeyStatus':
           await this.checkI18nKeyStatus(data.index, data.key);
           break;
-          
+
         case 'toggleScanAllFiles':
           await this.toggleScanAllFiles(data.scanAllFiles);
           break;
-          
+
         case 'performVisibleReplacements':
           await this.performVisibleReplacements(data.visibleIndexes);
           break;
-          
+
         case 'openLanguageFile':
           await this.openLanguageFile(data.filePath, data.key, data.languageCode);
           break;
-          
+
         case 'openApiTranslation':
           await this.openApiTranslationConfig();
           break;
-          
+
         case 'updateStyleConfig':
           await this.updateStyleConfiguration(data.config);
           break;
-          
+
         case 'updateMissingKeyStyle':
           await this.updateMissingKeyStyle(data.config);
           break;
-          
+
         case 'addExcludePattern':
           await this.addExcludePattern(data.pattern);
           break;
-          
+
         case 'removeExcludePattern':
           await this.removeExcludePattern(data.pattern);
           break;
-          
+
         case 'addIncludePattern':
           await this.addIncludePattern(data.pattern);
           break;
-          
+
         case 'removeIncludePattern':
           await this.removeIncludePattern(data.pattern);
           break;
-          
+
         case 'selectIncludeFile':
           await this.selectIncludeFile(false);
           break;
-          
+
         case 'selectIncludeFolder':
           await this.selectIncludeFile(true);
           break;
-        
+
         case 'updateOutputFunctionName':
           await this.updateOutputFunctionName(data.name);
           break;
-          
+
         case 'updateFilterState':
           // 保存筛选状态到类属性，以便在更新面板时保持
           this.filterState = data;
+          break;
+
+        case 'updateConfig':
+          await vscode.workspace.getConfiguration().update(
+            message.data.key,
+            message.data.value,
+            vscode.ConfigurationTarget.Workspace
+          );
+
+          // 如果是自动翻译相关设置，可能需要刷新
+          if (message.data.key.includes('autoGenerate') ||
+            message.data.key.includes('autoTranslate')) {
+            // 更新内部缓存的配置
+            this._loadConfiguration();
+          }
           break;
       }
     } catch (error) {
@@ -641,7 +678,7 @@ class BatchReplacementPanel {
           }
         });
       }
-      
+
       // 处理 existingI18nCalls 的路径
       if (this.existingI18nCalls && this.existingI18nCalls.length > 0) {
         this.existingI18nCalls.forEach(item => {
@@ -653,7 +690,7 @@ class BatchReplacementPanel {
           }
         });
       }
-      
+
       // 处理语言映射的路径
       if (languageMappings && languageMappings.length > 0) {
         languageMappings.forEach(mapping => {
@@ -667,8 +704,7 @@ class BatchReplacementPanel {
       const html = getPanelHtml(
         scanPatterns,
         this.replacements,
-        localesPaths,
-        {
+        localesPaths, {
           decorationStyle: config.get('decorationStyle', 'suffix'),
           showFullFormInEditMode: config.get('showFullFormInEditMode', true),
           suffixStyle: config.get('suffixStyle', {}),
@@ -708,7 +744,7 @@ class BatchReplacementPanel {
       } else if (this.scanMode === 'all') {
         searchKeys = this.replacements.concat(this.existingI18nCalls);
       }
-      
+
       // 委托给i18n键状态服务处理
       await this.i18nKeyStatusService.loadI18nKeysStatus(searchKeys, languageMappings);
     } catch (error) {
@@ -723,7 +759,7 @@ class BatchReplacementPanel {
   async refreshPanel(currentFilter) {
     try {
       this.selectedIndexes = []; // 清空选中项
-      
+
       // 根据当前扫描模式选择刷新方法
       if (this.scanAllFiles) {
         // 如果当前是扫描所有文件模式，则使用工作区扫描服务重新扫描
@@ -733,24 +769,26 @@ class BatchReplacementPanel {
           cancellable: false
         }, async (progress) => {
           try {
-            progress.report({ message: "重新扫描所有文件..." });
-            
+            progress.report({
+              message: "重新扫描所有文件..."
+            });
+
             // 使用分析现有i18n调用的绑定函数
             const analyzeExistingI18nCallsBound = this.analyzeExistingI18nCalls.bind(this);
-            
+
             // 调用工作区扫描服务
             this.allFilesResults = await workspaceScannerService.scanAllWorkspaceFiles(
               analyzeExistingI18nCallsBound,
               progress
             );
-            
+
             // 更新当前显示的结果
             this.replacements = this.allFilesResults.replacements;
             this.existingI18nCalls = this.allFilesResults.existingCalls;
-            
+
             // 更新面板内容
             await this.updatePanelContent();
-            
+
             // 如果有筛选值，恢复筛选状态
             if (currentFilter && this.panel) {
               // 延迟发送恢复筛选状态的消息，确保面板内容已更新
@@ -769,7 +807,7 @@ class BatchReplacementPanel {
             throw error;
           }
         });
-        
+
         vscode.window.showInformationMessage(
           `刷新完成: 找到 ${this.allFilesResults.replacements.length} 个待转义项, ${this.allFilesResults.existingCalls.length} 个已转义项`
         );
@@ -790,7 +828,7 @@ class BatchReplacementPanel {
    */
   selectVisibleItems(visibleIndexes, isChecked) {
     console.log('选择可见项目：', visibleIndexes, isChecked);
-    
+
     // 更新选中状态
     if (this.scanMode === 'pending' || this.scanMode === 'all') {
       for (const index of visibleIndexes) {
@@ -799,7 +837,7 @@ class BatchReplacementPanel {
         }
       }
     }
-    
+
     if (this.scanMode === 'translated' || this.scanMode === 'all') {
       for (const index of visibleIndexes) {
         if (index >= 0 && index < this.existingI18nCalls.length) {
@@ -807,31 +845,31 @@ class BatchReplacementPanel {
         }
       }
     }
-    
+
     // 更新面板
     this._updatePanel();
   }
-  
+
   /**
    * 选择所有项目
    * @param {boolean} updatePanel 是否更新面板
    */
   selectAllItems(updatePanel = true) {
     console.log('选择所有项目');
-    
+
     // 根据当前模式选择
     if (this.scanMode === 'pending' || this.scanMode === 'all') {
       this.replacements.forEach(item => {
         item.selected = true;
       });
     }
-    
+
     if (this.scanMode === 'translated' || this.scanMode === 'all') {
       this.existingI18nCalls.forEach(item => {
         item.selected = true;
       });
     }
-    
+
     // 更新面板
     if (updatePanel) {
       this._updatePanel();
@@ -997,10 +1035,10 @@ class BatchReplacementPanel {
   async performSelectedReplacements(selectedIndexes) {
     try {
       console.log('执行选中项替换，索引:', selectedIndexes);
-      
+
       // 如果提供了索引数组，使用它；否则使用所有选中项
       const indexesToReplace = selectedIndexes || this.getSelectedIndexes();
-      
+
       // 使用可见项替换方法执行替换
       return await this.performVisibleReplacements(indexesToReplace);
     } catch (error) {
@@ -1008,14 +1046,14 @@ class BatchReplacementPanel {
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
     }
   }
-  
+
   /**
    * 获取所有选中项的索引
    * @returns {Array<number>} 选中项的索引数组
    */
   getSelectedIndexes() {
     const selectedIndexes = [];
-    
+
     // 根据当前扫描模式获取正确的数据源
     if (this.scanMode === 'pending') {
       this.replacements.forEach((item, index) => {
@@ -1035,14 +1073,14 @@ class BatchReplacementPanel {
         ...this.replacements,
         ...this.existingI18nCalls
       ];
-      
+
       allItems.forEach((item, index) => {
         if (item.selected) {
           selectedIndexes.push(index);
         }
       });
     }
-    
+
     return selectedIndexes;
   }
 
@@ -1109,13 +1147,13 @@ class BatchReplacementPanel {
             return;
           }
         }
-        
+
         // 规范化文件路径
         let filePath = item.filePath;
         if (!path.isAbsolute(filePath)) {
           filePath = path.join(rootPath, filePath);
         }
-        
+
         if (!itemsByFile[filePath]) {
           itemsByFile[filePath] = [];
         }
@@ -1130,7 +1168,7 @@ class BatchReplacementPanel {
       }, async (progress) => {
         let processedFiles = 0;
         const totalFiles = Object.keys(itemsByFile).length;
-        
+
         // 处理每个文件的替换
         for (const [filePath, fileItems] of Object.entries(itemsByFile)) {
           try {
@@ -1138,36 +1176,36 @@ class BatchReplacementPanel {
               message: `处理文件 ${processedFiles + 1}/${totalFiles}...`,
               increment: 100 / totalFiles
             });
-            
+
             console.log(`处理文件: ${filePath}`);
-            
+
             if (!fs.existsSync(filePath)) {
               throw new Error(`文件不存在: ${filePath}`);
             }
-            
+
             // 获取文件内容
             const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
-            
+
             // 从后向前替换，避免位置变化
             fileItems.sort((a, b) => b.start - a.start);
-            
+
             // 获取配置
             const config = vscode.workspace.getConfiguration('i18n-swapper');
             const functionName = config.get('functionName', 't');
             const quoteType = config.get('quoteType', 'single');
             const quote = quoteType === 'single' ? "'" : '"';
-            
+
             // 为每个文件创建独立的工作区编辑对象
             const workspaceEdit = new vscode.WorkspaceEdit();
             let fileItemCount = 0;
-            
+
             // 处理每个替换项
             for (const item of fileItems) {
               if (!item.i18nKey) continue;
-              
+
               // 获取位置信息
               const position = document.positionAt(item.start);
-              
+
               // 使用统一的replaceFn方法处理替换逻辑
               const replacementResult = utils.replaceFn(
                 item.text,
@@ -1177,7 +1215,7 @@ class BatchReplacementPanel {
                 document,
                 position
               );
-              
+
               // 使用返回的范围和替换文本
               workspaceEdit.replace(
                 document.uri,
@@ -1187,10 +1225,10 @@ class BatchReplacementPanel {
                 ),
                 replacementResult.replacementText
               );
-              
+
               fileItemCount++;
             }
-            
+
             // 为每个文件单独应用编辑，确保每个文件的操作可以独立撤销
             if (fileItemCount > 0) {
               const success = await vscode.workspace.applyEdit(workspaceEdit);
@@ -1201,7 +1239,7 @@ class BatchReplacementPanel {
                 vscode.window.showWarningMessage(`文件 ${path.basename(filePath)} 替换失败`);
               }
             }
-            
+
             processedFiles++;
           } catch (error) {
             console.error(`处理文件 ${filePath} 时出错:`, error);
@@ -1221,7 +1259,7 @@ class BatchReplacementPanel {
             count: totalItems
           });
         }
-        
+
         // 刷新面板
         await this.refreshPanel();
       } else {
@@ -1262,27 +1300,27 @@ class BatchReplacementPanel {
       const workspaceEdit = new vscode.WorkspaceEdit();
       const totalItems = validItems.length;
       const document = this.document;
-      
+
       if (!document) {
         throw new Error('未找到关联的文档');
       }
-      
+
       // 处理每个替换项
       for (let i = 0; i < totalItems; i++) {
         const item = validItems[i];
-        
+
         // 更新进度
         progress.report({
           message: `替换第 ${i+1}/${totalItems} 项...`,
           increment: 100 / totalItems
         });
-        
+
         // 获取配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
         const configQuoteType = config.get('quoteType', 'single');
         const functionName = config.get('functionName', 't');
         const codeQuote = configQuoteType === 'single' ? "'" : '"';
-        
+
         // 使用统一的replaceFn方法处理替换逻辑
         const position = document.positionAt(item.start);
         const replacementResult = utils.replaceFn(
@@ -1293,14 +1331,14 @@ class BatchReplacementPanel {
           document,
           position
         );
-        
+
         // 使用返回的范围和替换文本
         workspaceEdit.replace(
-          document.uri, 
+          document.uri,
           replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
             document.positionAt(item.start),
             document.positionAt(item.end)
-          ), 
+          ),
           replacementResult.replacementText
         );
       }
@@ -1319,7 +1357,7 @@ class BatchReplacementPanel {
             count: totalItems
           });
         }
-        
+
         // 重新分析文档
         await this.analyzeAndLoadPanel();
       } else {
@@ -1590,7 +1628,7 @@ class BatchReplacementPanel {
    */
   async switchScanMode(mode, currentFilter) {
     if (this.scanMode === mode) return;
-    
+
     console.log(`切换扫描模式: ${this.scanMode} -> ${mode}，当前筛选值: ${currentFilter || '无'}`);
 
     this.scanMode = mode;
@@ -1598,7 +1636,7 @@ class BatchReplacementPanel {
 
     // 更新面板内容
     await this.updatePanelContent();
-    
+
     // 如果有筛选值，恢复筛选状态
     if (currentFilter && this.panel) {
       // 延迟发送恢复筛选状态的消息，确保面板内容已更新
@@ -1762,9 +1800,11 @@ class BatchReplacementPanel {
         currentItems.forEach((item, index) => {
           item.selected = true;
         });
-        
+
         // 更新选中索引
-        this.selectedIndexes = Array.from({ length: currentItems.length }, (_, index) => index);
+        this.selectedIndexes = Array.from({
+          length: currentItems.length
+        }, (_, index) => index);
       }
 
       // 强制更新面板状态，保持一致性
@@ -1773,7 +1813,7 @@ class BatchReplacementPanel {
         selectedIndexes: this.selectedIndexes,
         selectAll: !allSelected
       });
-      
+
       // 延迟更新面板内容，确保状态先被更新
       setTimeout(async () => {
         await this.updatePanelContent();
@@ -1808,11 +1848,11 @@ class BatchReplacementPanel {
 
     // 根据当前扫描模式获取正确的数据源
     if (this.scanMode === 'translated') {
-      selectedItems = this.existingI18nCalls.filter((item, index) => 
+      selectedItems = this.existingI18nCalls.filter((item, index) =>
         item.selected && item.i18nKey
       );
     } else if (this.scanMode === 'pending') {
-      selectedItems = this.replacements.filter((item, index) => 
+      selectedItems = this.replacements.filter((item, index) =>
         item.selected && item.i18nKey
       );
     } else if (this.scanMode === 'all') {
@@ -1829,21 +1869,21 @@ class BatchReplacementPanel {
       // 如果没有选中项但selectedIndexes不为空，说明可能是全选刚被点击
       // 重新尝试获取选中项
       if (this.scanMode === 'translated') {
-        selectedItems = this.existingI18nCalls.filter((item, index) => 
+        selectedItems = this.existingI18nCalls.filter((item, index) =>
           this.selectedIndexes.includes(index) && item.i18nKey
         );
       } else if (this.scanMode === 'pending') {
-        selectedItems = this.replacements.filter((item, index) => 
+        selectedItems = this.replacements.filter((item, index) =>
           this.selectedIndexes.includes(index) && item.i18nKey
         );
       } else if (this.scanMode === 'all') {
         // 合并两个列表
         const allItems = [...this.replacements, ...this.existingI18nCalls];
-        selectedItems = allItems.filter((item, index) => 
+        selectedItems = allItems.filter((item, index) =>
           this.selectedIndexes.includes(index) && item.i18nKey
         );
       }
-      
+
       console.log(`尝试通过索引找到 ${selectedItems.length} 个选中项`);
     }
 
@@ -1859,10 +1899,10 @@ class BatchReplacementPanel {
           ...this.existingI18nCalls.filter(item => item.i18nKey)
         ];
       }
-      
+
       console.log(`全选模式下找到 ${selectedItems.length} 个项目`);
     }
-    
+
     return selectedItems;
   }
 
@@ -1899,7 +1939,7 @@ class BatchReplacementPanel {
 
         // 构建完整的文件路径
         const fullPath = path.isAbsolute(filePath) ? filePath : path.join(rootPath, filePath);
-        
+
         // 检查文件是否存在
         if (!fs.existsSync(fullPath)) {
           throw new Error(`文件不存在: ${filePath}`);
@@ -1907,7 +1947,7 @@ class BatchReplacementPanel {
 
         const uri = vscode.Uri.file(fullPath);
         document = await vscode.workspace.openTextDocument(uri);
-        
+
         // 在第一个窗口中打开文件
         await vscode.window.showTextDocument(document, {
           viewColumn: vscode.ViewColumn.One, // 指定在第一个窗口打开
@@ -1935,7 +1975,7 @@ class BatchReplacementPanel {
   async replaceSingleItem(data) {
     try {
       const index = data.index;
-      
+
       // 获取正确的数据源
       let items = [];
       if (this.scanMode === 'pending') {
@@ -1945,21 +1985,21 @@ class BatchReplacementPanel {
       } else if (this.scanMode === 'all') {
         items = [...this.replacements, ...this.existingI18nCalls];
       }
-      
+
       // 检查索引是否有效
       if (index < 0 || index >= items.length) {
         vscode.window.showWarningMessage('无效的项目索引');
         return;
       }
-      
+
       const item = items[index];
-      
+
       // 检查项目是否有国际化键
       if (!item.i18nKey) {
         vscode.window.showWarningMessage('无法替换：该项目没有国际化键');
         return;
       }
-      
+
       await vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: '正在替换项目...',
@@ -1970,16 +2010,16 @@ class BatchReplacementPanel {
         const functionName = config.get('functionName', 't');
         const quoteType = config.get('quoteType', 'single');
         const quote = quoteType === 'single' ? "'" : '"';
-        
+
         // 确定要编辑的文档
         let document;
         let editor;
-        
+
         if (this.scanAllFiles && item.fileUri) {
           // 在日志中使用相对路径
           const relativePath = this.getRelativePath(item.fileUri.fsPath);
           console.log(`打开文件进行替换: ${relativePath}`);
-          
+
           // 正常使用 URI 打开文档，但在第一个窗口中
           document = await vscode.workspace.openTextDocument(item.fileUri);
           editor = await vscode.window.showTextDocument(document, {
@@ -1991,20 +2031,20 @@ class BatchReplacementPanel {
           if (!document) {
             throw new Error('未找到关联的文档');
           }
-          
+
           editor = vscode.window.visibleTextEditors.find(
             e => e.document.uri.toString() === document.uri.toString()
           );
         }
-        
+
         if (!editor) {
           throw new Error('未找到关联的编辑器');
         }
-        
+
         progress.report({
           message: '正在替换...'
         });
-        
+
         // 创建编辑对象
         await editor.edit(editBuilder => {
           const position = document.positionAt(item.start);
@@ -2016,7 +2056,7 @@ class BatchReplacementPanel {
             document,
             position
           );
-          
+
           // 使用返回的范围和替换文本
           editBuilder.replace(
             replacementResult.isVueAttr ? replacementResult.range : new vscode.Range(
@@ -2026,7 +2066,7 @@ class BatchReplacementPanel {
             replacementResult.replacementText
           );
         });
-        
+
         // 重新分析文档，更新所有项目的位置信息
         if (this.scanAllFiles) {
           // 简单刷新当前项目，而不是重新扫描整个工作区
@@ -2035,7 +2075,7 @@ class BatchReplacementPanel {
         } else {
           await this.analyzeAndLoadPanel();
         }
-        
+
         vscode.window.showInformationMessage('项目替换成功');
       });
     } catch (error) {
@@ -2119,7 +2159,7 @@ class BatchReplacementPanel {
 
       // 委托给i18n键状态服务处理
       const status = await this.i18nKeyStatusService.checkI18nKeyStatus(
-        this.replacements[index], 
+        this.replacements[index],
         key,
         languageMappings
       );
@@ -2149,8 +2189,8 @@ class BatchReplacementPanel {
   async openLanguageFile(filePath, key, languageCode) {
     // 修改为在第一个窗口打开
     await this.i18nKeyStatusService.openLanguageFile(
-      filePath, 
-      key, 
+      filePath,
+      key,
       languageCode,
       vscode.ViewColumn.One // 指定在第一个窗口打开
     );
@@ -2160,7 +2200,7 @@ class BatchReplacementPanel {
   async addExcludePattern(pattern) {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     const excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
-    
+
     if (!excludeFiles.includes(pattern)) {
       excludeFiles.push(pattern);
       await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
@@ -2172,17 +2212,17 @@ class BatchReplacementPanel {
   async removeExcludePattern(pattern) {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     let excludeFiles = config.get('excludeFiles', defaultsConfig.excludeFiles);
-    
+
     excludeFiles = excludeFiles.filter(p => p !== pattern);
     await config.update('excludeFiles', excludeFiles, vscode.ConfigurationTarget.Workspace);
     this.refreshPanel();
   }
-  
+
   // 添加包含文件或文件夹
   async addIncludePattern(pattern) {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
-    
+
     if (!includeFiles.includes(pattern)) {
       includeFiles.push(pattern);
       await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
@@ -2194,36 +2234,36 @@ class BatchReplacementPanel {
   async removeIncludePattern(pattern) {
     const config = vscode.workspace.getConfiguration('i18n-swapper');
     let includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
-    
+
     includeFiles = includeFiles.filter(p => p !== pattern);
     await config.update('includeFiles', includeFiles, vscode.ConfigurationTarget.Workspace);
     this.refreshPanel();
   }
-  
+
   /**
    * 获取相对路径
    * @param {string} absolutePath 绝对路径
    * @returns {string} 相对于工作区的路径
    */
   getRelativePath(absolutePath) {
-    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const workspaceFolder = vscode.workspace.workspaceFolders?. [0];
     if (!workspaceFolder) return absolutePath;
-    
+
     const rootPath = workspaceFolder.uri.fsPath;
-    
+
     // 确保路径使用一致的路径分隔符
     const normalizedAbsolutePath = absolutePath.replace(/\\/g, '/');
     const normalizedRootPath = rootPath.replace(/\\/g, '/');
-    
+
     if (normalizedAbsolutePath.startsWith(normalizedRootPath)) {
       // 去除开头的斜杠，保持相对路径格式
       const relativePath = normalizedAbsolutePath.substring(normalizedRootPath.length);
       return relativePath.startsWith('/') ? relativePath.substring(1) : relativePath;
     }
-    
+
     return absolutePath;
   }
-  
+
   /**
    * 选择要包含的文件或文件夹
    * @param {boolean} folderOnly 是否只选择文件夹
@@ -2240,28 +2280,28 @@ class BatchReplacementPanel {
           '所有文件': ['*']
         }
       };
-      
+
       // 显示文件选择对话框
       const uris = await vscode.window.showOpenDialog(options);
-      
+
       if (uris && uris.length > 0) {
         // 获取当前配置
         const config = vscode.workspace.getConfiguration('i18n-swapper');
         const includeFiles = config.get('includeFiles', defaultsConfig.includeFiles);
         const updatedIncludeFiles = [...includeFiles]; // 创建新数组，避免直接修改原始数组
-        
+
         const fs = require('fs');
         let addedFiles = 0;
         let addedDirs = 0;
-        
+
         // 处理每个选中的文件/文件夹
         for (const uri of uris) {
           try {
             const isDirectory = folderOnly || fs.statSync(uri.fsPath).isDirectory();
-            
+
             // 转换为相对路径
             let relativePath = this.getRelativePath(uri.fsPath);
-            
+
             // 如果是文件夹，确保路径以斜杠结尾
             if (isDirectory && !relativePath.endsWith('/')) {
               relativePath += '/';
@@ -2269,7 +2309,7 @@ class BatchReplacementPanel {
             } else if (!isDirectory) {
               addedFiles++;
             }
-            
+
             // 如果不在列表中，则添加
             if (!updatedIncludeFiles.includes(relativePath)) {
               updatedIncludeFiles.push(relativePath);
@@ -2280,14 +2320,14 @@ class BatchReplacementPanel {
             vscode.window.showWarningMessage(`处理 ${uri.fsPath} 时出错: ${error.message}`);
           }
         }
-        
+
         // 更新配置
         await config.update('includeFiles', updatedIncludeFiles, vscode.ConfigurationTarget.Workspace);
-        
+
         // 刷新面板
         this.refreshPanel();
-        
-        const message = folderOnly ? 
+
+        const message = folderOnly ?
           `已添加 ${addedDirs} 个文件夹到扫描列表` :
           `已添加 ${addedFiles} 个文件到扫描列表`;
         vscode.window.showInformationMessage(message);
@@ -2306,7 +2346,7 @@ class BatchReplacementPanel {
     try {
       // 更新扫描模式
       this.scanAllFiles = scanAllFiles;
-      
+
       // 如果切换到扫描所有文件且当前有打开的面板
       if (scanAllFiles && this.panel) {
         await vscode.window.withProgress({
@@ -2320,14 +2360,14 @@ class BatchReplacementPanel {
               this.analyzeExistingI18nCalls.bind(this),
               progress
             );
-            
+
             // 替换当前的扫描结果
             this.replacements = results.replacements;
             this.existingI18nCalls = results.existingCalls;
-            
+
             // 更新面板内容
             await this.updatePanelContent();
-            
+
             vscode.window.showInformationMessage(`扫描完成，找到 ${this.replacements.length} 个待替换项和 ${this.existingI18nCalls.length} 个已转义项`);
           } catch (error) {
             console.error('扫描所有文件时出错:', error);
@@ -2339,7 +2379,7 @@ class BatchReplacementPanel {
         // 重新分析当前文档
         await this.analyzeAndLoadPanel();
       }
-      
+
       // // 更新配置
       // await vscode.workspace.getConfiguration('i18n-swapper').update(
       //   'scanAllFilesMode',
@@ -2359,7 +2399,7 @@ class BatchReplacementPanel {
   async performVisibleReplacements(visibleIndexes) {
     try {
       console.log('执行可见项替换，可见索引:', visibleIndexes);
-      
+
       // 检查是否是扫描所有文件模式
       if (this.scanAllFiles) {
         return await this._performMultiFileReplacementsForIndexes(visibleIndexes);
@@ -2423,13 +2463,13 @@ class BatchReplacementPanel {
             return;
           }
         }
-        
+
         // 规范化文件路径
         let filePath = item.filePath;
         if (!path.isAbsolute(filePath)) {
           filePath = path.join(rootPath, filePath);
         }
-        
+
         if (!itemsByFile[filePath]) {
           itemsByFile[filePath] = [];
         }
@@ -2444,7 +2484,7 @@ class BatchReplacementPanel {
       }, async (progress) => {
         const totalFiles = Object.keys(itemsByFile).length;
         let processedFiles = 0;
-        
+
         // 处理每个文件的替换
         for (const [filePath, fileItems] of Object.entries(itemsByFile)) {
           try {
@@ -2452,36 +2492,36 @@ class BatchReplacementPanel {
               message: `处理文件 ${processedFiles + 1}/${totalFiles}...`,
               increment: 100 / totalFiles
             });
-            
+
             console.log(`处理文件: ${filePath}`);
-            
+
             if (!fs.existsSync(filePath)) {
               throw new Error(`文件不存在: ${filePath}`);
             }
-            
+
             // 获取文件内容
             const document = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
-            
+
             // 从后向前替换，避免位置变化
             fileItems.sort((a, b) => b.start - a.start);
-            
+
             // 获取配置
             const config = vscode.workspace.getConfiguration('i18n-swapper');
             const functionName = config.get('functionName', 't');
             const quoteType = config.get('quoteType', 'single');
             const quote = quoteType === 'single' ? "'" : '"';
-            
+
             // 为每个文件创建独立的工作区编辑对象
             const workspaceEdit = new vscode.WorkspaceEdit();
             let fileItemCount = 0;
-            
+
             // 处理每个替换项
             for (const item of fileItems) {
               if (!item.i18nKey) continue;
-              
+
               // 获取位置信息
               const position = document.positionAt(item.start);
-              
+
               // 使用统一的replaceFn方法处理替换逻辑
               const replacementResult = utils.replaceFn(
                 item.text,
@@ -2491,7 +2531,7 @@ class BatchReplacementPanel {
                 document,
                 position
               );
-              
+
               // 使用返回的范围和替换文本
               workspaceEdit.replace(
                 document.uri,
@@ -2501,10 +2541,10 @@ class BatchReplacementPanel {
                 ),
                 replacementResult.replacementText
               );
-              
+
               fileItemCount++;
             }
-            
+
             // 为每个文件单独应用编辑，确保每个文件的操作可以独立撤销
             if (fileItemCount > 0) {
               const success = await vscode.workspace.applyEdit(workspaceEdit);
@@ -2515,7 +2555,7 @@ class BatchReplacementPanel {
                 vscode.window.showWarningMessage(`文件 ${path.basename(filePath)} 替换失败`);
               }
             }
-            
+
             processedFiles++;
           } catch (error) {
             console.error(`处理文件 ${filePath} 时出错:`, error);
@@ -2566,21 +2606,21 @@ class BatchReplacementPanel {
 
       // 创建编辑操作
       const workspaceEdit = new vscode.WorkspaceEdit();
-      
+
       // 从后向前替换，避免位置变化
       items.sort((a, b) => b.start - a.start);
-      
+
       // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
       const functionName = config.get('functionName', 't');
       const quoteType = config.get('quoteType', 'single');
       const quote = quoteType === 'single' ? "'" : '"';
-      
+
       // 处理每个替换项
       for (const item of items) {
         // 获取位置信息
         const position = this.document.positionAt(item.start);
-        
+
         // 使用统一的replaceFn方法处理替换逻辑
         const replacementResult = utils.replaceFn(
           item.text,
@@ -2590,7 +2630,7 @@ class BatchReplacementPanel {
           this.document,
           position
         );
-        
+
         // 使用返回的范围和替换文本
         workspaceEdit.replace(
           this.document.uri,
@@ -2636,6 +2676,72 @@ class BatchReplacementPanel {
     // 现有的清理代码...
     if (this.panel) {
       this.panel.dispose();
+    }
+  }
+
+
+
+  async updateStyleConfiguration(data) {
+    try {
+      console.log('更新样式配置:', data);
+
+      // 提取样式配置
+      const {
+        decorationStyle,
+        suffixStyle,
+        inlineStyle
+      } = data;
+
+      // 使用VSCode API更新配置
+      const config = vscode.workspace.getConfiguration('i18n-swapper');
+      await config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Workspace);
+      await config.update('suffixStyle', suffixStyle, vscode.ConfigurationTarget.Workspace);
+      await config.update('inlineStyle', inlineStyle, vscode.ConfigurationTarget.Workspace);
+
+      // 应用新的样式
+      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+
+      // 提示用户
+      vscode.window.showInformationMessage('已更新装饰样式设置，手动返回代码页面激活生效。');
+
+      // 刷新面板内容以反映新配置
+      this.updatePanelContent();
+    } catch (error) {
+      console.error('更新样式配置时出错:', error);
+      vscode.window.showErrorMessage(`更新样式配置失败: ${error.message}`);
+    }
+  }
+
+  async updateMissingKeyStyle(config) {
+    try {
+      console.log('更新缺失键样式:', config);
+
+      const {
+        missingKeyBorderWidth,
+        missingKeyBorderStyle,
+        missingKeyBorderColor,
+        missingKeyBorderSpacing
+      } = config;
+
+      // 更新配置
+      const vscodeConfig = vscode.workspace.getConfiguration('i18n-swapper');
+
+      // 逐项更新配置
+      await vscodeConfig.update('missingKeyBorderWidth', missingKeyBorderWidth, vscode.ConfigurationTarget.Workspace);
+      await vscodeConfig.update('missingKeyBorderStyle', missingKeyBorderStyle, vscode.ConfigurationTarget.Workspace);
+      await vscodeConfig.update('missingKeyBorderColor', missingKeyBorderColor, vscode.ConfigurationTarget.Workspace);
+      await vscodeConfig.update('missingKeyBorderSpacing', missingKeyBorderSpacing, vscode.ConfigurationTarget.Workspace);
+
+      // 刷新装饰器
+      await vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+
+      // 刷新面板内容以反映新配置
+      this.updatePanelContent();
+
+      vscode.window.showInformationMessage('缺失键样式设置已保存，返回代码页面重新激活');
+    } catch (error) {
+      console.error('更新缺失键样式失败:', error);
+      vscode.window.showErrorMessage(`更新缺失键样式失败: ${error.message}`);
     }
   }
 }

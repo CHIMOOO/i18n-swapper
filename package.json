@@ -2,7 +2,7 @@
   "name": "i18n-swapper",
   "displayName": "i18n swapper",
   "description": "查找并替换文本国际化键",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "publisher": "chimoo",
   "author": {
     "name": "chimoo"
