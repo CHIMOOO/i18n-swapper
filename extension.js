@@ -8,165 +8,206 @@ const defaultsConfig = require('./src/config/defaultsConfig');  // 引入默认�
 const { LANGUAGE_NAMES } = require('./src/utils/language-mappings');
 const { handleHoverTranslate } = require('./src/commands/translateHover');
 const { editLanguageEntry } = require('./src/commands/edit-language-entry');
+const BatchReplacementPanel = require('./src/panels/BatchReplacementPanel');
 
 /**
  * 激活扩展
  * @param {vscode.ExtensionContext} context 扩展上下文
  */
 function activate(context) {
-  console.log('i18n-swapper 扩展已激活');
+  console.log('i18n-swapper 插件已激活');
 
-  // 确保工作区设置中有默认配置
-  ensureDefaultWorkspaceSettings();
-
-  // 注册所有命令
-  context.subscriptions.push(
-    vscode.commands.registerCommand(
-      'i18n-swapper.replaceWithI18n', 
-      commands.replaceWithI18n
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.batchReplaceWithI18n', 
-      () => commands.batchReplaceWithI18n(context)
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.quickBatchReplace', 
-      (context, document) => commands.quickBatchReplace(context, document)
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.setLocalesPaths', 
-      commands.setLocalesPaths
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.openApiTranslationConfig', 
-      () => commands.openApiTranslationConfig(context)
-    ),
-    vscode.commands.registerCommand(
-      'i18n-swapper.applyAllReplacements',
-      () => {
-        // 直接调用已有的命令
-        vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
-      }
-    ),
-    vscode.commands.registerCommand('i18n-swapper.translateText', async (params) => {
-        try {
-            const { text, targetLang, i18nKey, filePath } = params;
-            
-            // 显示正在翻译的消息
-            vscode.window.showInformationMessage(`正在翻译文本到 ${LANGUAGE_NAMES[targetLang] || targetLang}...`);
-            
-            // 调用翻译服务
-            const translatedText = await translateText(text, targetLang);
-            
-            if (translatedText) {
-                // 更新语言文件
-                const success = await updateLanguageFile(filePath, i18nKey, translatedText);
-                
-                if (success) {
-                    vscode.window.showInformationMessage(`已翻译并更新: ${translatedText}`);
-                    
-                    // 先关闭悬浮窗口
-                    // await vscode.commands.executeCommand('editor.action.hideHover');
-                    
-                    // 然后刷新国际化装饰器
-                    vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
-                } else {
-                    vscode.window.showErrorMessage('无法更新语言文件');
-                }
-            } else {
-                vscode.window.showErrorMessage('翻译失败');
-            }
-        } catch (error) {
-            console.error('翻译出错:', error);
-            vscode.window.showErrorMessage(`翻译出错: ${error.message}`);
-        }
-    }),
-    vscode.commands.registerCommand('i18n-swapper.translateHover', handleHoverTranslate),
-    vscode.commands.registerCommand('i18n-swapper.editLanguageEntry', async (params) => {
-      try {
-        const { langCode, i18nKey, filePath, currentValue = '' } = params;
-        
-        if (!i18nKey || !filePath) {
-            vscode.window.showErrorMessage('缺少必要的参数');
-            return;
-        }
-        
-        // 显示输入框让用户编辑值
-        const inputOptions = {
-            prompt: `编辑 ${i18nKey} (${langCode})`,
-            value: currentValue,
-            placeHolder: '输入翻译文本'
-        };
-        
-        const newValue = await vscode.window.showInputBox(inputOptions);
-        
-        // 如果用户取消了输入或没有改变值，就不执行更新
-        if (newValue === undefined || newValue === currentValue) {
-            return;
-        }
-        
-        // 获取完整的绝对路径
-        let fullPath = filePath;
-        if (!path.isAbsolute(filePath) && vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
-            fullPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath);
-        }
-        
-        console.log(`尝试访问文件: ${fullPath}`);
-        
-        // 检查文件是否存在
-        if (!fs.existsSync(fullPath)) {
-            vscode.window.showErrorMessage(`找不到语言文件: ${fullPath}`);
-            
-            // 检查目录是否存在，不存在则创建
-            const dirPath = path.dirname(fullPath);
-            if (!fs.existsSync(dirPath)) {
-                try {
-                    fs.mkdirSync(dirPath, { recursive: true });
-                    console.log(`创建目录: ${dirPath}`);
-                    // 创建空的JSON文件
-                    fs.writeFileSync(fullPath, JSON.stringify({}, null, 2), 'utf8');
-                    console.log(`创建新语言文件: ${fullPath}`);
-                } catch (err) {
-                    vscode.window.showErrorMessage(`无法创建文件或目录: ${err.message}`);
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-        
-        // 使用已有的更新语言文件函数，传递绝对路径
-        const success = await updateLanguageFile(fullPath, i18nKey, newValue);
-        
-        if (success) {
-            vscode.window.showInformationMessage(`已更新 ${langCode} 中的 "${i18nKey}"`);
-            // 刷新装饰器以更新显示
-            vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
-        } else {
-            vscode.window.showErrorMessage(`无法更新 ${langCode} 中的 "${i18nKey}"`);
-        }
-      } catch (error) {
-        vscode.window.showErrorMessage(`编辑失败: ${error.message}`);
-        console.error('编辑语言条目时出错:', error);
-      }
-    })
-  );
-
-  // 初始化其他命令
-  commands.initializeCommands(context);
-
-  // 初始化i18n装饰器
-  const i18nDecorator = new I18nDecorator(context);
-  i18nDecorator.initialize();
-  
-  // 注册刷新i18n装饰命令
-  registerRefreshI18nDecorations(context, i18nDecorator);
-  
-  // 注册销毁函数
-  context.subscriptions.push({
-    dispose: () => {
-      i18nDecorator.dispose();
+  // 确保为新打开的工作区初始化默认设置
+  ensureDefaultWorkspaceSettings().then(() => {
+    // 确保设置已经被正确应用
+    const config = vscode.workspace.getConfiguration('i18n-swapper');
+    
+    // 强制预加载装饰样式配置以确保第一次打开时正确
+    const decorationStyle = config.get('decorationStyle', defaultsConfig.decorationStyle);
+    if (decorationStyle) {
+      console.log(`预加载装饰样式: ${decorationStyle}`);
+      // 将装饰样式强制应用到配置中
+      config.update('decorationStyle', decorationStyle, vscode.ConfigurationTarget.Workspace)
+        .then(() => {
+          console.log('装饰样式配置已更新');
+        })
+        .catch(err => {
+          console.error('更新装饰样式配置时出错:', err);
+        });
     }
+    
+    // 继续注册命令和创建其他服务
+    
+    // 注册所有命令
+    context.subscriptions.push(
+      vscode.commands.registerCommand(
+        'i18n-swapper.replaceWithI18n', 
+        commands.replaceWithI18n
+      ),
+      vscode.commands.registerCommand(
+        'i18n-swapper.batchReplaceWithI18n', 
+        () => commands.batchReplaceWithI18n(context)
+      ),
+      vscode.commands.registerCommand(
+        'i18n-swapper.quickBatchReplace', 
+        (context, document) => commands.quickBatchReplace(context, document)
+      ),
+      vscode.commands.registerCommand(
+        'i18n-swapper.setLocalesPaths', 
+        commands.setLocalesPaths
+      ),
+      vscode.commands.registerCommand(
+        'i18n-swapper.openApiTranslationConfig', 
+        () => commands.openApiTranslationConfig(context)
+      ),
+      vscode.commands.registerCommand(
+        'i18n-swapper.applyAllReplacements',
+        () => {
+          // 直接调用已有的命令
+          vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
+        }
+      ),
+      vscode.commands.registerCommand('i18n-swapper.translateText', async (params) => {
+          try {
+              const { text, targetLang, i18nKey, filePath } = params;
+              
+              // 显示正在翻译的消息
+              vscode.window.showInformationMessage(`正在翻译文本到 ${LANGUAGE_NAMES[targetLang] || targetLang}...`);
+              
+              // 调用翻译服务
+              const translatedText = await translateText(text, targetLang);
+              
+              if (translatedText) {
+                  // 更新语言文件
+                  const success = await updateLanguageFile(filePath, i18nKey, translatedText);
+                  
+                  if (success) {
+                      vscode.window.showInformationMessage(`已翻译并更新: ${translatedText}`);
+                      
+                      // 先关闭悬浮窗口
+                      // await vscode.commands.executeCommand('editor.action.hideHover');
+                      
+                      // 然后刷新国际化装饰器
+                      vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+                  } else {
+                      vscode.window.showErrorMessage('无法更新语言文件');
+                  }
+              } else {
+                  vscode.window.showErrorMessage('翻译失败');
+              }
+          } catch (error) {
+              console.error('翻译出错:', error);
+              vscode.window.showErrorMessage(`翻译出错: ${error.message}`);
+          }
+      }),
+      vscode.commands.registerCommand('i18n-swapper.translateHover', handleHoverTranslate),
+      vscode.commands.registerCommand('i18n-swapper.editLanguageEntry', async (params) => {
+        try {
+          const { langCode, i18nKey, filePath, currentValue = '' } = params;
+          
+          if (!i18nKey || !filePath) {
+              vscode.window.showErrorMessage('缺少必要的参数');
+              return;
+          }
+          
+          // 显示输入框让用户编辑值
+          const inputOptions = {
+              prompt: `编辑 ${i18nKey} (${langCode})`,
+              value: currentValue,
+              placeHolder: '输入翻译文本'
+          };
+          
+          const newValue = await vscode.window.showInputBox(inputOptions);
+          
+          // 如果用户取消了输入或没有改变值，就不执行更新
+          if (newValue === undefined || newValue === currentValue) {
+              return;
+          }
+          
+          // 获取完整的绝对路径
+          let fullPath = filePath;
+          if (!path.isAbsolute(filePath) && vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders.length > 0) {
+              fullPath = path.join(vscode.workspace.workspaceFolders[0].uri.fsPath, filePath);
+          }
+          
+          console.log(`尝试访问文件: ${fullPath}`);
+          
+          // 检查文件是否存在
+          if (!fs.existsSync(fullPath)) {
+              vscode.window.showErrorMessage(`找不到语言文件: ${fullPath}`);
+              
+              // 检查目录是否存在，不存在则创建
+              const dirPath = path.dirname(fullPath);
+              if (!fs.existsSync(dirPath)) {
+                  try {
+                      fs.mkdirSync(dirPath, { recursive: true });
+                      console.log(`创建目录: ${dirPath}`);
+                      // 创建空的JSON文件
+                      fs.writeFileSync(fullPath, JSON.stringify({}, null, 2), 'utf8');
+                      console.log(`创建新语言文件: ${fullPath}`);
+                  } catch (err) {
+                      vscode.window.showErrorMessage(`无法创建文件或目录: ${err.message}`);
+                      return;
+                  }
+              } else {
+                  return;
+              }
+          }
+          
+          // 使用已有的更新语言文件函数，传递绝对路径
+          const success = await updateLanguageFile(fullPath, i18nKey, newValue);
+          
+          if (success) {
+              vscode.window.showInformationMessage(`已更新 ${langCode} 中的 "${i18nKey}"`);
+              // 刷新装饰器以更新显示
+              vscode.commands.executeCommand('i18n-swapper.refreshI18nDecorations');
+          } else {
+              vscode.window.showErrorMessage(`无法更新 ${langCode} 中的 "${i18nKey}"`);
+          }
+        } catch (error) {
+          vscode.window.showErrorMessage(`编辑失败: ${error.message}`);
+          console.error('编辑语言条目时出错:', error);
+        }
+      }),
+      vscode.commands.registerCommand('i18n-swapper.openPanel', function() {
+        try {
+          // 获取当前编辑器
+          const editor = vscode.window.activeTextEditor;
+          let filePath = '';
+          if (editor) {
+            filePath = editor.document.uri.fsPath;
+          }
+          
+          // 创建批量替换面板
+          const panel = new BatchReplacementPanel(context, filePath);
+          
+          // 显示面板
+          panel.show();
+        } catch (error) {
+          console.error('打开面板时出错:', error);
+          vscode.window.showErrorMessage('打开国际化面板时出错: ' + error.message);
+        }
+      })
+    );
+
+    // 初始化其他命令
+    commands.initializeCommands(context);
+
+    // 初始化i18n装饰器
+    const i18nDecorator = new I18nDecorator(context);
+    i18nDecorator.initialize();
+    
+    // 注册刷新i18n装饰命令
+    registerRefreshI18nDecorations(context, i18nDecorator);
+    
+    // 注册销毁函数
+    context.subscriptions.push({
+      dispose: () => {
+        i18nDecorator.dispose();
+      }
+    });
+  }).catch(error => {
+    console.error('初始化工作区设置时出错:', error);
   });
 }
 

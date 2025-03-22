@@ -11,6 +11,19 @@ class I18nDecorator {
     constructor(context) {
         this.context = context;
         const config = vscode.workspace.getConfiguration('i18n-swapper');
+        
+        // 先加载完整配置
+        this.decorationStyle = config.get('decorationStyle', defaultsConfig.decorationStyle);
+        this.defaultLocale = config.get('defaultLocale', defaultsConfig.defaultLocale);
+        this.showFullFormInEditMode = config.get('showFullFormInEditMode', defaultsConfig.showFullFormInEditMode);
+        this.functionName = config.get('functionName', defaultsConfig.functionName);
+        this.quoteType = config.get('quoteType', defaultsConfig.quoteType);
+        
+        // 加载样式配置
+        this.suffixStyle = config.get('suffixStyle', defaultsConfig.suffixStyle);
+        this.inlineStyle = config.get('inlineStyle', defaultsConfig.inlineStyle);
+        
+        // 加载缺失键样式配置
         this.missingKeyBorderWidth = config.get('missingKeyBorderWidth', defaultsConfig.missingKeyBorderWidth);
         this.missingKeyBorderStyle = config.get('missingKeyBorderStyle', defaultsConfig.missingKeyBorderStyle);
         this.missingKeyBorderColor = config.get('missingKeyBorderColor', defaultsConfig.missingKeyBorderColor);
@@ -19,9 +32,9 @@ class I18nDecorator {
         // 后缀模式的装饰器
         this.suffixDecorationType = vscode.window.createTextEditorDecorationType({
             after: {
-                margin: '0 0 0 3px',
-                color: new vscode.ThemeColor('editorCodeLens.foreground'),
-                fontStyle: 'italic'
+                margin: this.suffixStyle?.margin || '0 0 0 3px',
+                color: this.suffixStyle?.color || new vscode.ThemeColor('editorCodeLens.foreground'),
+                fontStyle: this.suffixStyle?.fontStyle || defaultsConfig.suffixStyle.fontStyle
             }
         });
 
@@ -29,7 +42,7 @@ class I18nDecorator {
         this.inlineDecorationType = vscode.window.createTextEditorDecorationType({
             before: {
                 contentText: '',
-                color: 'red'
+                color: this.inlineStyle?.color || 'red'
             },
             textDecoration: 'none; opacity: 0;display: none;', // 隐藏原始文本
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
@@ -56,18 +69,15 @@ class I18nDecorator {
             rangeBehavior: vscode.DecorationRangeBehavior.ClosedClosed
         });
 
-        // 当前使用的装饰器类型
-        this.decorationType = this.suffixDecorationType;
+        // 根据配置选择装饰器类型
+        this.decorationType = (this.decorationStyle === 'inline') ? 
+            this.inlineDecorationType : 
+            this.suffixDecorationType;
 
         this.localeData = {};
         this.activeEditor = vscode.window.activeTextEditor;
-        this.localesPaths = [];
-        this.defaultLocale = 'zh-CN'; // 默认语言
-        this.decorationStyle = 'inline'; // 默认装饰样式
-        this.showFullFormInEditMode = false;
-        this.functionName = 't';
-        this.quoteType = 'single';
-
+        this.localesPaths = config.get('localesPaths', defaultsConfig.localesPaths);
+        
         // 跟踪当前编辑状态
         this.isInEditMode = false;
         this.editModeRange = null;
@@ -81,8 +91,16 @@ class I18nDecorator {
      * 初始化装饰器
      */
     async initialize() {
-        // 加载配置的本地化文件路径
+        // 重新加载配置确保配置是最新的
         this.loadConfig();
+        
+        // 更新装饰器类型
+        this.updateDecoratorTypes();
+        
+        // 根据配置再次确认当前使用的装饰器类型
+        this.decorationType = (this.decorationStyle === 'inline') ? 
+            this.inlineDecorationType : 
+            this.suffixDecorationType;
 
         // 检查并引导用户选择国际化文件
         const hasLocalesFiles = await this.checkAndSelectLocaleFile();
@@ -169,7 +187,7 @@ class I18nDecorator {
         // 更新装饰器类型
         this.updateDecoratorTypes();
 
-        // 根据配置选择装饰器类型
+        // 根据配置选择装饰器类型 - 确保在配置加载后立即更新使用的装饰器类型
         this.decorationType = (this.decorationStyle === 'inline') ?
             this.inlineDecorationType :
             this.suffixDecorationType;
@@ -209,7 +227,7 @@ class I18nDecorator {
             after: {
                 margin: this.suffixStyle.margin || '0 0 0 3px',
                 color: this.suffixStyle.color,
-                fontStyle: this.suffixStyle.fontStyle || 'italic',
+                fontStyle: this.suffixStyle.fontStyle ||  defaultsConfig.suffixStyle.fontStyle,
                 fontSize: suffixFontSize||'14px',
                 fontWeight: String(this.suffixStyle.fontWeight)
             }
@@ -222,7 +240,7 @@ class I18nDecorator {
                 color: this.inlineStyle.color,
                 fontSize: inlineFontSize||'14px',
                 fontWeight: String(this.inlineStyle.fontWeight),
-                fontStyle: this.inlineStyle.fontStyle || 'normal',
+                fontStyle: this.inlineStyle.fontStyle || defaultsConfig.inlineStyle.fontStyle,
                 margin: this.inlineStyle.margin || '0'
             },
             textDecoration: 'none; opacity: 0; display: none;', // 隐藏原始文本
@@ -469,7 +487,7 @@ class I18nDecorator {
                                         !this.suffixStyle.fontSize.includes('px') ? 
                                         `${this.suffixStyle.fontSize}px` : this.suffixStyle.fontSize,
                                 fontWeight: String(this.suffixStyle.fontWeight),
-                                fontStyle: this.suffixStyle.fontStyle || 'italic'
+                                fontStyle: this.suffixStyle.fontStyle || defaultsConfig.suffixStyle.fontStyle
                             }
                         }
                         // 移除hoverMessage属性
@@ -503,7 +521,7 @@ class I18nDecorator {
                                             !this.inlineStyle.fontSize.includes('px') ? 
                                             `${this.inlineStyle.fontSize}px` : this.inlineStyle.fontSize,
                                     fontWeight: String(this.inlineStyle.fontWeight),
-                                    fontStyle: this.inlineStyle.fontStyle || 'normal'
+                                        fontStyle: this.inlineStyle.fontStyle || defaultsConfig.inlineStyle.fontStyle
                                 },
                                 textDecoration: 'none; display: none;'
                             }

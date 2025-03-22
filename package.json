@@ -204,7 +204,7 @@
         "i18n-swapper.decorationStyle": {
           "type": "string",
           "enum": ["suffix", "inline"],
-          "default": "suffix",
+          "default": "inline",
           "description": "i18n装饰显示样式 (suffix: 显示为t('key')(译文); inline: 显示为t(译文))"
         },
         "i18n-swapper.suffixStyle": {
@@ -248,11 +248,11 @@
         "i18n-swapper.inlineStyle": {
           "type": "object",
           "default": {
-            "color": "#CE9178",
+            "color": "#ffdd00",
             "fontSize": "14px",
             "fontWeight": "400",
             "fontStyle": "normal",
-            "margin": "0 0 0 0"
+            "margin": "0"
           },
           "properties": {
             "color": {
