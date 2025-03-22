@@ -791,36 +791,41 @@ class I18nDecorator {
         if (this.isInEditMode) {
             // 如果已经在编辑模式，检查是否点击了其他区域
             if (!this.editModeRange.contains(selection.active)) {
-                // 检查是否点击了后缀翻译文本区域
+                // 检查是否点击了需要忽略的区域
                 let clickedOnIgnoredArea = false;
                 const document = this.activeEditor.document;
                 const positionOffset = document.offsetAt(selection.active);
                 
-                // 检查是否点击在装饰文本后缀上或相关区域
+                // 查找当前编辑的内容所在的函数调用
+                let currentCallRange = null;
                 for (const [key, value] of this.decorationHoverMap.entries()) {
-                    // 只检查包含当前编辑内容的函数调用
                     if (value.range.contains(this.editModeRange)) {
-                        const callRange = value.range;
-                        const suffixStart = document.offsetAt(callRange.end);
+                        currentCallRange = value.range;
+                        // 检查后缀翻译区域
+                        const suffixStart = document.offsetAt(value.range.end);
                         const suffixEnd = suffixStart + value.suffixLength;
-                        
-                        // 检查是否点击在后缀翻译文本上
                         if (positionOffset >= suffixStart && positionOffset <= suffixEnd) {
                             clickedOnIgnoredArea = true;
                             break;
                         }
-                        
-                        // 检查函数调用区域内右括号
-                        const callText = document.getText(callRange);
-                        const rightParenIndex = callText.lastIndexOf(')');
-                        if (rightParenIndex !== -1) {
-                            const rightParenPos = document.offsetAt(callRange.start) + rightParenIndex;
-                            // 检查是否点击在右括号附近
-                            if (Math.abs(positionOffset - rightParenPos) <= 1) {
-                                clickedOnIgnoredArea = true;
-                                break;
-                            }
-                        }
+                        break;
+                    }
+                }
+                
+                // 如果找到了当前函数调用区域
+                if (currentCallRange && !clickedOnIgnoredArea) {
+                    // 检查是否点击在这个函数调用范围内但不在键值内
+                    const callStart = document.offsetAt(currentCallRange.start);
+                    const callEnd = document.offsetAt(currentCallRange.end);
+                    
+                    // 检查是否点击在函数调用区域内（排除键值本身）
+                    const keyStart = document.offsetAt(this.editModeRange.start);
+                    const keyEnd = document.offsetAt(this.editModeRange.end);
+                    
+                    // 如果点击在函数调用的开始和键值开始之间，或者键值结束和函数调用结束之间
+                    if ((positionOffset >= callStart && positionOffset < keyStart) || 
+                        (positionOffset > keyEnd && positionOffset <= callEnd)) {
+                        clickedOnIgnoredArea = true;
                     }
                 }
                 
