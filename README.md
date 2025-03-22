@@ -158,7 +158,7 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
     "i18n-swapper.tencentTranslation.apiSecret": "",
     "i18n-swapper.tencentTranslation.region": "ap-guangzhou",
     "i18n-swapper.tencentTranslation.sourceLanguage": "zh",
-    "i18n-swapper.decorationStyle": "suffix",
+    "i18n-swapper.decorationStyle": "inline",
     "i18n-swapper.includeFiles": ["src/components", "src/pages"],
     "i18n-swapper.excludeFiles": ["**/node_modules/**", "**/*.test.js"]
 }

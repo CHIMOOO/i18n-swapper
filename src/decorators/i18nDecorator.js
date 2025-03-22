@@ -63,7 +63,7 @@ class I18nDecorator {
         this.activeEditor = vscode.window.activeTextEditor;
         this.localesPaths = [];
         this.defaultLocale = 'zh-CN'; // 默认语言
-        this.decorationStyle = 'suffix'; // 默认装饰样式
+        this.decorationStyle = 'inline'; // 默认装饰样式
         this.showFullFormInEditMode = false;
         this.functionName = 't';
         this.quoteType = 'single';
@@ -210,7 +210,7 @@ class I18nDecorator {
                 margin: this.suffixStyle.margin || '0 0 0 3px',
                 color: this.suffixStyle.color,
                 fontStyle: this.suffixStyle.fontStyle || 'italic',
-                fontSize: suffixFontSize,
+                fontSize: suffixFontSize||'14px',
                 fontWeight: String(this.suffixStyle.fontWeight)
             }
         });
@@ -220,7 +220,7 @@ class I18nDecorator {
             before: {
                 contentText: '',
                 color: this.inlineStyle.color,
-                fontSize: inlineFontSize,
+                fontSize: inlineFontSize||'14px',
                 fontWeight: String(this.inlineStyle.fontWeight),
                 fontStyle: this.inlineStyle.fontStyle || 'normal',
                 margin: this.inlineStyle.margin || '0'

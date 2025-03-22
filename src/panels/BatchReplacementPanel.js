@@ -705,12 +705,12 @@ class BatchReplacementPanel {
         scanPatterns,
         this.replacements,
         localesPaths, {
-          decorationStyle: config.get('decorationStyle', 'suffix'),
-          showFullFormInEditMode: config.get('showFullFormInEditMode', true),
-          suffixStyle: config.get('suffixStyle', {}),
-          inlineStyle: config.get('inlineStyle', {}),
-          autoGenerateKeyFromText: config.get('autoGenerateKeyFromText', true),
-          autoGenerateKeyPrefix: config.get('autoGenerateKeyPrefix', '_iw'),
+          decorationStyle: config.get('decorationStyle', defaultsConfig.decorationStyle),
+          showFullFormInEditMode: config.get('showFullFormInEditMode', defaultsConfig.showFullFormInEditMode),
+          suffixStyle: config.get('suffixStyle', defaultsConfig.suffixStyle),
+          inlineStyle: config.get('inlineStyle', defaultsConfig.inlineStyle),
+          autoGenerateKeyFromText: config.get('autoGenerateKeyFromText', defaultsConfig.autoGenerateKeyFromText),
+          autoGenerateKeyPrefix: config.get('autoGenerateKeyPrefix', defaultsConfig.autoGenerateKeyPrefix),
           autoTranslateAllLanguages: config.get('autoTranslateAllLanguages', true),
           outputI18nFunctionName: config.get('functionName', 't'),
           scanMode: this.scanMode

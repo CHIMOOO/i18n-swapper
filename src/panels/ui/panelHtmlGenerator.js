@@ -25,22 +25,22 @@ const defaultsConfig = require('../../config/defaultsConfig');
 function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, isConfigExpanded = false, languageMappings = [], existingI18nCalls = [], scanAllFiles = false, currentFilePath = '') {
   // 获取配置
   const config = vscode.workspace.getConfiguration('i18n-swapper');
-  const decorationStyle = context.decorationStyle || config.get('decorationStyle', 'suffix');
+  const decorationStyle = context.decorationStyle || config.get('decorationStyle', defaultsConfig.decorationStyle);
   const showFullFormInEditMode = context.showFullFormInEditMode !== undefined ?
     context.showFullFormInEditMode : config.get('showFullFormInEditMode', true);
-  const suffixStyle = context.suffixStyle || config.get('suffixStyle', {});
-  const inlineStyle = context.inlineStyle || config.get('inlineStyle', {});
+  const suffixStyle = context.suffixStyle || config.get('suffixStyle', defaultsConfig.suffixStyle);
+  const inlineStyle = context.inlineStyle || config.get('inlineStyle', defaultsConfig.inlineStyle);
 
   // 添加新的翻译功能设置项
   const autoGenerateKeyFromText = context.autoGenerateKeyFromText !== undefined ?
     context.autoGenerateKeyFromText : config.get('autoGenerateKeyFromText', true);
   const autoGenerateKeyPrefix = context.autoGenerateKeyPrefix ||
-    config.get('autoGenerateKeyPrefix', '_iw');
+    config.get('autoGenerateKeyPrefix', defaultsConfig.autoGenerateKeyPrefix);
   const autoTranslateAllLanguages = context.autoTranslateAllLanguages !== undefined ?
     context.autoTranslateAllLanguages : config.get('autoTranslateAllLanguages', true);
 
   // 获取输出国际化函数名称
-  const outputI18nFunctionName = context.outputI18nFunctionName || config.get('functionName', 't');
+  const outputI18nFunctionName = context.outputI18nFunctionName || config.get('functionName', defaultsConfig.functionName);
 
   // 从上下文中获取扫描模式
   const scanMode = context.scanMode || 'pending';
