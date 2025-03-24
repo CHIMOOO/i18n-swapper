@@ -1060,7 +1060,10 @@ class BatchReplacementPanel {
       const indexesToReplace = selectedIndexes || this.getSelectedIndexes();
 
       // 使用可见项替换方法执行替换
-      return await this.performVisibleReplacements(indexesToReplace);
+      await this.performVisibleReplacements(indexesToReplace);
+      
+      // 使用与刷新按钮相同的方法刷新面板
+      await this.refreshPanel();
     } catch (error) {
       console.error('执行选中项替换时出错:', error);
       vscode.window.showErrorMessage(`替换失败: ${error.message}`);
