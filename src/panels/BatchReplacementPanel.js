@@ -22,9 +22,12 @@ const {
 } = require('./services/replacementService');
 const {
   generateKeyFromText,
-  translateText,
+  
   getLanguageName
 } = require('./services/translationService');
+const {
+  translateText
+} = require('../services/translationService');
 const {
   translateTextToAllLanguages
 } = require('../services/translationService');
