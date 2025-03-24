@@ -6,7 +6,7 @@ const vscode = require('vscode');
 const { escapeHtml } = require('./utils/htmlUtils');
 const { getPanelStyles } = require('./styles/panelStyles');
 const { getPanelScripts } = require('./scripts/panelScripts');
-const { generatePanelBody, fileNameFilter } = require('./components/panelTemplate');
+const { generatePanelBody, fileNameFilter, getRightClickMenuScript } = require('./components/panelTemplate');
 const { LANGUAGE_NAMES } = require('../../utils/language-mappings');
 const defaultsConfig = require('../../config/defaultsConfig');
 
@@ -77,6 +77,7 @@ function getPanelHtml(scanPatterns, replacements, localesPaths, context = {}, is
       <style>
         ${styles}
       </style>
+      ${getRightClickMenuScript()}
     </head>
     <body>
       ${panelBodyHtml}

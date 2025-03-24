@@ -413,6 +413,13 @@ class BatchReplacementPanel {
             this._loadConfiguration();
           }
           break;
+
+        case 'saveTranslation':
+          // 处理语言值的编辑保存
+          await this.saveTranslation(message.filePath, message.key, message.value);
+          // 保存后刷新面板显示
+          await this.refreshPanel();
+          break;
       }
     } catch (error) {
       console.error('处理面板消息时出错:', error);
