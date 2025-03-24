@@ -2,6 +2,7 @@ const i18nHelper = require('./i18n-helper');
 const textAnalyzer = require('./text-analyzer');
 const textReplacer = require('./text-replacer');
 const PromptManager = require('./prompt-manager');
+const languageFileUtils = require('./language-file-utils');
 
 const vscode = require('vscode');
 
@@ -22,4 +23,5 @@ module.exports = {
   ...textAnalyzer,
   ...textReplacer,
   PromptManager,
+  ...languageFileUtils,
 }; 

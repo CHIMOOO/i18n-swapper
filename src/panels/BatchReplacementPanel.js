@@ -161,6 +161,14 @@ class BatchReplacementPanel {
     // 监听活动编辑器变化事件
     this._activeEditorChangeDisposable = vscode.window.onDidChangeActiveTextEditor(editor => {
       if (editor && this.panel && !this.scanAllFiles) {
+        // 判断当前文件是否为语言文件
+        const isLanguageFile = utils.isLanguageFile(editor.document.uri.fsPath);
+        if (isLanguageFile) {
+          // 如果是语言文件，不更新面板内容
+          console.log('编辑器切换到语言文件，不更新面板内容');
+          return;
+        }
+        
         // 只有在非扫描所有文件模式下，才需要更新内容
         if ((!this.document || this.document.uri.toString() !== editor.document.uri.toString())) {
           console.log('编辑器切换，自动更新面板内容');
