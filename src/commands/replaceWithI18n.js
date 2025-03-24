@@ -146,7 +146,8 @@ async function replaceWithI18n() {
             // 未找到匹配键时的处理逻辑
             // 使用PromptManager来处理是否翻译生成键名的提示
             let autoGenerateKeyFromText = await utils.PromptManager.promptForKeyGeneration();
-            const autoTranslateAllLanguages = config.get('autoTranslateAllLanguages', false);
+            // 使用PromptManager来处理是否自动翻译到所有语言文件的提示
+            let autoTranslateAllLanguages = await utils.PromptManager.promptForAutoTranslate();
             const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
             
             try {
@@ -193,7 +194,7 @@ async function replaceWithI18n() {
                         const targetFile = path.join(rootPath, sourceLangMapping.filePath);
                         
                         // 保存到源语言文件
-                        await utils.saveTranslationToFile(targetFile, i18nKey, textToFind);
+                        await saveTranslationToFile(targetFile, i18nKey, textToFind);
                         
                         // 设置使用的文件路径
                         foundInFile = targetFile;

@@ -90,6 +90,25 @@ class PromptManager {
         
         return result.value;
     }
+    
+    /**
+     * 检查并提示用户是否自动翻译并保存到所有语言文件
+     * @returns {Promise<boolean>} 用户是否选择自动翻译到所有语言
+     */
+    static async promptForAutoTranslate() {
+        const result = await this.checkAndPrompt('autoTranslateAllLanguages', {
+            message: '是否自动翻译并保存到[所有语言]文件？\n\n该操作需要在API翻译配置中添加语言映射\n\n本次操作将被保存配置，后续可在[右键菜单打开面板] → [配置设置] → [5、翻译功能设置]中修改此选项',
+            modal: true,
+            items: [
+                { title: '翻译到所有语言', value: true },
+                { title: '仅保存源语言', value: false }
+            ],
+            config: vscode.workspace.getConfiguration('i18n-swapper'),
+            configKey: 'autoTranslateAllLanguages'
+        });
+        
+        return result.value;
+    }
 }
 
 module.exports = PromptManager; 
