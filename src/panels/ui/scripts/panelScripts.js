@@ -5,6 +5,7 @@
  * @returns {string} 包含所有脚本的JavaScript代码
  */
 const { getEditValueScripts } = require('./editValueScripts');
+const { getGenerateEmptyKeysScripts } = require('./generateEmptyKeysScripts');
 
 function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
   return `
@@ -1125,6 +1126,9 @@ function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
         });
       });
     }
+
+    // 引入生成空键脚本
+    ${getGenerateEmptyKeysScripts()}
   `;
 }
 

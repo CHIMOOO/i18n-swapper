@@ -208,13 +208,16 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
       
       <div class="toolbar">
         <div class="tools-group">
+          <button id="refresh-panel">刷新</button>
           <button id="replace-selected" class="action-button replace-btn" title="仅替换已选中的项目">
             替换选中项
           </button>
           <button id="replace-all" class="action-button replace-all-btn" title="替换所有有国际化键的项目（无需选中）">
             替换所有项
           </button>
-          <button id="refresh-panel">刷新</button>
+          <button id="generate-empty-keys" class="action-button generate-keys-btn" title="为空的国际化键自动生成键名，并根据设置进行翻译">
+            生成空键
+          </button>
           <button id="open-api-translation">API翻译配置</button>
                         <!-- 添加文件名筛选功能，仅在扫描所有文件模式下显示 -->
       ${scanAllFiles ? `

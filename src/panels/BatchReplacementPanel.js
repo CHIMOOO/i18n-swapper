@@ -20,16 +20,13 @@ const {
   performReplacements,
   generateReplacement
 } = require('./services/replacementService');
+const { generateEmptyKeys } = require('./services/emptyKeysGeneratorService');
 const {
   generateKeyFromText,
-  
-  getLanguageName
-} = require('./services/translationService');
-const {
-  translateText
-} = require('../services/translationService');
-const {
-  translateTextToAllLanguages
+  getLanguageName,
+  translateText,
+  translateTextToAllLanguages,
+  generateKeyFromTranslation
 } = require('../services/translationService');
 const defaultsConfig = require('../config/defaultsConfig'); // 引入默认配置，更改为明确的名称
 const HighlightService = require('./services/highlightService'); // 新增：引入高亮服务
@@ -427,6 +424,11 @@ class BatchReplacementPanel {
           await this.saveTranslation(message.filePath, message.key, message.value);
           // 保存后刷新面板显示
           await this.refreshPanel();
+          break;
+
+        // 处理生成空键命令
+        case 'generateEmptyKeys':
+          this._handleGenerateEmptyKeys(data.indexes);
           break;
       }
     } catch (error) {
@@ -2760,6 +2762,30 @@ class BatchReplacementPanel {
     } catch (error) {
       console.error('更新缺失键样式失败:', error);
       vscode.window.showErrorMessage(`更新缺失键样式失败: ${error.message}`);
+    }
+  }
+
+  /**
+   * 处理生成空键命令
+   * @param {Array} indexes 需要生成键名的项目索引
+   * @private
+   */
+  async _handleGenerateEmptyKeys(indexes) {
+    try {
+      // 调用空键生成服务
+      const result = await generateEmptyKeys(indexes, this.replacements, this);
+      
+      // 更新面板内容
+      this.updatePanelContent();
+      
+      // 发送完成消息到webview
+      this.panel.webview.postMessage({
+        command: 'generateEmptyKeysCompleted',
+        data: result
+      });
+      
+    } catch (error) {
+      vscode.window.showErrorMessage(`生成国际化键名失败: ${error.message}`);
     }
   }
 }
