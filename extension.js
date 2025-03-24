@@ -255,7 +255,10 @@ async function ensureDefaultWorkspaceSettings() {
         'i18n-swapper.missingKeyBorderWidth': defaultsConfig.missingKeyBorderWidth,
         'i18n-swapper.missingKeyBorderStyle': defaultsConfig.missingKeyBorderStyle,
         'i18n-swapper.missingKeyBorderColor': defaultsConfig.missingKeyBorderColor,
-        'i18n-swapper.missingKeyBorderSpacing': defaultsConfig.missingKeyBorderSpacing
+        'i18n-swapper.missingKeyBorderSpacing': defaultsConfig.missingKeyBorderSpacing,
+          'i18n-swapper.excludeFiles': defaultsConfig.excludeFiles,
+          'i18n-swapper.includeFiles': defaultsConfig.includeFiles,
+          'i18n-swapper.SkipPrompt': defaultsConfig.SkipPrompt,
     };
     
     // 检查 .vscode 目录是否存在，如果不存在则创建
@@ -323,7 +326,7 @@ async function translateText(text, targetLang) {
     }
     
     // 调用现有的翻译服务
-    return require('./src/panels/services/translationService').translateText(
+    return require('./src/services/translationService').translateText(
         text, 
         sourceLanguage, // 源语言代码
         targetLang, 

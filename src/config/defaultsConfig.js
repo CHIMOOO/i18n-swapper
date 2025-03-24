@@ -5,18 +5,18 @@
 module.exports = {
     // 基本配置
     decorationStyle: 'inline', // 装饰样式: 'suffix' 或 'inline'
-    defaultLocale: 'zh-CN',             // 默认语言
-    functionName: 't',                  // 输出国际化函数名称
+    defaultLocale: 'zh-CN', // 默认语言
+    functionName: 't', // 输出国际化函数名称
     IdentifyTheCurrentName: ['t', '$t'], // 识别当前页面上的国际化函数方法
-    quoteType: 'single',                // 引号类型: 'single' 或 'double'
-    localesPaths: [],                   // 本地化文件路径
-    showFullFormInEditMode: true,      // 编辑模式下是否显示完整形式
-    
+    quoteType: 'single', // 引号类型: 'single' 或 'double'
+    localesPaths: [], // 本地化文件路径
+    showFullFormInEditMode: true, // 编辑模式下是否显示完整形式
+
     // 扫描配置
     scanPatterns: [
         'label', 'value', 'placeholder', 'title', 'message', 'text'
     ],
-    
+
     // 后缀样式
     suffixStyle: {
         color: '#6A9955',
@@ -25,7 +25,7 @@ module.exports = {
         fontStyle: 'normal',
         margin: '0 0 0 3px'
     },
-    
+
     // 内联样式
     inlineStyle: {
         color: '#ffdd00',
@@ -34,7 +34,7 @@ module.exports = {
         fontStyle: 'normal',
         margin: '0'
     },
-    
+
     // 腾讯翻译配置
     tencentTranslation: {
         apiKey: '',
@@ -43,7 +43,7 @@ module.exports = {
         sourceLanguage: 'zh',
         languageMappings: []
     },
-    
+
     // 消息文本
     messages: {
         noLocaleConfigured: '未配置源语言文件国际化词库路径（将用于国际化函数预览）',
@@ -52,7 +52,7 @@ module.exports = {
         workspaceNotFound: '未找到工作区文件夹',
         filesAdded: (count) => `已添加 ${count} 个国际化文件`
     },
-    
+
     // 自动生成键名配置
     autoGenerateKeyFromText: true, // 默认开启自动生成键名功能
     autoTranslateAllLanguages: true, // 默认开启自动翻译所有语言功能
@@ -61,7 +61,7 @@ module.exports = {
     missingKeyBorderStyle: 'solid',
     missingKeyBorderColor: '#ff6900',
     missingKeyBorderSpacing: '2px',
-    
+
     // 新增: 默认排除的文件模式
     excludeFiles: [
         "node_modules",
@@ -71,7 +71,8 @@ module.exports = {
         "vendor",
         ".history"
     ],
-    
+
     // 新增: 指定要扫描的文件或文件夹路径
-    includeFiles: []
-}; 
+    includeFiles: [],
+    SkipPrompt: [], //跳过提示的功能
+};

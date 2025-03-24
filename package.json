@@ -38,13 +38,11 @@
   ],
   "main": "./extension.js",
   "keywords": [
-
- 
-      "i18n-swapper",
-      "i18n swapper",
-      "I18n Swapper",
-      "I18n swapper",
-      "i18nSwapper",
+    "i18n-swapper",
+    "i18n swapper",
+    "I18n Swapper",
+    "I18n swapper",
+    "i18nSwapper",
     "i18n",
     "i18n-swapper",
     "i18n swapper",
@@ -77,7 +75,7 @@
       },
       {
         "command": "i18n-swapper.quickBatchReplace",
-        "title": "I18n Swapper: 一键批量替换国际化"
+        "title": "I18n Swapper: 一键批量替换已有国际化"
       },
       {
         "command": "i18n-swapper.refreshI18nDecorations",
@@ -146,7 +144,10 @@
         },
         "i18n-swapper.quoteType": {
           "type": "string",
-          "enum": ["single", "double"],
+          "enum": [
+            "single",
+            "double"
+          ],
           "default": "single",
           "description": "生成的国际化调用中使用的引号类型"
         },
@@ -203,7 +204,10 @@
         },
         "i18n-swapper.decorationStyle": {
           "type": "string",
-          "enum": ["suffix", "inline"],
+          "enum": [
+            "suffix",
+            "inline"
+          ],
           "default": "inline",
           "description": "i18n装饰显示样式 (suffix: 显示为t('key')(译文); inline: 显示为t(译文))"
         },
@@ -311,7 +315,12 @@
         "i18n-swapper.missingKeyBorderStyle": {
           "type": "string",
           "default": "solid",
-          "enum": ["solid", "dashed", "dotted", "double"],
+          "enum": [
+            "solid",
+            "dashed",
+            "dotted",
+            "double"
+          ],
           "description": "缺失键下划线边框样式"
         },
         "i18n-swapper.missingKeyBorderColor": {
@@ -326,7 +335,10 @@
         },
         "i18n-swapper.IdentifyTheCurrentName": {
           "type": "array",
-          "default": ["t", "$t"],
+          "default": [
+            "t",
+            "$t"
+          ],
           "items": {
             "type": "string"
           },
@@ -345,13 +357,19 @@
             "build",
             ".git",
             "vendor",
-            ".history"],
+            ".history"
+          ],
           "description": "扫描时要排除的文件或目录模式"
         },
         "i18n-swapper.includeFiles": {
           "type": "array",
           "default": [],
           "description": "指定要扫描的文件或文件夹路径（如果指定，则只扫描这些路径）"
+        },
+        "i18n-swapper.SkipPrompt": {
+          "type": "array",
+          "default": [],
+          "description": "用户操作跳过提示的功能模块名称  "
         },
         "i18n-swapper.scanAllFilesMode": {
           "type": "boolean",
@@ -361,4 +379,4 @@
       }
     }
   }
-} 
+}

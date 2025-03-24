@@ -3,7 +3,8 @@ const path = require('path');
 const fs = require('fs');
 const { translateTextToAllLanguages } = require('../../services/translationService');
 const { saveTranslationToFile } = require('./languageFileManager');
-const { generateKeyFromText, translateText, getLanguageName } = require('./translationService');
+const { generateKeyFromText, getLanguageName } = require('./translationService');
+const { translateText } = require('../../services/translationService');
 const defaultsConfig = require('../../config/defaultsConfig');
 
 /**
