@@ -60,13 +60,6 @@ function activate(context) {
         'i18n-swapper.openApiTranslationConfig', 
         () => commands.openApiTranslationConfig(context)
       ),
-      vscode.commands.registerCommand(
-        'i18n-swapper.applyAllReplacements',
-        () => {
-          // 直接调用已有的命令
-          vscode.commands.executeCommand('i18n-swapper.confirmAllReplacements');
-        }
-      ),
       vscode.commands.registerCommand('i18n-swapper.translateText', async (params) => {
           try {
               const { text, targetLang, i18nKey, filePath } = params;
