@@ -655,6 +655,15 @@ function generatePanelBody(scanPatterns, replacements, localesPaths, context, is
   `;
 }
 
+/**
+ * 为页面添加右键菜单脚本
+ * @returns {string} 右键菜单脚本代码
+ */
+function getRightClickMenuScript() {
+  // 样式和脚本已经移至独立的文件中，不再需要在这里定义
+  return '';
+}
+
 module.exports = {
   generatePanelBody,
   generateTableRow,
@@ -1069,163 +1078,5 @@ module.exports = {
     }
   },
 
-  /**
-   * 为页面添加右键菜单脚本
-   * @returns {string} 右键菜单脚本代码
-   */
-  getRightClickMenuScript: function() {
-    return `
-      <style>
-        /* 编辑值输入框样式 */
-        .edit-value-input-container {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          height: 40px;
-          background-color: var(--vscode-editor-background);
-          border-bottom: 1px solid var(--vscode-editorWidget-border);
-          display: flex;
-          align-items: center;
-          padding: 0 10px;
-          z-index: 10000;
-          box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-        }
-        
-        .edit-value-input {
-          flex: 1;
-          height: 28px;
-          padding: 0 8px;
-          border: 1px solid var(--vscode-input-border);
-          background-color: var(--vscode-input-background);
-          color: var(--vscode-input-foreground);
-          border-radius: 3px;
-          font-size: 14px;
-        }
-        
-        .edit-value-save {
-          margin-left: 10px;
-          padding: 4px 10px;
-          border: none;
-          background-color: var(--vscode-button-background);
-          color: var(--vscode-button-foreground);
-          border-radius: 3px;
-          cursor: pointer;
-        }
-        
-        .edit-value-cancel {
-          margin-left: 5px;
-          padding: 4px 10px;
-          border: none;
-          background-color: var(--vscode-button-secondaryBackground);
-          color: var(--vscode-button-secondaryForeground);
-          border-radius: 3px;
-          cursor: pointer;
-        }
-      </style>
-      
-      <script>
-        let editInputContainer = null;
-        
-        // 显示右键菜单
-        function showEditValueMenu(event, language, filePath, key, value) {
-          event.preventDefault();
-          
-          // 创建编辑输入框
-          showEditValueInput(language, filePath, key, value);
-          
-          return false;
-        }
-        
-        // 显示编辑值的输入框
-        function showEditValueInput(language, filePath, key, value) {
-          // 移除已有的输入框
-          removeEditValueInput();
-          
-          // 创建输入框容器
-          editInputContainer = document.createElement('div');
-          editInputContainer.className = 'edit-value-input-container';
-          
-          // 语言标识
-          const langLabel = document.createElement('span');
-          langLabel.style.marginRight = '10px';
-          langLabel.style.fontWeight = 'bold';
-          langLabel.textContent = \`[\${language}]\`;
-          
-          // 创建输入框
-          const input = document.createElement('input');
-          input.type = 'text';
-          input.className = 'edit-value-input';
-          input.value = value;
-          input.placeholder = '输入翻译值';
-          
-          // 保存按钮
-          const saveButton = document.createElement('button');
-          saveButton.className = 'edit-value-save';
-          saveButton.textContent = '保存';
-          saveButton.onclick = function() {
-            saveTranslationValue(language, filePath, key, input.value);
-          };
-          
-          // 取消按钮
-          const cancelButton = document.createElement('button');
-          cancelButton.className = 'edit-value-cancel';
-          cancelButton.textContent = '取消';
-          cancelButton.onclick = removeEditValueInput;
-          
-          // 按下Enter键保存，按下Esc键取消
-          input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-              saveTranslationValue(language, filePath, key, input.value);
-            } else if (e.key === 'Escape') {
-              removeEditValueInput();
-            }
-          });
-          
-          // 添加元素到容器
-          editInputContainer.appendChild(langLabel);
-          editInputContainer.appendChild(input);
-          editInputContainer.appendChild(saveButton);
-          editInputContainer.appendChild(cancelButton);
-          
-          // 添加容器到页面
-          document.body.appendChild(editInputContainer);
-          
-          // 聚焦输入框
-          input.focus();
-          input.select();
-        }
-        
-        // 保存翻译值
-        function saveTranslationValue(language, filePath, key, value) {
-          // 发送消息给VS Code扩展
-          vscode.postMessage({
-            command: 'saveTranslation',
-            language: language,
-            filePath: filePath,
-            key: key,
-            value: value
-          });
-          
-          // 移除输入框
-          removeEditValueInput();
-        }
-        
-        // 移除编辑输入框
-        function removeEditValueInput() {
-          if (editInputContainer) {
-            editInputContainer.remove();
-            editInputContainer = null;
-          }
-        }
-        
-        // 监听点击事件，当点击页面其他区域时隐藏输入框
-        document.addEventListener('click', function(e) {
-          if (editInputContainer && !editInputContainer.contains(e.target)) {
-            removeEditValueInput();
-          }
-        });
-      </script>
-    `;
-  }
+  getRightClickMenuScript
 }; 

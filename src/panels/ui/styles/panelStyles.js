@@ -1,9 +1,12 @@
+const { getEditValueStyles } = require('./editValueStyles');
+
 /**
  * 生成面板的CSS样式
  * @returns {string} 包含所有样式的CSS代码
  */
 function getPanelStyles() {
   return `
+    ${getEditValueStyles()}
     body {
       font-family: var(--vscode-font-family);
       font-size: var(--vscode-font-size);

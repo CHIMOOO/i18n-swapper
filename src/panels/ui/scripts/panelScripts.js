@@ -4,8 +4,13 @@
  * @param {Object} LANGUAGE_NAMES 语言名称映射
  * @returns {string} 包含所有脚本的JavaScript代码
  */
+const { getEditValueScripts } = require('./editValueScripts');
+
 function getPanelScripts(languageMappings, LANGUAGE_NAMES) {
   return `
+    // 编辑值功能脚本
+    ${getEditValueScripts()}
+    
     // 使用acquireVsCodeApi获取vscode实例
     const vscode = acquireVsCodeApi();
     
