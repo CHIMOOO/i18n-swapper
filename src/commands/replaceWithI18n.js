@@ -98,8 +98,6 @@ async function replaceWithI18n() {
         return;
     }
 
-
-
     // 检查并选择国际化文件
     const localesPaths = await utils.checkAndSelectLocaleFile();
     if (localesPaths.length === 0) {
@@ -146,7 +144,8 @@ async function replaceWithI18n() {
             i18nKey = foundPath;
         } else {
             // 未找到匹配键时的处理逻辑
-            const autoGenerateKeyFromText = config.get('autoGenerateKeyFromText', false);
+            // 使用PromptManager来处理是否翻译生成键名的提示
+            let autoGenerateKeyFromText = await utils.PromptManager.promptForKeyGeneration();
             const autoTranslateAllLanguages = config.get('autoTranslateAllLanguages', false);
             const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
             
