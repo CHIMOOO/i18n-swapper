@@ -18,6 +18,7 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 - 🌐 **多语言支持**：支持多种语言的自动翻译
 - 👁️ **实时预览**：在代码中直接查看翻译结果
 - ⚙️ **灵活配置**：支持自定义国际化函数名、样式等
+- 🔑 **自动生成键名**：为空的国际化键自动生成有意义的键名，并根据配置进行翻译
 
 ### 核心功能亮点 ✨
 
@@ -40,6 +41,9 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
    ☁️ 无缝对接腾讯云机器翻译 API，通过配置文件快速接入：
    开发者仅需专注业务键值设计，翻译工作流完全自动化。
 
+5. **空键批量生成与翻译**
+   🔑 一键为所有空的国际化键生成有意义的键名，智能处理键名结构，并根据配置自动翻译到源语言或所有语言文件中。
+
 ### 主要特性
 
 - 🔍 **智能文本查找**：自动在国际化文件中查找选中文本对应的键
@@ -53,6 +57,7 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 - 🌟 **配置保持状态**：配置面板操作不再刷新整个面板，保留展开状态和筛选条件
 - 📄 **文件名筛选功能**：支持按文件名/路径筛选国际化文本条目
 - 🔍 **指定范围搜索**：支持在特定文件或目录中进行国际化文本扫描
+- 🔑 **空键智能生成**：一键为所有空的国际化键生成有意义的键名并自动保存翻译
 
 ### 翻译方式
 
@@ -86,6 +91,19 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 - **全工作区扫描**: 支持扫描整个工作区的文件，而不仅限于当前文件
 - **指定范围搜索**: 可以指定特定文件或目录进行扫描，提高国际化效率
 - **文件名筛选**: 扫描结果支持按文件名或路径筛选，便于大型项目中的精确查找
+
+#### 6. 空键自动生成
+
+- **批量生成键名**: 一键为所有空的国际化键自动生成有意义的键名
+- **智能生成策略**: 根据配置决定使用 API 生成有意义的键名或使用简单算法
+- **自动翻译同步**: 根据配置决定是否将生成的键值翻译到所有语言文件中
+
+### 6. 使用空键自动生成功能
+
+1. 在批量替换面板中，点击"生成空键"按钮
+2. 系统会自动为所有空的国际化键生成键名
+3. 根据配置，系统会自动将生成的键名翻译到源语言或所有语言文件中
+4. 操作完成后可以查看结果统计，包括成功和失败的数量
 
 ## 安装
 
@@ -160,7 +178,10 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
     "i18n-swapper.tencentTranslation.sourceLanguage": "zh",
     "i18n-swapper.decorationStyle": "inline",
     "i18n-swapper.includeFiles": ["src/components", "src/pages"],
-    "i18n-swapper.excludeFiles": ["**/node_modules/**", "**/*.test.js"]
+    "i18n-swapper.excludeFiles": ["**/node_modules/**", "**/*.test.js"],
+    "i18n-swapper.autoGenerateKeyFromText": true,
+    "i18n-swapper.autoTranslateAllLanguages": true,
+    "i18n-swapper.autoGenerateKeyPrefix": "common"
 }
 
 ```
@@ -177,6 +198,9 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 | `decorationStyle` | 国际化键预览样式 (`suffix` 或 `inline`) | `"suffix"` |
 | `includeFiles` | 扫描工作区时要包含的文件或目录 | `[]` |
 | `excludeFiles` | 扫描工作区时要排除的文件或目录 | `[默认排除]` |
+| `autoGenerateKeyFromText` | 是否使用API生成有意义的键名 | `true` |
+| `autoTranslateAllLanguages` | 是否自动翻译到所有语言文件 | `true` |
+| `autoGenerateKeyPrefix` | 自动生成键名的前缀 | `""` |
 
 
 ## 项目结构
@@ -197,10 +221,14 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 - `src/panels/services/languageFileManager.js` - 管理语言文件的创建和选择
 - `src/panels/services/replacementService.js` - 处理文本替换为国际化调用的逻辑
 - `src/panels/services/translationService.js` - 处理翻译API相关功能
+- `src/panels/services/emptyKeysGeneratorService.js` - 处理自动生成空国际化键名功能
 
 ## 界面相关
 
 - `src/panels/ui/panelHtmlGenerator.js` - 生成面板的HTML内容
+- `src/panels/ui/components/panelTemplate.js` - 面板HTML模板
+- `src/panels/ui/scripts/panelScripts.js` - 面板交互脚本
+- `src/panels/ui/scripts/generateEmptyKeysScripts.js` - 空键生成相关脚本
 
 ## 工具和配置
 
@@ -264,6 +292,9 @@ A: 在开启"扫描所有文件"选项后，面板顶部会显示文件名筛选
 
 A: 在配置面板的"8、扫描全部文件配置"部分，可以指定要扫描的特定文件或文件夹路径。
 
+**Q: 自动生成的键名格式是什么样的？**
+
+A: 默认情况下，如果启用了`autoGenerateKeyFromText`，系统会根据文本内容生成有意义的键名。如果设置了前缀，格式为`前缀.生成的键名`。
 
 ## 许可证
 
@@ -299,4 +330,27 @@ v0.6.0 版本添加了扫描整个工作区的功能，使您能够一次性找�
 ## 性能说明
 
 扫描整个工作区可能较为耗时，特别是对于大型项目。系统会在右下角显示扫描进度，您可以随时查看当前进度。使用指定范围搜索功能可以显著提升性能。
+
+# 空键自动生成功能
+
+v0.7.0 版本新增了空键自动生成功能，让您能够快速为所有未设置国际化键的文本生成智能键名。
+
+## 使用方法
+
+1. 在批量替换面板中找到"生成空键"按钮
+2. 点击按钮后，系统会自动为所有空的国际化键生成键名
+3. 系统会根据配置决定使用API生成有意义的键名或使用简单算法
+4. 生成的键名会根据配置自动翻译到源语言或所有语言文件中
+
+## 配置选项
+
+以下配置选项会影响空键生成功能：
+
+1. `autoGenerateKeyFromText` - 如果为true，系统会使用翻译API生成更有意义的键名
+2. `autoTranslateAllLanguages` - 如果为true，系统会自动将生成的键翻译到所有语言文件中
+3. `autoGenerateKeyPrefix` - 设置键名的前缀，格式为`前缀.生成的键名`
+
+## 性能说明
+
+由于需要调用翻译API生成键名，此操作可能需要一些时间。系统会显示进度条，并在完成后显示成功和失败的数量统计。
 
