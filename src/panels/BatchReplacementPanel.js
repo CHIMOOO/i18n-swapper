@@ -287,7 +287,7 @@ class BatchReplacementPanel {
           break;
 
         case 'translateItem':
-          await this.translateItem(data.index, data.userInputKey);
+          await this.translateItem(data.index, data.key);
           break;
 
         case 'highlightSourceText':
