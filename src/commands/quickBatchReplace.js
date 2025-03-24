@@ -389,7 +389,7 @@ function showConfirmationDecorations(editor, document, replacements, functionNam
 
                     margin: '0 0 0 auto',
 
-                    padding: '3px 3px 3px 10px',
+                    padding: '1px 3px 1px 10px',
 
                     color: '#ffffff',
                     borderRadius: '16px',
@@ -1014,9 +1014,9 @@ function applyDecorations(editor) {
                     borderRadius: '16px',
                     margin: '0 0 0 auto',
 
-                    padding: '3px 3px 3px 10px',
+                    padding: '1px 3px 1px 10px',
 
-                    color: '#ffffff!important',
+                    color: '#ffffff',
                 },
 
             },
