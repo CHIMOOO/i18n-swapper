@@ -70,50 +70,61 @@ async function openLanguageFile(args) {
         
         // 如果有键值，且shouldLocateKey为true，尝试找到该键在文件中的位置
         if (i18nKey && shouldLocateKey) {
-            // 搜索键的位置
-            const text = document.getText();
-            const keyParts = i18nKey.split('.');
-            
-            // 构建搜索模式：寻找如 "key": 或 "key" : 或 'key': 等模式
-            let searchPosition = 0;
-            let currentPart = 0;
-            
-            while (currentPart < keyParts.length && searchPosition !== -1) {
-                const key = keyParts[currentPart];
-                const keyPattern = new RegExp(`['"](${key})['"]\\s*:`, 'g');
-                keyPattern.lastIndex = searchPosition;
-                
-                const match = keyPattern.exec(text);
-                if (match) {
-                    searchPosition = match.index;
-                    currentPart++;
-                } else {
-                    searchPosition = -1;
-                }
-            }
-            
-            if (searchPosition !== -1) {
-                // 找到键的位置，创建选择区域
-                const pos = document.positionAt(searchPosition);
-                editor.selection = new vscode.Selection(pos, pos);
-                editor.revealRange(
-                    new vscode.Range(pos, pos),
-                    vscode.TextEditorRevealType.InCenter
-                );
-            } else if (i18nKey) {
-                // 没有找到键，给用户提示
-                vscode.window.showInformationMessage(`在 ${langCode} 语言文件中未找到键 "${i18nKey}"`);
-            }
+            await locateKeyInDocument(document, editor, i18nKey);
         }
     } catch (error) {
         console.error('打开语言文件时出错:', error);
-        vscode.window.showErrorMessage(`无法打开语言文件: ${error.message}`);
+        vscode.window.showErrorMessage(`打开语言文件失败: ${error.message}`);
+    }
+}
+
+/**
+ * 在文档中定位i18n键
+ * @param {vscode.TextDocument} document - 文本文档
+ * @param {vscode.TextEditor} editor - 文本编辑器
+ * @param {string} i18nKey - 要定位的i18n键名
+ */
+async function locateKeyInDocument(document, editor, i18nKey) {
+    // 搜索键的位置
+    const text = document.getText();
+    const keyParts = i18nKey.split('.');
+    
+    // 构建搜索模式：寻找如 "key": 或 "key" : 或 'key': 等模式
+    let searchPosition = 0;
+    let currentPart = 0;
+    
+    while (currentPart < keyParts.length && searchPosition !== -1) {
+        const key = keyParts[currentPart];
+        const keyPattern = new RegExp(`['"](${key})['"]\\s*:`, 'g');
+        keyPattern.lastIndex = searchPosition;
+        
+        const match = keyPattern.exec(text);
+        if (match) {
+            searchPosition = match.index;
+            currentPart++;
+        } else {
+            searchPosition = -1;
+        }
+    }
+    
+    if (searchPosition !== -1) {
+        // 找到键的位置，创建选择区域
+        const pos = document.positionAt(searchPosition);
+        editor.selection = new vscode.Selection(pos, pos);
+        editor.revealRange(
+            new vscode.Range(pos, pos),
+            vscode.TextEditorRevealType.InCenter
+        );
+    } else if (i18nKey) {
+        // 没有找到键，给用户提示
+        vscode.window.showInformationMessage(`在文件中未找到键 "${i18nKey}"`);
     }
 }
 
 /**
  * 注册打开语言文件命令
  * @param {vscode.ExtensionContext} context - 扩展上下文
+ * @returns {vscode.Disposable} 命令注册
  */
 function registerOpenLanguageFileCommand(context) {
     const command = vscode.commands.registerCommand('i18n-swapper.openLanguageFile', openLanguageFile);
