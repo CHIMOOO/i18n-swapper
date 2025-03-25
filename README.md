@@ -258,7 +258,7 @@ graph LR
   <img src="images/pan06.png" width="500">
 </p>
 
-#### 3. 自定义面板设置
+#### 3. 自定义面板设置（可选）
 
 <p align="left">
   <img src="images/mianban1.png" width="600">
