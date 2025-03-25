@@ -28,19 +28,20 @@
 
 3. 直接从 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 下载
 
+## 核心配置
+
+### 首次安装将提示选择源语言文件：
+
 <p align="left">
   <img src="images/tip1.png" alt="提示" width="400">
 </p>
 
-首次安装提示选择源语言文件：
-- 如已有中文国际化键值库，请选择它
+- 如已有中文国际化键值库，请选择【选择文件】
 - 系统将根据源语言库，自动转义 t 方法到预览模式
-
-
 
 <p align="center">
 
-# **已配置完成，开始享受高效国际化体验吧！🎉🎉🎉**
+# **ok，已经配置完成，开始享受高效国际化体验吧！🎉🎉🎉**
 
 </p>
 
