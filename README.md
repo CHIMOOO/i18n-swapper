@@ -12,7 +12,21 @@
   <img src="images/show.gif" >
 </p>
 
+## 安装
 
+可以通过以下几种方式安装：
+
+1. 在VSCode中，或者Cursor的应用商店中，直接搜索 i18n swapper
+<p align="left">
+  <img src="images/shop.png" >
+</p>
+
+2. 在 VSCode 中，按 `Ctrl+P` 打开命令面板，输入：
+   ```
+   ext install chimoo.i18n-swapper
+   ```
+
+3. 或直接从 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 下载
 
 ## 功能介绍
 
@@ -320,16 +334,6 @@ graph LR
 3. 根据配置，系统会自动将生成的键名翻译到源语言或所有语言文件中
 4. 操作完成后可以查看结果统计，包括成功和失败的数量
 
-## 安装
-
-可以通过以下几种方式安装：
-
-1. 在 VSCode 中，按 `Ctrl+P` 打开命令面板，输入：
-   ```
-   ext install chimoo.i18n-swapper
-   ```
-
-2. 或直接从 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 下载
 
 ## 快速上手
 
