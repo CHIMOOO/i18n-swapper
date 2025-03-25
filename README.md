@@ -28,7 +28,7 @@
 
 3. 直接从 [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=chimoo.i18n-swapper) 下载
 
-## 核心配置
+## ❗核心配置❗
 
 ### 首次安装将提示选择源语言文件：
 
@@ -41,7 +41,7 @@
 
 <p align="center">
 
-# **ok，已经配置完成，开始享受高效国际化体验吧！🎉🎉🎉**
+# **ok，已配置完成，享受高效国际化体验吧！🎉🎉🎉**
 
 </p>
 
