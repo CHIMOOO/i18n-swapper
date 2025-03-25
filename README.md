@@ -19,6 +19,7 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 - 👁️ **实时预览**：在代码中直接查看翻译结果
 - ⚙️ **灵活配置**：支持自定义国际化函数名、样式等
 - 🔑 **自动生成键名**：为空的国际化键自动生成有意义的键名，并根据配置进行翻译
+- 🏷️ **HTML标签内容智能扫描**：只扫描常见HTML标签内的文本，如 `<p>`, `<div>`, `<span>` 等，自动排除 `<script>`, `<style>` 标签内容
 
 ### 核心功能亮点 ✨
 
@@ -44,6 +45,11 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 5. **空键批量生成与翻译**
    🔑 一键为所有空的国际化键生成有意义的键名，智能处理键名结构，并根据配置自动翻译到源语言或所有语言文件中。
 
+6. **自定义样式**
+   - 不喜欢 `t('译文')` 模式？[配置面板](#教程3配置自定义面板)中可以切换成`t('key')(译文)` 模式！
+   - 不喜欢 `译文` 的颜色/大小？[配置面板](#教程3配置自定义面板)中可以修改颜色/粗细/大小！
+   - 不是使用`t`国际化函数方法？[配置面板](#教程3配置自定义面板)中支持自定义输出函数方法！
+
 ### 主要特性
 
 - 🔍 **智能文本查找**：自动在国际化文件中查找选中文本对应的键
@@ -62,6 +68,19 @@ i18n-swapper 是一个 VSCode 扩展，用于帮助开发者快速查找和替�
 
 
 ### 翻译方式
+
+#### 前言-独特的设计模式
+
+该插件的设计模式为，根据文档上对应的字段（例如label）所对应的值进行国际化
+label等字段名称支持自定义扫描
+
+<p align="left">
+  <img src="images/tip1.png" alt="提示" width="400">
+</p>
+当安装插件后，会提示选择源语言文件。
+如果你已经有中文国际化键值库，那么请选择他！
+将会根据源语言库，把函数t方法转义成预览模式。
+
 
 #### 1. 单体翻译功能
 
@@ -251,6 +270,17 @@ graph LR
   <img src="images/pan06.png" width="500">
 </p>
 
+> #### 教程3：配置自定义面板
+
+右键VScode菜单选择"I18n Swapper: 打开面板"或使用快捷键`Ctrl+Alt+I`（Windows/Linux）/ `Cmd+Alt+I`（Mac），可以打开国际化管理面板。
+最下方的配置设置中，可以自定义自己想要的配置。
+
+<p align="left">
+  <img src="images/mianban1.png" width="600">
+</p>
+<p align="left">
+  <img src="images/mianban2.png" width="600">
+</p>
 
 #### 4. 自定义字段扫描
 
@@ -357,7 +387,8 @@ graph LR
     "i18n-swapper.excludeFiles": ["**/node_modules/**", "**/*.test.js"],
     "i18n-swapper.autoGenerateKeyFromText": true,
     "i18n-swapper.autoTranslateAllLanguages": true,
-    "i18n-swapper.autoGenerateKeyPrefix": "common"
+    "i18n-swapper.autoGenerateKeyPrefix": "common",
+    "i18n-swapper.scanTagContent": true
 }
 
 ```
@@ -377,6 +408,7 @@ graph LR
 | `autoGenerateKeyFromText` | 是否使用API生成有意义的键名 | `true` |
 | `autoTranslateAllLanguages` | 是否自动翻译到所有语言文件 | `true` |
 | `autoGenerateKeyPrefix` | 自动生成键名的前缀 | `""` |
+| `scanTagContent` | 是否扫描HTML标签内的文本内容 | `true` |
 
 
 ## 项目结构

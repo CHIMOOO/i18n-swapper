@@ -456,6 +456,8 @@ fill: #d6d6dd;
     .text-highlight-trigger {
       cursor: pointer;
       transition: background-color 0.2s;
+      max-width: calc(100vw - 430px);
+          min-width: calc(100vw - 430px);
     }
     
     .text-highlight-trigger:hover {
