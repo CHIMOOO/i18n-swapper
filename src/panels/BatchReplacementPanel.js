@@ -223,6 +223,7 @@ class BatchReplacementPanel {
           break;
 
         case 'selectLocalesFile':
+        case 'selectLocaleFile':
           await this.selectLocaleFile();
           break;
 
