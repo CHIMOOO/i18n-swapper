@@ -226,6 +226,100 @@ function checkVueTemplateAttr(document, position) {
     };
   }
 }
+
+/**
+ * 检查是否在Vue模板标签内容中
+ * @param {vscode.TextDocument} document 文档对象
+ * @param {vscode.Position} position 位置
+ * @returns {Object} 包含检查结果的对象
+ */
+function checkVueTemplateContent(document, position) {
+  try {
+    // 检查是否是Vue文件
+    const isVueFile = document.fileName.toLowerCase().endsWith('.vue');
+    if (!isVueFile) {
+      return {
+        isVueContent: false,
+        contentInfo: null
+      };
+    }
+
+    // 检查是否在template标签内
+    const documentText = document.getText();
+    const templateMatch = /<template[^>]*>([\s\S]*?)<\/template>/g.exec(documentText);
+    if (!templateMatch) {
+      return {
+        isVueContent: false,
+        contentInfo: null
+      };
+    }
+
+    const templateStartOffset = templateMatch.index;
+    const templateEndOffset = templateMatch.index + templateMatch[0].length;
+    const positionOffset = document.offsetAt(position);
+
+    if (positionOffset < templateStartOffset || positionOffset > templateEndOffset) {
+      return {
+        isVueContent: false,
+        contentInfo: null
+      };
+    }
+
+    // 获取当前位置的前后文本
+    const textBefore = documentText.substring(0, positionOffset);
+    const textAfter = documentText.substring(positionOffset);
+
+    // 向前查找最近的 > 和 <
+    const lastOpenBracket = textBefore.lastIndexOf('<');
+    const lastCloseBracket = textBefore.lastIndexOf('>');
+
+    // 向后查找最近的 < 和 >
+    const nextOpenBracket = textAfter.indexOf('<');
+    const nextCloseBracket = textAfter.indexOf('>');
+
+    // 如果当前位置在标签内容中
+    if (lastCloseBracket > lastOpenBracket && 
+        nextOpenBracket !== -1 && 
+        (nextCloseBracket === -1 || nextOpenBracket < nextCloseBracket)) {
+      
+      // 获取标签前缀和后缀
+      const tagPrefix = textBefore.substring(lastCloseBracket + 1);
+      const tagSuffix = textAfter.substring(0, nextOpenBracket);
+      
+      // 检查是否已经是插值表达式 {{}}
+      const isAlreadyInterpolation = 
+        (tagPrefix.trim().endsWith('{{') || tagPrefix.includes('{{ ')) && 
+        (tagSuffix.trim().startsWith('}}') || tagSuffix.includes(' }}'));
+      
+      if (isAlreadyInterpolation) {
+        return {
+          isVueContent: false, // 不需要处理已经是插值表达式的内容
+          contentInfo: null
+        };
+      }
+      
+      return {
+        isVueContent: true,
+        contentInfo: {
+          start: document.offsetAt(position),
+          end: document.offsetAt(position) + tagSuffix.indexOf('<')
+        }
+      };
+    }
+
+    return {
+      isVueContent: false,
+      contentInfo: null
+    };
+  } catch (error) {
+    console.error('检查Vue模板内容时出错:', error);
+    return {
+      isVueContent: false,
+      contentInfo: null
+    };
+  }
+}
+
 /**
  * 根据路径设置对象中的值
  * @param {Object} obj 目标对象
@@ -270,6 +364,19 @@ function replaceFn(selectedText, i18nKey, functionName, codeQuote, document, pos
     position,
     new vscode.Position(position.line, position.character + selectedText.length)
   );
+  
+  // 检查是否在Vue模板标签内容中
+  const { isVueContent, contentInfo } = checkVueTemplateContent(document, position);
+  
+  // 如果是Vue标签内容，使用双花括号包裹
+  if (isVueContent && contentInfo) {
+    return {
+      range: originalRange,
+      replacementText: `{{${baseReplacement}}}`,
+      isVueContent: true,
+      contentInfo: contentInfo
+    };
+  }
   
   // 检查是否在Vue模板属性中
   const { isVueAttr, attrInfo } = checkVueTemplateAttr(document, position);
@@ -318,6 +425,7 @@ function replaceFn(selectedText, i18nKey, functionName, codeQuote, document, pos
 module.exports = {
   generateReplacementText,
   checkVueTemplateAttr,
+  checkVueTemplateContent,
   setValueByPath,
   findQuotesAround,
   replaceFn
