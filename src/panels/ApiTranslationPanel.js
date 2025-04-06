@@ -104,7 +104,7 @@ class ApiTranslationPanel {
             // 使用VSCode API更新配置（首选方法）
 
             const config = vscode.workspace.getConfiguration('i18n-swapper');
-            
+
 
 
             // 先更新到内存配置
@@ -118,13 +118,13 @@ class ApiTranslationPanel {
             await config.update('tencentTranslation.sourceLanguage', this.state.sourceLanguage, vscode.ConfigurationTarget.Workspace);
 
             await config.update('tencentTranslation.languageMappings', this.state.languageMappings, vscode.ConfigurationTarget.Workspace);
-            
+
 
 
             // 提示用户
 
             vscode.window.showInformationMessage('翻译API配置已保存到工作区');
-            
+
 
 
             return true;
@@ -241,27 +241,27 @@ class ApiTranslationPanel {
 
      */
 
- /**
-  * 获取WebView内容
-  */
- getWebviewContent() {
-     const {
-         apiKey,
-         apiSecret,
-         region,
-         languageMappings,
-         sourceLanguage
-     } = this.state;
+    /**
+     * 获取WebView内容
+     */
+    getWebviewContent() {
+        const {
+            apiKey,
+            apiSecret,
+            region,
+            languageMappings,
+            sourceLanguage
+        } = this.state;
 
-     // 获取语言映射列表的 HTML
-     const mappingsHtml = this.getMappingsHTML(languageMappings);
+        // 获取语言映射列表的 HTML
+        const mappingsHtml = this.getMappingsHTML(languageMappings);
 
-     // 获取可用语言选项的 HTML
-     const languageOptions = Object.keys(LANGUAGE_NAMES).map(code =>
-         `<option value="${code}" ${code === sourceLanguage ? 'selected' : ''}>${LANGUAGE_NAMES[code]} (${code})</option>`
-     ).join('');
+        // 获取可用语言选项的 HTML
+        const languageOptions = Object.keys(LANGUAGE_NAMES).map(code =>
+            `<option value="${code}" ${code === sourceLanguage ? 'selected' : ''}>${LANGUAGE_NAMES[code]} (${code})</option>`
+        ).join('');
 
-     return `
+        return `
     <!DOCTYPE html>
     <html lang="zh-CN">
     <head>
@@ -1072,25 +1072,25 @@ class ApiTranslationPanel {
     </body>
     </html>
     `;
- }
+    }
 
- /**
-  * 获取语言映射的HTML内容
-  * @param {Array} mappings 语言映射数组
-  * @returns {string} 映射的HTML内容
-  */
- getMappingsHTML(mappings) {
-     if (!mappings || mappings.length === 0) {
-         return `
+    /**
+     * 获取语言映射的HTML内容
+     * @param {Array} mappings 语言映射数组
+     * @returns {string} 映射的HTML内容
+     */
+    getMappingsHTML(mappings) {
+        if (!mappings || mappings.length === 0) {
+            return `
             <div class="empty-message">
                 尚未配置语言映射，请点击"添加语言映射"按钮添加。
             </div>
         `;
-     }
+        }
 
-     return mappings.map((mapping, index) => {
-         const languageName = this.getLanguageName(mapping.languageCode);
-         return `
+        return mappings.map((mapping, index) => {
+            const languageName = this.getLanguageName(mapping.languageCode);
+            return `
             <div class="mapping-item" data-index="${index}">
                 <div class="mapping-header">
                     <div class="mapping-title">
@@ -1110,8 +1110,8 @@ class ApiTranslationPanel {
                 </div>
             </div>
         `;
-     }).join('');
- }
+        }).join('');
+    }
 
 
     /**
@@ -1474,27 +1474,7 @@ class ApiTranslationPanel {
 
         try {
 
-            if (!this.state.apiKey || !this.state.apiSecret) {
-
-                vscode.window.showErrorMessage('请先配置API密钥');
-
-                return;
-
-            }
-
-
-
-            if (!this.state.languageMappings || this.state.languageMappings.length === 0) {
-
-                vscode.window.showErrorMessage('请先配置语言映射');
-
-                return;
-
-            }
-
-
-
-            // 获取当前工作区
+            // 获取工作区根路径
 
             const workspaceFolders = vscode.workspace.workspaceFolders;
 
@@ -1506,45 +1486,49 @@ class ApiTranslationPanel {
 
             }
 
-
-
             const rootPath = workspaceFolders[0].uri.fsPath;
 
 
 
-            // 获取源语言文件
+            // 检查API密钥
 
-            const sourceFiles = this.state.languageMappings.filter(m =>
+            if (!this.state.apiKey || !this.state.apiSecret) {
 
-                m.languageCode === this.state.sourceLanguage
+                vscode.window.showErrorMessage('请先配置腾讯云翻译API密钥');
+
+                return;
+
+            }
+
+
+
+            // 检查语言映射
+
+            if (!this.state.languageMappings || this.state.languageMappings.length === 0) {
+
+                vscode.window.showErrorMessage('未配置语言映射，请先添加语言文件');
+
+                return;
+
+            }
+
+
+
+            // 检查源语言文件
+
+            const sourceFiles = this.state.languageMappings.filter(
+
+                m => m.languageCode === this.state.sourceLanguage
 
             );
 
 
 
-            if (sourceFiles.length === 0) {
+            if (!sourceFiles || sourceFiles.length === 0) {
 
-                // 如果没有明确的源语言映射，使用localesPaths中的第一个文件
+                vscode.window.showErrorMessage(`未找到源语言(${this.state.sourceLanguage})的文件配置`);
 
-                const localesPaths = vscode.workspace.getConfiguration('i18n-swapper').get('localesPaths', []);
-
-                if (localesPaths.length > 0) {
-
-                    sourceFiles.push({
-
-                        languageCode: this.state.sourceLanguage,
-
-                        filePath: localesPaths[0]
-
-                    });
-
-                } else {
-
-                    vscode.window.showErrorMessage('未找到源语言文件');
-
-                    return;
-
-                }
+                return;
 
             }
 
@@ -1594,200 +1578,144 @@ class ApiTranslationPanel {
 
 
 
-                // 对每个目标语言进行翻译
+                progress.report({
 
-                for (const targetLang of targetLanguages) {
+                    message: `正在准备翻译任务...`
 
+                });
+
+                // 创建每个目标语言文件的翻译任务
+                const languageTasks = targetLanguages.map(async (targetLang) => {
                     if (token.isCancellationRequested) {
-
-                        vscode.window.showInformationMessage('翻译已取消');
-
-                        return;
-
+                        return {
+                            languageCode: targetLang.languageCode,
+                            success: false,
+                            message: '已取消'
+                        };
                     }
-
-
-
-                    progress.report({
-
-                        message: `正在翻译 ${this.getLanguageName(targetLang.languageCode)}...`
-
-                    });
-
-
-
-                    // 加载目标语言文件
-
-                    const targetFilePath = path.join(rootPath, targetLang.filePath);
-
-                    let targetLocaleData = {};
-
-
 
                     try {
-
-                        // 尝试加载现有文件
-
-                        const existingData = utils.loadLocaleFile(targetFilePath);
-
-                        if (existingData) {
-
-                            targetLocaleData = existingData;
-
-                        }
-
-                    } catch (error) {
-
-                        console.warn(`创建新的目标语言文件: ${targetLang.filePath}`);
-
-                    }
-
-
-
-                    // 逐个翻译键值
-
-                    let processedCount = 0;
-
-                    for (const [key, value] of Object.entries(keysToTranslate)) {
-
-                        if (token.isCancellationRequested) break;
-
-
-
-                        // 计算进度百分比
-
-                        processedCount++;
-
-                        const progressPercent = Math.round((processedCount / totalKeys) * 100);
-
-                        progress.report({
-
-                            message: `${this.getLanguageName(targetLang.languageCode)}: ${progressPercent}% (${processedCount}/${totalKeys})`,
-
-                            increment: 100 / (totalKeys * targetLanguages.length)
-
-                        });
-
-
-
-                        // 检查目标文件中是否已有该键的翻译
-
-                        const existingTranslation = this.getValueByPath(targetLocaleData, key);
-
-
-
-                        // 如果已有翻译且不为空，则跳过
-
-                        if (existingTranslation && typeof existingTranslation === 'string' && existingTranslation.trim() !== '') {
-
-                            continue;
-
-                        }
-
-
-
-                        // 调用API翻译
+                        // 加载目标语言文件
+                        const targetFilePath = path.join(rootPath, targetLang.filePath);
+                        let targetLocaleData = {};
 
                         try {
+                            // 尝试加载现有文件
+                            const existingData = utils.loadLocaleFile(targetFilePath);
+                            if (existingData) {
+                                targetLocaleData = existingData;
+                            }
+                        } catch (error) {
+                            console.warn(`创建新的目标语言文件: ${targetLang.filePath}`);
+                        }
 
-                            const translationResult = await this.translateText(
+                        // 为此语言创建所有翻译键的任务
+                        const keyTranslationTasks = Object.entries(keysToTranslate).map(async ([key, value], keyIndex) => {
+                            if (token.isCancellationRequested) return null;
 
-                                value,
+                            // 检查目标文件中是否已有该键的翻译
+                            const existingTranslation = this.getValueByPath(targetLocaleData, key);
 
-                                this.state.sourceLanguage,
-
-                                targetLang.languageCode,
-
-                                this.state.apiKey,
-
-                                this.state.apiSecret,
-
-                                this.state.region
-
-                            );
-
-
-
-                            if (translationResult && translationResult.Response && translationResult.Response.TargetText) {
-
-                                // 更新目标对象
-
-                                this.setValueByPath(targetLocaleData, key, translationResult.Response.TargetText);
-
+                            // 如果已有翻译且不为空，则跳过
+                            if (existingTranslation && typeof existingTranslation === 'string' && existingTranslation.trim() !== '') {
+                                return {
+                                    key,
+                                    skipped: true
+                                };
                             }
 
+                            try {
+                                // 调用API翻译
+                                const translationResult = await this.translateText(
+                                    value,
+                                    this.state.sourceLanguage,
+                                    targetLang.languageCode,
+                                    this.state.apiKey,
+                                    this.state.apiSecret,
+                                    this.state.region
+                                );
 
+                                if (translationResult && translationResult.Response && translationResult.Response.TargetText) {
+                                    // 更新目标对象
+                                    this.setValueByPath(targetLocaleData, key, translationResult.Response.TargetText);
+                                    return {
+                                        key,
+                                        success: true
+                                    };
+                                }
+                                return {
+                                    key,
+                                    success: false
+                                };
+                            } catch (error) {
+                                console.error(`翻译键 ${key} 到 ${targetLang.languageCode} 出错:`, error);
+                                return {
+                                    key,
+                                    success: false,
+                                    error: error.message
+                                };
+                            } finally {
+                                // 更新总体进度
+                                const progressIncrement = 100 / (totalKeys * targetLanguages.length);
+                                progress.report({
+                                    increment: progressIncrement,
+                                    message: `正在翻译 ${this.getLanguageName(targetLang.languageCode)}: ${Math.round((keyIndex + 1) / totalKeys * 100)}%`
+                                });
+                            }
+                        });
 
-                            // 添加一个小延迟，以避免API速率限制
+                        // 分批执行翻译任务，避免同时发送太多请求
+                        const batchSize = 5; // 每批处理的键数量
+                        const results = [];
 
-                            await new Promise(resolve => setTimeout(resolve, 100));
+                        for (let i = 0; i < keyTranslationTasks.length; i += batchSize) {
+                            if (token.isCancellationRequested) break;
 
-                        } catch (error) {
+                            const batch = keyTranslationTasks.slice(i, i + batchSize);
+                            const batchResults = await Promise.all(batch);
+                            results.push(...batchResults.filter(r => r !== null));
 
-                            console.error(`翻译键 ${key} 出错:`, error);
-
+                            // 添加小延迟，避免API限流
+                            await new Promise(resolve => setTimeout(resolve, 200));
                         }
 
-                    }
+                        // 保存更新后的语言文件
+                        utils.saveLocaleFile(targetFilePath, targetLocaleData);
 
-
-
-                    // 保存更新后的目标语言文件
-
-                    try {
-
-                        if (!fs.existsSync(path.dirname(targetFilePath))) {
-
-                            fs.mkdirSync(path.dirname(targetFilePath), {
-
-                                recursive: true
-
-                            });
-
-                        }
-
-
-
-                        if (targetFilePath.endsWith('.json')) {
-
-                            fs.writeFileSync(targetFilePath, JSON.stringify(targetLocaleData, null, 2), 'utf8');
-
-                        } else if (targetFilePath.endsWith('.js')) {
-
-                            const jsContent = `module.exports = ${JSON.stringify(targetLocaleData, null, 2)};`;
-
-                            fs.writeFileSync(targetFilePath, jsContent, 'utf8');
-
-                        }
-
-
-
-                        vscode.window.showInformationMessage(`已更新 ${this.getLanguageName(targetLang.languageCode)} 翻译文件: ${targetLang.filePath}`);
-
+                        return {
+                            languageCode: targetLang.languageCode,
+                            success: true,
+                            translatedCount: results.filter(r => r && r.success).length,
+                            skippedCount: results.filter(r => r && r.skipped).length,
+                            failedCount: results.filter(r => r && !r.success && !r.skipped).length
+                        };
                     } catch (error) {
-
-                        console.error(`保存目标语言文件 ${targetLang.filePath} 出错:`, error);
-
-                        vscode.window.showErrorMessage(`保存翻译文件失败: ${error.message}`);
-
+                        console.error(`处理语言 ${targetLang.languageCode} 失败:`, error);
+                        return {
+                            languageCode: targetLang.languageCode,
+                            success: false,
+                            error: error.message
+                        };
                     }
+                });
 
+                // 并发执行所有语言的翻译任务
+                const results = await Promise.all(languageTasks);
+
+                // 显示完成消息
+                if (token.isCancellationRequested) {
+                    vscode.window.showInformationMessage('翻译已取消');
+                } else {
+                    const successCount = results.filter(r => r.success).length;
+                    vscode.window.showInformationMessage(`翻译完成: ${successCount}/${targetLanguages.length} 种语言已更新`);
                 }
 
+                return results;
             });
-
-
-
-            vscode.window.showInformationMessage('翻译完成!');
-
         } catch (error) {
-
-            console.error('执行翻译出错:', error);
-
+            console.error('翻译任务出错:', error);
             vscode.window.showErrorMessage(`翻译失败: ${error.message}`);
-
         }
-
     }
 
 
@@ -2345,11 +2273,11 @@ class ApiTranslationPanel {
 
             const createdFiles = [];
             const newMappings = [];
-            
+
             // 检查源语言是否已存在于映射中
             const existingSourceMapping = this.state.languageMappings.find(m => m.languageCode === sourceLanguage);
             let sourceFilePath;
-            
+
             if (existingSourceMapping) {
                 // 使用现有的源语言映射
                 sourceFilePath = this.resolveFilePath(existingSourceMapping.filePath);
@@ -2381,13 +2309,13 @@ class ApiTranslationPanel {
             for (const langCode of targetLanguages) {
                 // 检查目标语言是否已存在于映射中
                 const existingTargetMapping = this.state.languageMappings.find(m => m.languageCode === langCode);
-                
+
                 if (existingTargetMapping) {
                     // 跳过已存在的目标语言
                     vscode.window.showInformationMessage(`跳过已存在的目标语言文件: ${existingTargetMapping.filePath}`);
                     continue;
                 }
-                
+
                 const fileName = `${langCode}${extension}`;
                 const filePath = path.join(folderPath, fileName);
 
@@ -2719,118 +2647,162 @@ class ApiTranslationPanel {
             }, async (progress, token) => {
 
                 const total = itemsToTranslate.length * this.state.languageMappings.length;
-                let completed = 0;
-
 
                 // 添加取消功能
-
                 token.onCancellationRequested(() => {
                     throw new Error('用户取消了翻译');
                 });
 
+                progress.report({
+                    message: `准备并发翻译 ${itemsToTranslate.length} 个项目...`
+                });
 
-                for (const item of itemsToTranslate) {
-
+                // 为每个项目创建翻译任务
+                const itemTasks = itemsToTranslate.map(async (item, itemIndex) => {
                     const {
                         key,
                         text
                     } = item;
 
-
-                    for (const mapping of this.state.languageMappings) {
-
-                        try {
-
-                            // 跳过源语言
-
-                            if (mapping.languageCode === this.state.sourceLanguage) {
-
-                                completed++;
-
-                                progress.report({
-                                    increment: (1 / total) * 100,
-                                    message: `已完成 ${completed}/${total}`
-                                });
-
-                                continue;
-
-                            }
-
-
-                            // 获取文件路径
-
-                            const filePath = this.resolveFilePath(mapping.filePath);
-                            if (!filePath) continue;
-
-
-                            // 翻译文本
-
-                            const translation = await this.translateText(
-
-                                text,
-
-                                this.state.sourceLanguage,
-
-                                mapping.languageCode,
-
-                                this.state.apiKey,
-
-                                this.state.apiSecret,
-
-                                this.state.region
-
-                            );
-
-
-                            // 更新翻译文件
-
-                            if (translation && translation.Response && translation.Response.TargetText) {
-
-                                await this.saveTranslationToFile(filePath, key, translation.Response.TargetText);
-
-                            }
-
-
-                            // 更新进度
-
-                            completed++;
-
-                            progress.report({
-                                increment: (1 / total) * 100,
-                                message: `已完成 ${completed}/${total}`
-                            });
-
-
-                            // 添加延迟，避免 API 请求过快
-
-                            await new Promise(resolve => setTimeout(resolve, 300));
-
-                        } catch (err) {
-
-                            console.error(`翻译失败 [${key}] 到 [${mapping.languageCode}]:`, err);
-
-                        }
-
+                    if (token.isCancellationRequested) {
+                        return {
+                            key,
+                            success: false,
+                            message: '用户取消'
+                        };
                     }
 
+                    // 获取目标语言（排除源语言）
+                    const targetLanguages = this.state.languageMappings.filter(
+                        mapping => mapping.languageCode !== this.state.sourceLanguage
+                    );
+
+                    // 为每种语言创建翻译任务
+                    const langTasks = targetLanguages.map(async (mapping) => {
+                        try {
+                            if (token.isCancellationRequested) {
+                                return {
+                                    languageCode: mapping.languageCode,
+                                    success: false,
+                                    message: '用户取消'
+                                };
+                            }
+
+                            // 获取文件路径
+                            const filePath = this.resolveFilePath(mapping.filePath);
+                            if (!filePath) {
+                                return {
+                                    languageCode: mapping.languageCode,
+                                    success: false,
+                                    message: '文件路径无效'
+                                };
+                            }
+
+                            // 翻译文本
+                            const translation = await this.translateText(
+                                text,
+                                this.state.sourceLanguage,
+                                mapping.languageCode,
+                                this.state.apiKey,
+                                this.state.apiSecret,
+                                this.state.region
+                            );
+
+                            // 更新翻译文件
+                            if (translation && translation.Response && translation.Response.TargetText) {
+                                await this.saveTranslationToFile(filePath, key, translation.Response.TargetText);
+
+                                // 更新进度
+                                const progressPercent = Math.round(
+                                    ((itemIndex + 1) / itemsToTranslate.length) * 100
+                                );
+                                progress.report({
+                                    increment: 100 / total,
+                                    message: `翻译项目 ${itemIndex + 1}/${itemsToTranslate.length} (${progressPercent}%)`
+                                });
+
+                                return {
+                                    languageCode: mapping.languageCode,
+                                    success: true,
+                                    text: translation.Response.TargetText
+                                };
+                            }
+
+                            return {
+                                languageCode: mapping.languageCode,
+                                success: false,
+                                message: '翻译结果无效'
+                            };
+                        } catch (err) {
+                            console.error(`翻译失败 [${key}] 到 [${mapping.languageCode}]:`, err);
+                            return {
+                                languageCode: mapping.languageCode,
+                                success: false,
+                                error: err.message
+                            };
+                        }
+                    });
+
+                    // 分批次并发执行每个项目的多语言翻译，避免同时发送太多请求
+                    const batchSize = 3; // 每批处理的语言数量
+                    const langResults = [];
+
+                    for (let i = 0; i < langTasks.length; i += batchSize) {
+                        if (token.isCancellationRequested) break;
+
+                        const batch = langTasks.slice(i, i + batchSize);
+                        const batchResults = await Promise.all(batch);
+                        langResults.push(...batchResults);
+
+                        // 添加小延迟，避免API限流
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+
+                    return {
+                        key,
+                        languages: langResults,
+                        successCount: langResults.filter(r => r.success).length,
+                        totalCount: langResults.length
+                    };
+                });
+
+                // 分批次执行项目任务
+                const batchSize = 5; // 每批处理的项目数量
+                const results = [];
+
+                for (let i = 0; i < itemTasks.length; i += batchSize) {
+                    if (token.isCancellationRequested) break;
+
+                    const batch = itemTasks.slice(i, i + batchSize);
+                    const batchResults = await Promise.all(batch);
+                    results.push(...batchResults);
+
+                    progress.report({
+                        message: `已完成 ${Math.min(i + batchSize, itemTasks.length)}/${itemTasks.length} 个项目`
+                    });
                 }
 
+                // 统计总体结果
+                const totalSuccessCount = results.reduce((sum, item) => sum + item.successCount, 0);
+                const totalLanguageCount = results.reduce((sum, item) => sum + item.totalCount, 0);
 
-                return completed;
-
+                return {
+                    success: true,
+                    itemCount: results.length,
+                    successCount: totalSuccessCount,
+                    totalLanguageCount: totalLanguageCount
+                };
+            }).then(result => {
+                if (result && result.success) {
+                    vscode.window.showInformationMessage(
+                        `批量翻译完成: 已翻译 ${result.itemCount} 个项目，${result.successCount}/${result.totalLanguageCount} 个语言翻译成功`
+                    );
+                }
             });
-
-
-            vscode.window.showInformationMessage('批量翻译完成');
-
         } catch (error) {
-
             console.error('批量翻译出错:', error);
-
             vscode.window.showErrorMessage(`批量翻译失败: ${error.message}`);
-
         }
-
     }
 
 
@@ -2972,7 +2944,7 @@ class ApiTranslationPanel {
                 type: 'success'
 
             });
-            
+
 
             vscode.window.showInformationMessage('语言映射设置已保存');
 

@@ -20,7 +20,9 @@ const {
   performReplacements,
   generateReplacement
 } = require('./services/replacementService');
-const { generateEmptyKeys } = require('./services/emptyKeysGeneratorService');
+const {
+  generateEmptyKeys
+} = require('./services/emptyKeysGeneratorService');
 const {
   generateKeyFromText,
   getLanguageName,
@@ -165,7 +167,7 @@ class BatchReplacementPanel {
           console.log('编辑器切换到语言文件，不更新面板内容');
           return;
         }
-        
+
         // 只有在非扫描所有文件模式下，才需要更新内容
         if ((!this.document || this.document.uri.toString() !== editor.document.uri.toString())) {
           console.log('编辑器切换，自动更新面板内容');
@@ -427,7 +429,7 @@ class BatchReplacementPanel {
           await this.refreshPanel();
           break;
 
-        // 处理生成空键命令
+          // 处理生成空键命令
         case 'generateEmptyKeys':
           this._handleGenerateEmptyKeys(data.indexes);
           break;
@@ -1062,7 +1064,7 @@ class BatchReplacementPanel {
 
       // 使用可见项替换方法执行替换
       await this.performVisibleReplacements(indexesToReplace);
-      
+
       // 使用与刷新按钮相同的方法刷新面板
       await this.refreshPanel();
     } catch (error) {
@@ -1425,7 +1427,7 @@ class BatchReplacementPanel {
     if (!item || !item.text) return;
 
     try {
-      console.log(`面板翻译项：索引=${index}, 文本="${item.text}", 用户键="${userInputKey}"`);
+      console.log(`批量面板翻译项：索引=${index}, 文本="${item.text}", 用户键="${userInputKey}"`);
 
       // 获取配置
       const config = vscode.workspace.getConfiguration('i18n-swapper');
@@ -1434,6 +1436,16 @@ class BatchReplacementPanel {
       const region = config.get('tencentTranslation.region', 'ap-guangzhou');
       const sourceLanguage = config.get('tencentTranslation.sourceLanguage', 'zh');
       const languageMappings = config.get('tencentTranslation.languageMappings', []);
+
+      // 检查API配置
+      if (!apiKey || !apiSecret) {
+        throw new Error('API密钥未配置，请先配置腾讯云翻译API密钥');
+      }
+
+      // 检查语言映射
+      if (!languageMappings || languageMappings.length === 0) {
+        throw new Error('未配置语言映射，请先配置语言映射');
+      }
 
       // 生成或使用提供的键名
       let suggestedKey = userInputKey || '';
@@ -1464,27 +1476,50 @@ class BatchReplacementPanel {
         location: vscode.ProgressLocation.Notification,
         title: '翻译中...'
       }, async (progress) => {
-        for (const mapping of languageMappings) {
-          progress.report({
-            message: `翻译为 ${getLanguageName(mapping.languageCode)}...`
-          });
+        progress.report({
+          message: `准备并发翻译到 ${languageMappings.length} 种语言...`
+        });
 
-          if (mapping.languageCode === sourceLanguage) {
-            // 源语言直接使用原文
-            await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, item.text);
-          } else {
-            // 其他语言调用翻译API
-            const translatedText = await translateText(
-              item.text,
-              sourceLanguage,
-              mapping.languageCode,
-              apiKey,
-              apiSecret,
-              region
-            );
-            await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, translatedText);
+        // 创建所有语言的翻译任务
+        const translationTasks = languageMappings.map(async (mapping) => {
+          try {
+            if (mapping.languageCode === sourceLanguage) {
+              // 源语言直接使用原文
+              await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, item.text);
+              return {
+                languageCode: mapping.languageCode,
+                success: true,
+                text: item.text
+              };
+            } else {
+              // 其他语言调用翻译API
+              const translatedText = await translateText(
+                item.text,
+                sourceLanguage,
+                mapping.languageCode,
+                apiKey,
+                apiSecret,
+                region
+              );
+              await saveTranslationToFile(path.join(rootPath, mapping.filePath), suggestedKey, translatedText);
+              return {
+                languageCode: mapping.languageCode,
+                success: true,
+                text: translatedText
+              };
+            }
+          } catch (error) {
+            console.error(`翻译到 ${mapping.languageCode} 失败:`, error);
+            return {
+              languageCode: mapping.languageCode,
+              success: false,
+              error: error.message
+            };
           }
-        }
+        });
+
+        // 并发执行所有翻译任务
+        await Promise.all(translationTasks);
       });
 
       // 更新项的键值
@@ -2778,16 +2813,16 @@ class BatchReplacementPanel {
     try {
       // 调用空键生成服务
       const result = await generateEmptyKeys(indexes, this.replacements, this);
-      
+
       // 更新面板内容
       this.updatePanelContent();
-      
+
       // 发送完成消息到webview
       this.panel.webview.postMessage({
         command: 'generateEmptyKeysCompleted',
         data: result
       });
-      
+
     } catch (error) {
       vscode.window.showErrorMessage(`生成国际化键名失败: ${error.message}`);
     }

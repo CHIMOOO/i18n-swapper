@@ -2,8 +2,12 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const utils = require('../utils');
-const { saveTranslationToFile } = require('../panels/services/languageFileManager');
-const {  getLanguageName } = require('../panels/services/translationService');
+const {
+  saveTranslationToFile
+} = require('../panels/services/languageFileManager');
+const {
+  getLanguageName
+} = require('../panels/services/translationService');
 const defaultsConfig = require('../config/defaultsConfig');
 const crypto = require('crypto');
 const https = require('https');
@@ -17,48 +21,48 @@ const https = require('https');
 async function generateKeyFromTranslation(text, prefix = null, options = {}) {
   // 获取配置
   const config = vscode.workspace.getConfiguration('i18n-swapper');
-  
+
   // 使用参数中的值或从配置中获取值
   const apiKey = options.apiKey || config.get('tencentTranslation.apiKey', '');
   const apiSecret = options.apiSecret || config.get('tencentTranslation.apiSecret', '');
   const region = options.region || config.get('tencentTranslation.region', 'ap-guangzhou');
   const autoGenerateKeyPrefix = prefix || config.get('autoGenerateKeyPrefix', defaultsConfig.autoGenerateKeyPrefix);
-  
+
   try {
     // 检查API配置是否完整
     if (!apiKey || !apiSecret) {
-            // 创建一个可操作的错误消息，允许用户直接打开配置面板
+      // 创建一个可操作的错误消息，允许用户直接打开配置面板
       const configureAction = '配置API密钥';
       const result = await vscode.window.showErrorMessage(
         '腾讯云翻译API密钥未配置，需要配置API密钥才能使用此功能。',
         configureAction
       );
-      
+
       if (result === configureAction) {
         // 打开API配置面板
         await vscode.commands.executeCommand('i18n-swapper.openApiTranslationConfig');
       }
-      
+
       throw new Error('操作取消：腾讯云翻译API密钥未配置');
     }
-    
+
     console.log(`[自动生成键名] 正在翻译文本: "${text}"`);
-    
+
     // 调用腾讯云翻译API，将中文翻译为英文
     const translation = await translateText(
       text,
       'auto', // 源语言设为自动检测
-      'en',   // 目标语言为英文
+      'en', // 目标语言为英文
       apiKey,
       apiSecret,
       region
     );
-    
+
     if (translation) {
       // 将翻译结果格式化为键名
       const translatedText = translation;
       console.log(`[自动生成键名] 翻译结果: "${translatedText}"`);
-      
+
       // 处理翻译结果，生成合适的键名格式
       const formattedKey = translatedText
         .toLowerCase() // 转小写
@@ -66,7 +70,7 @@ async function generateKeyFromTranslation(text, prefix = null, options = {}) {
         .replace(/[^\w\s]/gi, '') // 移除特殊字符
         .replace(/\s+/g, '_') // 空格替换为下划线
         .replace(/_+/g, '_'); // 多个下划线合并为一个
-      
+
       // 生成完整键名（添加前缀）
       const suggestedKey = `${autoGenerateKeyPrefix}.${formattedKey}`;
       console.log(`[自动生成键名] 生成的键名: "${suggestedKey}"`);
@@ -114,12 +118,12 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
         '腾讯云翻译API密钥未配置，需要配置API密钥才能使用此功能。',
         configureAction
       );
-      
+
       if (result === configureAction) {
         // 打开API配置面板
         await vscode.commands.executeCommand('i18n-swapper.openApiTranslationConfig');
       }
-      
+
       throw new Error('操作取消：腾讯云翻译API密钥未配置');
     }
     // 使用参数传入的键名或生成一个新的
@@ -155,8 +159,6 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
       title: '翻译中...',
       cancellable: false
     }, async (progress) => {
-
-
       // 获取工作区目录
       const workspaceFolders = vscode.workspace.workspaceFolders;
       if (!workspaceFolders) {
@@ -164,13 +166,13 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
       }
       const rootPath = workspaceFolders[0].uri.fsPath;
 
-      // 遍历所有目标语言进行翻译
-      for (const mapping of languageMappings) {
-        try {
-          progress.report({
-            message: `翻译为 ${getLanguageName(mapping.languageCode)}...`
-          });
+      progress.report({
+        message: `准备并发翻译到 ${languageMappings.length} 种语言...`
+      });
 
+      // 准备所有翻译任务的Promise数组
+      const translationTasks = languageMappings.map(async (mapping) => {
+        try {
           // 如果是源语言，直接使用原文
           if (mapping.languageCode === sourceLanguage) {
             await saveTranslationToFile(
@@ -179,7 +181,7 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
               text
             );
             results[mapping.languageCode] = text;
-            continue;
+            return;
           }
 
           // 调用翻译API
@@ -200,7 +202,7 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
             suggestedKey,
             translatedText
           );
-          
+
           // 记录翻译结果
           results[mapping.languageCode] = translatedText;
         } catch (error) {
@@ -208,11 +210,18 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
           vscode.window.showErrorMessage(`翻译到 ${getLanguageName(mapping.languageCode)} 失败: ${error.message}`);
           results[mapping.languageCode] = null;
         }
-      }
+      });
+
+      // 并发执行所有翻译任务
+      await Promise.all(translationTasks);
+
+      progress.report({
+        message: `所有翻译任务已完成`
+      });
     });
 
     vscode.window.showInformationMessage(`已生成键名 "${suggestedKey}" 并保存翻译`);
-    
+
     return {
       key: suggestedKey,
       results: results
@@ -231,14 +240,14 @@ async function translateTextToAllLanguages(text, userInputKey = '', documentInfo
  */
 function generateKeyFromText(text) {
   if (!text) return '';
-  
+
   // 获取配置的前缀
   const config = vscode.workspace.getConfiguration('i18n-swapper');
   const prefix = config.get('autoGenerateKeyPrefix', '_iw');
-  
+
   // 从文本生成简短的哈希
   const hash = simpleHash(text).toString(16).substring(0, 6);
-  
+
   return `${prefix}.${hash}`;
 }
 
@@ -264,9 +273,17 @@ function simpleHash(str) {
  * @param {string} secretId API密钥ID
  * @param {string} secretKey API密钥
  * @param {string} region 区域
+ * @param {Object} options 可选参数
+ * @param {number} options.timeout 请求超时时间(毫秒)，默认为10000(10秒)
+ * @param {number} options.retries 重试次数，默认为2
  * @returns {Promise<string>} 翻译结果
  */
-async function translateText(text, sourceLanguage, targetLanguage, secretId, secretKey, region) {
+async function translateText(text, sourceLanguage, targetLanguage, secretId, secretKey, region, options = {}) {
+  // 默认选项
+  const timeout = options.timeout || 10000; // 10秒超时
+  const maxRetries = options.retries || 2;
+  let retries = 0;
+
   // 检查API密钥是否配置
   if (!secretId || !secretKey) {
     // 创建一个可操作的错误消息，允许用户直接打开配置面板
@@ -284,138 +301,179 @@ async function translateText(text, sourceLanguage, targetLanguage, secretId, sec
     throw new Error('操作取消：腾讯云翻译API密钥未配置');
   }
 
-  return new Promise((resolve, reject) => {
-    try {
-      const endpoint = 'tmt.tencentcloudapi.com';
-      const service = 'tmt';
-      const action = 'TextTranslate';
-      const version = '2018-03-21';
-      const timestamp = Math.round(new Date().getTime() / 1000);
+  // 重试函数
+  async function attemptTranslate() {
+    return new Promise((resolve, reject) => {
+      try {
+        const endpoint = 'tmt.tencentcloudapi.com';
+        const service = 'tmt';
+        const action = 'TextTranslate';
+        const version = '2018-03-21';
+        const timestamp = Math.round(new Date().getTime() / 1000);
 
-      // 请求参数
-      const requestParams = {
-        SourceText: text,
-        Source: sourceLanguage,
-        Target: targetLanguage,
-        ProjectId: 0
-      };
+        // 请求参数
+        const requestParams = {
+          SourceText: text,
+          Source: sourceLanguage,
+          Target: targetLanguage,
+          ProjectId: 0
+        };
 
-      console.log(`[API请求] 参数:`, requestParams);
+        console.log(`[API请求] ${targetLanguage} 参数:`, requestParams);
 
-      // 参数签名
-      const requestParamString = JSON.stringify(requestParams);
+        // 参数签名
+        const requestParamString = JSON.stringify(requestParams);
 
-      // 生成签名所需参数
-      const hashedRequestPayload = crypto
-        .createHash('sha256')
-        .update(requestParamString)
-        .digest('hex');
+        // 生成签名所需参数
+        const hashedRequestPayload = crypto
+          .createHash('sha256')
+          .update(requestParamString)
+          .digest('hex');
 
-      const canonicalRequest = [
-        'POST',
-        '/',
-        '',
-        'content-type:application/json; charset=utf-8',
-        'host:' + endpoint,
-        '',
-        'content-type;host',
-        hashedRequestPayload
-      ].join('\n');
+        const canonicalRequest = [
+          'POST',
+          '/',
+          '',
+          'content-type:application/json; charset=utf-8',
+          'host:' + endpoint,
+          '',
+          'content-type;host',
+          hashedRequestPayload
+        ].join('\n');
 
-      const date = new Date(timestamp * 1000).toISOString().split('T')[0];
-      const stringToSign = [
-        'TC3-HMAC-SHA256',
-        timestamp,
-        `${date}/${service}/tc3_request`,
-        crypto
-        .createHash('sha256')
-        .update(canonicalRequest)
-        .digest('hex')
-      ].join('\n');
+        const date = new Date(timestamp * 1000).toISOString().split('T')[0];
+        const stringToSign = [
+          'TC3-HMAC-SHA256',
+          timestamp,
+          `${date}/${service}/tc3_request`,
+          crypto
+          .createHash('sha256')
+          .update(canonicalRequest)
+          .digest('hex')
+        ].join('\n');
 
-      // 计算签名
-      const secretDate = crypto
-        .createHmac('sha256', 'TC3' + secretKey)
-        .update(date)
-        .digest();
+        // 计算签名
+        const secretDate = crypto
+          .createHmac('sha256', 'TC3' + secretKey)
+          .update(date)
+          .digest();
 
-      const secretService = crypto
-        .createHmac('sha256', secretDate)
-        .update(service)
-        .digest();
+        const secretService = crypto
+          .createHmac('sha256', secretDate)
+          .update(service)
+          .digest();
 
-      const secretSigning = crypto
-        .createHmac('sha256', secretService)
-        .update('tc3_request')
-        .digest();
+        const secretSigning = crypto
+          .createHmac('sha256', secretService)
+          .update('tc3_request')
+          .digest();
 
-      const signature = crypto
-        .createHmac('sha256', secretSigning)
-        .update(stringToSign)
-        .digest('hex');
+        const signature = crypto
+          .createHmac('sha256', secretSigning)
+          .update(stringToSign)
+          .digest('hex');
 
-      // 构造授权信息
-      const authorization =
-        'TC3-HMAC-SHA256 ' +
-        `Credential=${secretId}/${date}/${service}/tc3_request, ` +
-        'SignedHeaders=content-type;host, ' +
-        `Signature=${signature}`;
+        // 构造授权信息
+        const authorization =
+          'TC3-HMAC-SHA256 ' +
+          `Credential=${secretId}/${date}/${service}/tc3_request, ` +
+          'SignedHeaders=content-type;host, ' +
+          `Signature=${signature}`;
 
-      const options = {
-        hostname: endpoint,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Host': endpoint,
-          'Authorization': authorization,
-          'X-TC-Action': action,
-          'X-TC-Timestamp': timestamp.toString(),
-          'X-TC-Version': version,
-          'X-TC-Region': region
-        }
-      };
-
-      const req = https.request(options, (res) => {
-        const chunks = [];
-
-        res.on('data', (chunk) => {
-          chunks.push(chunk);
-        });
-
-        res.on('end', () => {
-          const responseBody = Buffer.concat(chunks).toString();
-
-          try {
-            const parsed = JSON.parse(responseBody);
-
-            if (parsed.Response && parsed.Response.Error) {
-              reject(new Error(
-                `API错误: ${parsed.Response.Error.Code} - ${parsed.Response.Error.Message}`
-              ));
-              return;
-            }
-
-            if (parsed.Response && parsed.Response.TargetText) {
-              resolve(parsed.Response.TargetText);
-            } else {
-              reject(new Error('API返回结果缺少翻译文本'));
-            }
-          } catch (error) {
-            reject(new Error(`解析API响应出错: ${error.message}`));
+        const options = {
+          hostname: endpoint,
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json; charset=utf-8',
+            'Host': endpoint,
+            'Authorization': authorization,
+            'X-TC-Action': action,
+            'X-TC-Timestamp': timestamp.toString(),
+            'X-TC-Version': version,
+            'X-TC-Region': region
           }
+        };
+
+        // 设置请求超时
+        let timeoutId = null;
+
+        const req = https.request(options, (res) => {
+          // 清除超时定时器
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+
+          const chunks = [];
+
+          res.on('data', (chunk) => {
+            chunks.push(chunk);
+          });
+
+          res.on('end', () => {
+            const responseBody = Buffer.concat(chunks).toString();
+
+            try {
+              const parsed = JSON.parse(responseBody);
+
+              if (parsed.Response && parsed.Response.Error) {
+                reject(new Error(
+                  `API错误: ${parsed.Response.Error.Code} - ${parsed.Response.Error.Message}`
+                ));
+                return;
+              }
+
+              if (parsed.Response && parsed.Response.TargetText) {
+                resolve(parsed.Response.TargetText);
+              } else {
+                reject(new Error('API返回结果缺少翻译文本'));
+              }
+            } catch (error) {
+              reject(new Error(`解析API响应出错: ${error.message}`));
+            }
+          });
         });
-      });
 
-      req.on('error', (error) => {
-        reject(new Error(`发送请求出错: ${error.message}`));
-      });
+        // 设置请求超时
+        timeoutId = setTimeout(() => {
+          req.destroy(new Error(`翻译请求超时(${timeout}ms)`));
+        }, timeout);
 
-      req.write(requestParamString);
-      req.end();
+        req.on('error', (error) => {
+          // 清除超时定时器
+          if (timeoutId) {
+            clearTimeout(timeoutId);
+          }
+          reject(new Error(`发送请求出错: ${error.message}`));
+        });
+
+        req.write(requestParamString);
+        req.end();
+      } catch (error) {
+        reject(new Error(`准备翻译请求出错: ${error.message}`));
+      }
+    });
+  }
+
+  // 执行翻译尝试，带重试逻辑
+  let lastError = null;
+  while (retries <= maxRetries) {
+    try {
+      return await attemptTranslate();
     } catch (error) {
-      reject(new Error(`准备翻译请求出错: ${error.message}`));
+      lastError = error;
+      retries++;
+
+      // 如果不是最后一次尝试，记录错误但继续重试
+      if (retries <= maxRetries) {
+        console.log(`翻译 ${targetLanguage} 失败，正在重试(${retries}/${maxRetries}): ${error.message}`);
+        // 在重试前等待一小段时间
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
     }
-  });
+  }
+
+  // 如果所有重试都失败，抛出最后一个错误
+  throw lastError;
 }
 module.exports = {
   translateTextToAllLanguages,
@@ -423,5 +481,4 @@ module.exports = {
   generateKeyFromTranslation,
   translateText,
   getLanguageName
-}; 
-
+};
