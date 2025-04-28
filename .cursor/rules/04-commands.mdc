@@ -1,0 +1,62 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 命令列表和用法
+
+i18n-swapper 扩展提供了多个命令，可通过右键菜单、命令面板或快捷键调用。
+
+## 主要命令
+
+### 替换为国际化函数 (replaceWithI18n)
+
+- 命令 ID: `i18n-swapper.replaceWithI18n`
+- 快捷键: `Ctrl+Alt+Y` (Windows/Linux) 或 `Cmd+Alt+Y` (Mac)
+- 功能: 将选中的文本替换为国际化函数调用
+- 实现文件: [./src/commands/replaceWithI18n.js](mdc:src/commands/replaceWithI18n.js)
+
+### 打开面板 (batchReplaceWithI18n)
+
+- 命令 ID: `i18n-swapper.batchReplaceWithI18n`
+- 功能: 打开国际化管理面板，提供可视化的批量替换和管理功能
+- 实现文件: [extension.js](mdc:extension.js)
+
+### 一键批量替换 (quickBatchReplace)
+
+- 命令 ID: `i18n-swapper.quickBatchReplace`
+- 快捷键: `Ctrl+Alt+I` (Windows/Linux) 或 `Cmd+Alt+I` (Mac)
+- 功能: 扫描当前文件，自动替换已存在于国际化文件中的文本
+- 实现文件: [extension.js](mdc:extension.js)
+
+### 刷新国际化装饰 (refreshI18nDecorations)
+
+- 命令 ID: `i18n-swapper.refreshI18nDecorations`
+- 功能: 刷新编辑器中的国际化装饰，更新翻译显示
+- 实现文件: [./src/commands/refreshI18nDecorations.js](mdc:src/commands/refreshI18nDecorations.js)
+
+### 设置国际化文件路径 (setLocalesPaths)
+
+- 命令 ID: `i18n-swapper.setLocalesPaths`
+- 功能: 设置国际化文件的路径
+- 实现文件: [extension.js](mdc:extension.js)
+
+### 配置API翻译 (openApiTranslationConfig)
+
+- 命令 ID: `i18n-swapper.openApiTranslationConfig`
+- 功能: 打开 API 翻译配置界面
+- 实现文件: [extension.js](mdc:extension.js)
+
+## 内部命令
+
+这些命令主要由扩展内部使用，不直接暴露给用户：
+
+- `i18n-swapper.translateText`: 翻译文本
+- `i18n-swapper.translateHover`: 处理悬停翻译
+- `i18n-swapper.editLanguageEntry`: 编辑语言条目
+- `i18n-swapper.confirmReplacement`: 确认替换
+- `i18n-swapper.cancelReplacement`: 取消替换
+- `i18n-swapper.applyAllReplacements`: 应用所有替换
+- `i18n-swapper.cancelAllReplacements`: 取消所有替换
+- `i18n-swapper.openLanguageFile`: 打开语言文件
+

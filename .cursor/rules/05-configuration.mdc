@@ -1,0 +1,81 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 配置选项
+
+i18n-swapper 扩展提供了多种配置选项，可通过 VSCode 的设置界面进行调整。
+
+## 主要配置项
+
+### 国际化文件路径 (localesPaths)
+
+- 类型: `array`
+- 默认值: `[]`
+- 说明: 本地化文件的路径，支持多个文件路径
+- 示例: `["src/locales/zh-CN.json", "src/locales/en-US.json"]`
+
+### 默认语言 (defaultLocale)
+
+- 类型: `string`
+- 默认值: `"zh-CN"`
+- 说明: 默认本地化语言
+
+### 引号类型 (quoteType)
+
+- 类型: `string`
+- 可选值: `"single"` 或 `"double"`
+- 默认值: `"single"`
+- 说明: 生成的国际化调用中使用的引号类型
+
+### 国际化函数名称 (functionName)
+
+- 类型: `string`
+- 默认值: `"t"`
+- 说明: 国际化函数名称
+
+### 扫描模式 (scanPatterns)
+
+- 类型: `array`
+- 默认值: `[]`
+- 说明: 配置扫描的字段列表 (用于批量替换功能)
+- 示例: `["label", "placeholder", "title"]`
+
+### 装饰样式 (decorationStyle)
+
+- 类型: `string`
+- 可选值: `"suffix"` 或 `"inline"`
+- 默认值: `"inline"`
+- 说明: i18n装饰显示样式
+  - `suffix`: 显示为 `t('key')(译文)`
+  - `inline`: 显示为 `t(译文)`
+
+### 后缀样式 (suffixStyle)
+
+- 类型: `object`
+- 说明: 后缀模式的样式设置
+- 属性:
+  - `color`: 后缀模式翻译文本的颜色
+  - `fontSize`: 后缀模式翻译文本的字体大小
+  - `fontWeight`: 后缀模式翻译文本的字体粗细
+  - `fontStyle`: 后缀模式翻译文本的字体样式
+  - `margin`: 后缀模式翻译文本的边距
+
+## 翻译 API 配置
+
+### 腾讯云翻译 API 配置
+
+- `i18n-swapper.tencentTranslation.apiKey`: 腾讯云翻译 API 密钥 ID (SecretId)
+- `i18n-swapper.tencentTranslation.apiSecret`: 腾讯云翻译 API 密钥 (SecretKey)
+- `i18n-swapper.tencentTranslation.region`: 腾讯云 API 区域，默认 `"ap-guangzhou"`
+- `i18n-swapper.tencentTranslation.sourceLanguage`: 源语言代码，默认 `"zh"`
+
+### 语言映射配置
+
+- `i18n-swapper.tencentTranslation.languageMappings`: 语言代码与国际化文件的映射
+- 类型: `array` of `object`
+- 每个对象包含:
+  - `languageCode`: 语言代码 (例如: `"en"`)
+  - `filePath`: 对应的国际化文件路径
+

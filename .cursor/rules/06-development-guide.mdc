@@ -1,0 +1,72 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 开发指南
+
+本文档提供了 i18n-swapper 扩展的开发指南，帮助开发者理解代码结构和实现逻辑。
+
+## 主要类和模块
+
+### 批量替换面板 (BatchReplacementPanel)
+
+批量替换面板是一个 WebView 界面，实现在 [i18n-swapper-plugin.js](mdc:i18n-swapper-plugin.js) 中。主要功能包括：
+
+- 创建并显示 WebView 面板
+- 分析当前文档中的文本
+- 查找国际化键匹配
+- 处理用户的替换操作
+
+### 国际化装饰器 (I18nDecorator)
+
+国际化装饰器负责在编辑器中显示国际化键的实际翻译，实现在 [src/decorators/i18nDecorator.js](mdc:src/decorators/i18nDecorator.js) 中。
+
+### 文档分析器 (DocumentAnalyzer)
+
+文档分析器负责分析文件内容，识别需要国际化的文本，实现在 [src/panels/services/documentAnalyzer.js](mdc:src/panels/services/documentAnalyzer.js) 中。
+
+## 工作流程
+
+1. 扩展激活时，初始化配置并注册命令
+2. 当编辑器打开支持的文件类型时，激活国际化装饰器
+3. 用户可以通过命令、快捷键或右键菜单触发国际化操作
+4. 根据操作类型，可能打开批量替换面板或直接执行替换
+
+## 主要文件说明
+
+### extension.js
+
+扩展的主入口文件，负责：
+
+- 注册命令
+- 初始化服务
+- 处理扩展激活和停用
+
+### i18n-swapper-plugin.js
+
+批量替换功能的核心实现，包括：
+
+- 查找国际化键
+- 创建和管理批量替换面板
+- 执行批量替换操作
+
+## 开发指南
+
+### 添加新命令
+
+1. 在 package.json 的 `contributes.commands` 中添加命令定义
+2. 在 extension.js 中注册命令处理函数
+3. 在 src/commands 目录中实现命令的功能
+
+### 修改界面样式
+
+1. 面板界面的 HTML 和 CSS 在 getWebviewContent 方法中定义
+2. 编辑器装饰的样式在 i18nDecorator.js 中定义
+
+### 添加新功能
+
+1. 在 src 目录的相应模块中实现功能
+2. 在 extension.js 中注册相关命令或事件处理
+3. 更新 package.json 中的配置项（如果需要）
+
