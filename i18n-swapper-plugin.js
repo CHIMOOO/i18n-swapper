@@ -5,6 +5,7 @@ const utils = require('../utils');
 const {
   analyzeDocument
 } = require('./src/panels/services/documentAnalyzer');
+const { parseJsFile } = require('./src/utils/js-parser');
 /**
  * 递归查找对象中指定值的路径
  * @param {Object} obj 要搜索的对象
@@ -44,15 +45,8 @@ function loadLocaleFile(filePath) {
       const content = fs.readFileSync(filePath, 'utf8');
       return JSON.parse(content);
     } else if (filePath.endsWith('.js')) {
-      // 加载JS文件
-      try {
-        // 清除require缓存，确保获取最新内容
-        delete require.cache[require.resolve(filePath)];
-        return require(filePath);
-      } catch (e) {
-        console.error(`加载JS文件失败: ${e.message}`);
-        return null;
-      }
+      // 使用公共的JS解析模块
+      return parseJsFile(filePath);
     }
     
     return null;

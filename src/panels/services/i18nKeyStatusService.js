@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const defaultsConfig = require('../../config/defaultsConfig');
+const { parseJsFile } = require('../../utils/js-parser');
 
 /**
  * i18n键状态管理服务
@@ -51,25 +52,15 @@ class I18nKeyStatusService {
             }
 
             // 读取文件内容
-            const fileContent = fs.readFileSync(fullPath, 'utf8');
             let i18nData;
 
             // 解析文件内容
             if (fullPath.endsWith('.json')) {
+              const fileContent = fs.readFileSync(fullPath, 'utf8');
               i18nData = JSON.parse(fileContent);
             } else if (fullPath.endsWith('.js')) {
-              // 简单解析JS模块导出
-              const match = fileContent.match(/export\s+default\s+({[\s\S]*?});?$/m);
-              if (match && match[1]) {
-                i18nData = Function(`return ${match[1]}`)();
-              } else {
-                item.i18nStatus[mapping.languageCode] = {
-                  exists: false,
-                  value: null,
-                  error: '无法解析JS文件'
-                };
-                continue;
-              }
+              // 使用公共的JS解析模块
+              i18nData = parseJsFile(fullPath);
             } else {
               item.i18nStatus[mapping.languageCode] = {
                 exists: false,
@@ -153,26 +144,15 @@ class I18nKeyStatusService {
             continue;
           }
 
-          // 读取文件内容
-          const fileContent = fs.readFileSync(fullPath, 'utf8');
+          // 解析文件内容
           let i18nData;
 
-          // 解析文件内容
           if (fullPath.endsWith('.json')) {
+            const fileContent = fs.readFileSync(fullPath, 'utf8');
             i18nData = JSON.parse(fileContent);
           } else if (fullPath.endsWith('.js')) {
-            // 简单解析JS模块导出
-            const match = fileContent.match(/export\s+default\s+({[\s\S]*?});?$/m);
-            if (match && match[1]) {
-              i18nData = Function(`return ${match[1]}`)();
-            } else {
-              item.i18nStatus[mapping.languageCode] = {
-                exists: false,
-                value: null,
-                error: '无法解析JS文件'
-              };
-              continue;
-            }
+            // 使用公共的JS解析模块
+            i18nData = parseJsFile(fullPath);
           } else {
             item.i18nStatus[mapping.languageCode] = {
               exists: false,

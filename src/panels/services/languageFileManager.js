@@ -2,6 +2,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { SUPPORTED_LANGUAGE_MAPPINGS, LANGUAGE_NAMES } = require('../../utils/language-mappings');
+const { parseJsFile } = require('../../utils/js-parser');
 
 /**
  * 创建或选择语言文件
@@ -173,8 +174,8 @@ async function saveTranslationToFile(filePath, key, value) {
           const content = fs.readFileSync(filePath, 'utf8');
           localeData = JSON.parse(content || '{}');
         } else if (filePath.endsWith('.js')) {
-          delete require.cache[require.resolve(filePath)];
-          localeData = require(filePath) || {};
+          // 使用公共的JS解析模块
+          localeData = parseJsFile(filePath);
         }
       } catch (error) {
         console.error(`加载文件 ${filePath} 失败:`, error);

@@ -15,6 +15,9 @@ const {
     LANGUAGE_NAMES
 } = require('../utils/language-mappings');
 
+// 在文件顶部添加导入
+const { parseJsFile } = require('../utils/js-parser');
+
 
 
 /**
@@ -2376,22 +2379,13 @@ class ApiTranslationPanel {
 
         try {
 
+            // 创建备份路径
+
             const backupPath = `${filePath}.bak`;
 
 
 
-            // 确保目录存在
-
-            const dirPath = path.dirname(filePath);
-            if (!fs.existsSync(dirPath)) {
-                fs.mkdirSync(dirPath, {
-                    recursive: true
-                });
-            }
-
-
-
-            // 加载现有文件或创建新对象
+            // 加载现有数据
 
             let data = {};
             if (fs.existsSync(filePath)) {
@@ -2411,10 +2405,9 @@ class ApiTranslationPanel {
 
 
 
-                        // 尝试加载JS模块
+                        // 使用公共的JS解析模块
 
-                        delete require.cache[require.resolve(filePath)];
-                        data = require(filePath);
+                        data = parseJsFile(filePath);
 
                     }
 

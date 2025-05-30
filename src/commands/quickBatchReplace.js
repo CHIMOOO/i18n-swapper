@@ -8,6 +8,7 @@ const {
     generateLanguageHoverContent
 } = require('../utils/hover-content-generator');
 const fs = require('fs');
+const { parseJsFile } = require('../utils/js-parser');
 
 // 存储所有待确认的替换项
 let pendingReplacements = [];
@@ -219,24 +220,23 @@ async function quickBatchReplace(context, targetDocument) {
  * @returns {Object} 包含语言数据和映射的对象
  */
 function loadAllLanguageData() {
-    const allLanguageData = {};
-
-    // 获取配置
     const config = vscode.workspace.getConfiguration('i18n-swapper');
-    const languageMappings = config.get('tencentTranslation.languageMappings', []);
+    const allLanguageData = {};
 
     // 获取工作区根目录
     const workspaceFolders = vscode.workspace.workspaceFolders;
     if (!workspaceFolders) {
         return {
-            allLanguageData,
-            languageMappings
+            allLanguageData: {},
+            languageMappings: []
         };
     }
-
     const rootPath = workspaceFolders[0].uri.fsPath;
 
-    // 为每个语言映射加载数据
+    // 获取语言映射配置
+    const languageMappings = config.get('tencentTranslation.languageMappings', []);
+
+    // 加载每种语言的数据
     for (const mapping of languageMappings) {
         try {
             const languageCode = mapping.languageCode;
@@ -249,8 +249,8 @@ function loadAllLanguageData() {
                     const content = fs.readFileSync(filePath, 'utf8');
                     data = JSON.parse(content);
                 } else if (filePath.endsWith('.js')) {
-                    delete require.cache[require.resolve(filePath)];
-                    data = require(filePath);
+                    // 使用公共的JS解析模块
+                    data = parseJsFile(filePath);
                 }
 
                 if (data) {
@@ -277,8 +277,8 @@ function loadAllLanguageData() {
                         const content = fs.readFileSync(filePath, 'utf8');
                         data = JSON.parse(content);
                     } else if (filePath.endsWith('.js')) {
-                        delete require.cache[require.resolve(filePath)];
-                        data = require(filePath);
+                        // 使用公共的JS解析模块
+                        data = parseJsFile(filePath);
                     }
 
                     if (data) {
