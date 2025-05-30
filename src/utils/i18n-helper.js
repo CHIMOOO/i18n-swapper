@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const fs = require('fs');
 const path = require('path');
+const { parseJsFile } = require('./js-parser');
 
 /**
  * 递归查找对象中指定值的路径
@@ -52,14 +53,8 @@ function loadLocaleFile(filePath) {
         return {};
       }
     } else if (filePath.endsWith('.js')) {
-      try {
-        // 清除require缓存，确保获取最新内容
-        delete require.cache[require.resolve(filePath)];
-        return require(filePath);
-      } catch (e) {
-        console.error(`[错误] 加载JS文件失败: ${filePath}, 错误: ${e.message}`);
-        return {};
-      }
+      // 使用公共的JS解析模块
+      return parseJsFile(filePath);
     }
     
     return null;
