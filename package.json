@@ -1,0 +1,108 @@
+{
+  "name": "i18n-swapper",
+  "displayName": "i18n Swapper",
+  "description": "一站式国际化（i18n）解决方案：实时翻译预览、智能替换、批量处理、多语言管理",
+  "version": "0.0.1",
+  "publisher": "chimoo",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other",
+    "Formatters"
+  ],
+  "keywords": [
+    "i18n",
+    "internationalization",
+    "translation",
+    "locale",
+    "vue",
+    "react"
+  ],
+  "activationEvents": [
+    "onLanguage:javascript",
+    "onLanguage:typescript",
+    "onLanguage:javascriptreact",
+    "onLanguage:typescriptreact",
+    "onLanguage:vue",
+    "onLanguage:html"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "i18n-swapper.replaceWithI18n",
+        "title": "i18n Swapper: 替换为 i18n 调用"
+      },
+      {
+        "command": "i18n-swapper.openPanel",
+        "title": "i18n Swapper: 打开管理面板"
+      }
+    ],
+    "configuration": {
+      "title": "i18n Swapper",
+      "properties": {
+        "i18n-swapper.localesPaths": {
+          "type": "array",
+          "default": [],
+          "description": "语言文件路径列表"
+        },
+        "i18n-swapper.functionName": {
+          "type": "string",
+          "default": "t",
+          "description": "i18n 函数名"
+        },
+        "i18n-swapper.quoteType": {
+          "type": "string",
+          "enum": [
+            "single",
+            "double"
+          ],
+          "default": "single",
+          "description": "引号类型"
+        },
+        "i18n-swapper.decorationStyle": {
+          "type": "string",
+          "enum": [
+            "suffix",
+            "inline"
+          ],
+          "default": "suffix",
+          "description": "翻译预览显示模式"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "dev": "concurrently \"pnpm run dev:ext\" \"pnpm run dev:webview\"",
+    "dev:ext": "node esbuild.config.mjs --watch",
+    "dev:webview": "pnpm run --filter webview dev",
+    "build": "pnpm run build:webview && pnpm run build:ext",
+    "build:ext": "node esbuild.config.mjs --production",
+    "build:webview": "pnpm run --filter webview build",
+    "lint": "eslint src --ext .ts,.vue",
+    "type-check": "tsc --noEmit -p tsconfig.extension.json",
+    "type-check:webview": "pnpm run --filter webview type-check",
+    "package": "pnpm run build && vsce package --no-dependencies",
+    "publish": "pnpm run build && vsce publish --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "concurrently": "^9.0.0",
+    "esbuild": "^0.24.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0",
+    "@vscode/vsce": "^3.0.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "@vscode/vsce-sign",
+      "keytar"
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+:root {
+  font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
+  font-size: var(--vscode-font-size, 13px);
+  color: var(--vscode-editor-foreground);
+  background-color: var(--vscode-editor-background);
+}
+
+body {
+  margin: 0;
+  padding: 0;
+}

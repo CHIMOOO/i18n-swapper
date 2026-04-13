@@ -1,0 +1,19 @@
+{
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#293103",
+        "titleBar.activeBackground": "#394504",
+        "titleBar.activeForeground": "#F7FDDD",
+        "titleBar.inactiveBackground": "#293103",
+        "titleBar.inactiveForeground": "#F7FDDD"
+    },
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+    "css.customData": [],
+    "files.associations": {
+        "*.css": "tailwindcss"
+    },
+    "[vue]": {
+        "editor.defaultFormatter": "Vue.volar"
+    }
+}

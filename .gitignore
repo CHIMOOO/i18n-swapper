@@ -1,0 +1,20 @@
+node_modules/
+dist/
+*.vsix
+.DS_Store
+Thumbs.db
+*.log
+.env
+.env.local
+
+# pnpm
+pnpm-debug.log*
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# Build artifacts
+src/webview/node_modules/
+docs/
