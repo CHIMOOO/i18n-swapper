@@ -1,0 +1,1 @@
+export { TextScanner } from './TextScanner';
