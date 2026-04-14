@@ -1,7 +1,7 @@
 {
   "name": "i18n-swapper",
   "displayName": "i18n Swapper",
-  "description": "一站式国际化（i18n）解决方案：实时翻译预览、智能替换、批量处理、多语言管理",
+  "description": "一站式国际化（i18n）解决方案：实时翻译预览、智能替换、批量处理、多语言管理。支持 Web/Android/iOS 三端。",
   "version": "0.0.1",
   "publisher": "chimoo",
   "license": "MIT",
@@ -18,7 +18,11 @@
     "translation",
     "locale",
     "vue",
-    "react"
+    "react",
+    "android",
+    "ios",
+    "swift",
+    "kotlin"
   ],
   "activationEvents": [
     "onLanguage:javascript",
@@ -26,50 +30,231 @@
     "onLanguage:javascriptreact",
     "onLanguage:typescriptreact",
     "onLanguage:vue",
-    "onLanguage:html"
+    "onLanguage:html",
+    "onLanguage:kotlin",
+    "onLanguage:java",
+    "onLanguage:swift",
+    "onLanguage:xml"
   ],
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
       {
         "command": "i18n-swapper.replaceWithI18n",
-        "title": "i18n Swapper: 替换为 i18n 调用"
+        "title": "i18n Swapper: 替换为国际化函数"
       },
       {
         "command": "i18n-swapper.openPanel",
         "title": "i18n Swapper: 打开管理面板"
+      },
+      {
+        "command": "i18n-swapper.refreshDecorations",
+        "title": "i18n Swapper: 刷新国际化装饰"
+      },
+      {
+        "command": "i18n-swapper.setLocalesPaths",
+        "title": "i18n Swapper: 设置国际化文件路径"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "i18n-swapper.replaceWithI18n",
+          "group": "i18n-swapper",
+          "when": "editorHasSelection"
+        },
+        {
+          "command": "i18n-swapper.openPanel",
+          "group": "i18n-swapper"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "i18n-swapper.replaceWithI18n",
+        "key": "ctrl+alt+y",
+        "mac": "cmd+alt+y",
+        "when": "editorHasSelection"
       }
     ],
     "configuration": {
       "title": "i18n Swapper",
       "properties": {
+        "i18n-swapper.platform": {
+          "type": "string",
+          "enum": ["auto", "web", "android", "ios"],
+          "default": "auto",
+          "description": "项目平台类型（auto 自动检测）"
+        },
         "i18n-swapper.localesPaths": {
           "type": "array",
+          "items": { "type": "string" },
           "default": [],
-          "description": "语言文件路径列表"
+          "description": "源语言文件路径列表"
         },
         "i18n-swapper.functionName": {
           "type": "string",
           "default": "t",
-          "description": "i18n 函数名"
+          "description": "输出国际化函数名称"
         },
         "i18n-swapper.quoteType": {
           "type": "string",
-          "enum": [
-            "single",
-            "double"
-          ],
+          "enum": ["single", "double"],
           "default": "single",
-          "description": "引号类型"
+          "description": "生成代码中使用的引号类型"
+        },
+        "i18n-swapper.defaultLocale": {
+          "type": "string",
+          "default": "zh-CN",
+          "description": "默认本地化语言"
+        },
+        "i18n-swapper.identifyFunctionNames": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["t", "$t"],
+          "description": "识别的国际化函数名称列表"
+        },
+        "i18n-swapper.matchPatterns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "source": { "type": "string", "description": "正则表达式字符串" },
+              "flags": { "type": "string", "description": "正则标志" },
+              "keyGroup": { "type": "number", "description": "键名捕获组索引" },
+              "fileTypes": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "适用的文件类型"
+              }
+            }
+          },
+          "default": [],
+          "description": "自定义匹配规则（正则表达式），可覆盖平台默认规则"
+        },
+        "i18n-swapper.scanPatterns": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["label", "value", "placeholder", "title", "message", "text"],
+          "description": "扫描的属性名列表（用于批量替换）"
+        },
+        "i18n-swapper.excludeFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["node_modules", "dist", "build", ".git", "vendor", ".history"],
+          "description": "扫描时排除的文件/目录"
+        },
+        "i18n-swapper.includeFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "指定扫描范围（为空则扫描全部）"
         },
         "i18n-swapper.decorationStyle": {
           "type": "string",
-          "enum": [
-            "suffix",
-            "inline"
-          ],
-          "default": "suffix",
-          "description": "翻译预览显示模式"
+          "enum": ["suffix", "inline"],
+          "default": "inline",
+          "description": "翻译预览显示模式（suffix: 后缀显示, inline: 内联替换显示）"
+        },
+        "i18n-swapper.showFullFormInEditMode": {
+          "type": "boolean",
+          "default": true,
+          "description": "内联模式下编辑时是否显示完整形式"
+        },
+        "i18n-swapper.suffixStyle": {
+          "type": "object",
+          "default": {
+            "color": "#6A9955",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontStyle": "italic",
+            "margin": "0 0 0 3px"
+          },
+          "description": "后缀模式翻译文本样式"
+        },
+        "i18n-swapper.inlineStyle": {
+          "type": "object",
+          "default": {
+            "color": "#ffdd00",
+            "fontSize": "14px",
+            "fontWeight": "400",
+            "fontStyle": "normal",
+            "margin": "0"
+          },
+          "description": "内联模式翻译文本样式"
+        },
+        "i18n-swapper.missingKeyStyle": {
+          "type": "object",
+          "default": {
+            "borderWidth": "0 0 2px 0",
+            "borderStyle": "solid",
+            "borderColor": "#ff6900",
+            "borderSpacing": "2px"
+          },
+          "description": "缺失键下划线样式"
+        },
+        "i18n-swapper.tencentTranslation.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "腾讯云翻译 API 密钥 (SecretId)"
+        },
+        "i18n-swapper.tencentTranslation.apiSecret": {
+          "type": "string",
+          "default": "",
+          "description": "腾讯云翻译 API 密钥 (SecretKey)"
+        },
+        "i18n-swapper.tencentTranslation.region": {
+          "type": "string",
+          "default": "ap-guangzhou",
+          "description": "腾讯云 API 区域"
+        },
+        "i18n-swapper.tencentTranslation.sourceLanguage": {
+          "type": "string",
+          "default": "zh",
+          "description": "源语言代码"
+        },
+        "i18n-swapper.tencentTranslation.languageMappings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "languageCode": { "type": "string", "description": "语言代码" },
+              "filePath": { "type": "string", "description": "对应的语言文件路径" }
+            }
+          },
+          "default": [],
+          "description": "语言代码与文件路径的映射"
+        },
+        "i18n-swapper.autoGenerateKeyFromText": {
+          "type": "boolean",
+          "default": true,
+          "description": "是否自动根据文本生成国际化键名"
+        },
+        "i18n-swapper.autoGenerateKeyPrefix": {
+          "type": "string",
+          "default": "_iw",
+          "description": "自动生成键名的前缀"
+        },
+        "i18n-swapper.autoTranslateAllLanguages": {
+          "type": "boolean",
+          "default": true,
+          "description": "替换时是否自动翻译到所有配置语言"
+        },
+        "i18n-swapper.defaultRepositories": {
+          "type": "object",
+          "default": { "web": "", "ios": "", "android": "" },
+          "properties": {
+            "web": { "type": "string", "description": "Web 项目默认多语言仓库路径" },
+            "ios": { "type": "string", "description": "iOS 项目默认多语言仓库路径" },
+            "android": { "type": "string", "description": "Android 项目默认多语言仓库路径" }
+          },
+          "description": "各平台默认代码仓库路径（用于自动读取多语言库）"
+        },
+        "i18n-swapper.skipPrompt": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "跳过提示的功能模块名称"
         }
       }
     }

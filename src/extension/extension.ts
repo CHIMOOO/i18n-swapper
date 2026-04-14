@@ -1,18 +1,73 @@
+/**
+ * i18n-swapper 扩展入口
+ * 负责激活、初始化各模块、注册命令和生命周期管理
+ */
 import * as vscode from 'vscode';
+import { ConfigManager } from './core/config/ConfigManager';
+import { PlatformRegistry } from './platforms/PlatformRegistry';
+import type { IPlatformAdapter } from './platforms/types';
 
-export function activate(context: vscode.ExtensionContext) {
-  console.log('i18n-swapper is now active');
+/** 全局单例，供各模块引用 */
+let configManager: ConfigManager;
+let platformRegistry: PlatformRegistry;
+let currentAdapter: IPlatformAdapter | null = null;
 
-  const replaceCmd = vscode.commands.registerCommand(
-    'i18n-swapper.replaceWithI18n',
-    () => {
-      vscode.window.showInformationMessage('i18n Swapper: 替换功能开发中...');
+export function getConfigManager(): ConfigManager {
+  return configManager;
+}
+
+export function getPlatformRegistry(): PlatformRegistry {
+  return platformRegistry;
+}
+
+export function getCurrentAdapter(): IPlatformAdapter | null {
+  return currentAdapter;
+}
+
+export async function activate(context: vscode.ExtensionContext) {
+  console.log('[i18n-swapper] 插件激活中...');
+
+  // 1. 初始化配置管理器
+  configManager = new ConfigManager();
+  context.subscriptions.push({ dispose: () => configManager.dispose() });
+
+  // 2. 初始化平台注册中心
+  platformRegistry = new PlatformRegistry();
+
+  // 3. 解析当前平台
+  const rootPath = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (rootPath) {
+    try {
+      currentAdapter = await platformRegistry.resolve(configManager.platform, rootPath);
+      console.log(`[i18n-swapper] 当前平台: ${currentAdapter.displayName}`);
+    } catch (e) {
+      console.error('[i18n-swapper] 平台解析失败:', e);
     }
+  }
+
+  // 4. 注册命令
+  registerCommands(context);
+
+  // 5. 监听配置变化
+  configManager.onDidChange(() => {
+    console.log('[i18n-swapper] 配置已变更');
+    // Phase 2 将在这里触发装饰器刷新等
+  });
+
+  console.log('[i18n-swapper] 插件激活完成');
+}
+
+function registerCommands(context: vscode.ExtensionContext): void {
+  // 替换为 i18n 调用（Phase 3 实现）
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.replaceWithI18n', () => {
+      vscode.window.showInformationMessage('i18n Swapper: 替换功能开发中...');
+    })
   );
 
-  const panelCmd = vscode.commands.registerCommand(
-    'i18n-swapper.openPanel',
-    () => {
+  // 打开管理面板
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.openPanel', () => {
       const panel = vscode.window.createWebviewPanel(
         'i18nSwapperPanel',
         'i18n Swapper',
@@ -32,17 +87,29 @@ export function activate(context: vscode.ExtensionContext) {
         (message) => {
           switch (message.command) {
             case 'ready':
-              console.log('WebView panel is ready');
+              console.log('[i18n-swapper] WebView 面板就绪');
               break;
           }
         },
         undefined,
         context.subscriptions
       );
-    }
+    })
   );
 
-  context.subscriptions.push(replaceCmd, panelCmd);
+  // 刷新装饰（Phase 2 实现）
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.refreshDecorations', () => {
+      vscode.window.showInformationMessage('i18n Swapper: 刷新装饰...');
+    })
+  );
+
+  // 设置语言文件路径（Phase 2 实现）
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.setLocalesPaths', () => {
+      vscode.window.showInformationMessage('i18n Swapper: 设置路径开发中...');
+    })
+  );
 }
 
 function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
@@ -80,4 +147,6 @@ function getNonce(): string {
   return text;
 }
 
-export function deactivate() {}
+export function deactivate() {
+  console.log('[i18n-swapper] 插件已停用');
+}
