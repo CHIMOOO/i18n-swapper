@@ -7,12 +7,17 @@ import type { I18nMatch, MatchPattern } from '../../core/types';
 
 export class WebMatcher implements ICodeMatcher {
   getPatterns(functionNames: string[], customPatterns?: MatchPattern[]): MatchPattern[] {
-    const defaultPatterns: MatchPattern[] = functionNames.map((fn) => ({
-      source: `(\\$?\\b${this.escapeRegex(fn)}\\b)\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`,
+    // 将所有函数名合并为一个正则：(?:\$t|t)\s*\(\s*(['"])([^'"]+)\1\s*\)
+    // 按长度降序排列，避免 t 优先匹配到 $t 中的 t
+    const sorted = [...functionNames].sort((a, b) => b.length - a.length);
+    const fnAlternation = sorted.map((fn) => this.escapeRegex(fn)).join('|');
+
+    const defaultPatterns: MatchPattern[] = [{
+      source: `(${fnAlternation})\\s*\\(\\s*(['"])([^'"]+)\\2\\s*\\)`,
       flags: 'g',
       keyGroup: 3,
       fileTypes: ['js', 'ts', 'jsx', 'tsx', 'vue', 'html'],
-    }));
+    }];
 
     if (customPatterns && customPatterns.length > 0) {
       return [...defaultPatterns, ...customPatterns];
@@ -34,7 +39,6 @@ export class WebMatcher implements ICodeMatcher {
         const key = match[pattern.keyGroup];
         if (!key) continue;
 
-        // 去重：同一位置同一键名只保留一次
         const dedupKey = `${match.index}:${key}`;
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
@@ -42,7 +46,6 @@ export class WebMatcher implements ICodeMatcher {
         const quoteChar = match[2] || "'";
         const fnName = match[1] || functionNames[0];
 
-        // 计算引号内键名的精确位置
         const quoteStartIndex = fullMatch.indexOf(quoteChar, fullMatch.indexOf('('));
         const quoteEndIndex = fullMatch.lastIndexOf(quoteChar);
 

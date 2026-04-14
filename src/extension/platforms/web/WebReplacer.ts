@@ -65,8 +65,8 @@ export class WebReplacer implements ICodeReplacer {
     const closingIndex = afterText.indexOf(attrQuote);
     if (closingIndex === -1) return null;
 
-    // 计算完整属性的范围（从属性名开始到闭合引号）
-    const attrStart = charOffset - attrValueMatch[0].length + attrValueMatch.index!;
+    // attrValueMatch.index 就是属性名在 lineText 中的起始位置
+    const attrStart = attrValueMatch.index!;
     const attrEnd = charOffset + originalText.length + closingIndex + 1;
 
     return { attrName, attrStart, attrEnd };

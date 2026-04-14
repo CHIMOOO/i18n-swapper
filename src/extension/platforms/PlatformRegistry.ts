@@ -2,8 +2,6 @@
  * 平台注册中心
  * 管理所有平台适配器的注册、检测和获取
  */
-import * as fs from 'fs';
-import * as path from 'path';
 import * as vscode from 'vscode';
 import type { IPlatformAdapter } from './types';
 import type { PlatformId } from '../core/types';

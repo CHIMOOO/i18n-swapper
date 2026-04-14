@@ -2,7 +2,6 @@
  * Web 平台语言文件解析器
  * 支持 JSON 和 JS (module.exports) 格式
  */
-import * as fs from 'fs';
 import type { ILocaleParser } from '../types';
 import type { FlatLocaleData, NestedLocaleData } from '../../core/types';
 

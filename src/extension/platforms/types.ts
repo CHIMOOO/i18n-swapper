@@ -8,7 +8,6 @@ import type {
   I18nMatch,
   MatchPattern,
   LocaleFileInfo,
-  ReplacementResult,
   SpecialSyntaxResult,
   PlatformId,
 } from '../core/types';
