@@ -137,7 +137,8 @@ export async function activate(context: vscode.ExtensionContext) {
   const hoverProvider = new I18nHoverProvider(
     localeStore,
     currentAdapter.matcher,
-    configManager.identifyFunctionNames
+    configManager.identifyFunctionNames,
+    configManager
   );
   const supportedLanguages = currentAdapter.activationLanguages;
   const hoverDisposable = vscode.languages.registerHoverProvider(
@@ -615,6 +616,74 @@ function registerCommands(context: vscode.ExtensionContext): void {
         await localeFileIO.saveTranslation(filePath, params.i18nKey, translated);
         loadLocalesAndRefresh(rootPath);
         vscode.window.showInformationMessage(`翻译完成: ${translated}`);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        vscode.window.showErrorMessage(`翻译失败: ${msg}`);
+      }
+    })
+  );
+
+  // 翻译到所有语言（HoverProvider 调用）
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.translateHover', async (params: {
+      text: string;
+      key: string;
+    }) => {
+      if (!translationService.isConfigured) {
+        vscode.window.showWarningMessage('翻译 API 未配置，请先设置 apiKey 和 apiSecret');
+        return;
+      }
+
+      let { text, key } = params;
+
+      if (!text) {
+        text = await vscode.window.showInputBox({
+          prompt: '请输入要翻译的文本',
+          placeHolder: '例如：提交表单',
+          validateInput: (input) => (input?.trim() ? null : '文本不能为空'),
+        }) ?? '';
+        if (!text) return;
+      }
+
+      const rootPath = getRootPath();
+      if (!rootPath) return;
+
+      const mappings = configManager.languageMappings;
+      const sourceLang = configManager.sourceLanguage;
+      const targetMappings = mappings.filter((m) => m.languageCode !== sourceLang);
+
+      if (targetMappings.length === 0) {
+        vscode.window.showWarningMessage('未配置目标语言映射，请先在 languageMappings 中配置');
+        return;
+      }
+
+      try {
+        await vscode.window.withProgress(
+          { location: vscode.ProgressLocation.Notification, title: '翻译中...', cancellable: false },
+          async (progress) => {
+            for (const mapping of targetMappings) {
+              progress.report({ message: `正在翻译到 ${mapping.languageCode}...` });
+              const translated = await translationService.translate(text, mapping.languageCode);
+              const filePath = path.isAbsolute(mapping.filePath)
+                ? mapping.filePath
+                : path.join(rootPath, mapping.filePath);
+              await localeFileIO.saveTranslation(filePath, key, translated);
+            }
+
+            // 源语言也保存
+            const sourceMapping = mappings.find((m) => m.languageCode === sourceLang);
+            if (sourceMapping) {
+              const filePath = path.isAbsolute(sourceMapping.filePath)
+                ? sourceMapping.filePath
+                : path.join(rootPath, sourceMapping.filePath);
+              await localeFileIO.saveTranslation(filePath, key, text);
+            }
+          }
+        );
+
+        loadLocalesAndRefresh(rootPath);
+        const preview = text.length > 20 ? text.substring(0, 20) + '...' : text;
+        vscode.window.showInformationMessage(`已翻译"${preview}"并保存到所有语言文件`);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         vscode.window.showErrorMessage(`翻译失败: ${msg}`);
