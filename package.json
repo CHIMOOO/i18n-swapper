@@ -66,6 +66,18 @@
       {
         "command": "i18n-swapper.toggleDecorationStyle",
         "title": "i18n Swapper: 切换装饰模式"
+      },
+      {
+        "command": "i18n-swapper.switchPlatform",
+        "title": "i18n Swapper: 切换平台"
+      },
+      {
+        "command": "i18n-swapper.discoverLocaleFiles",
+        "title": "i18n Swapper: 自动发现语言文件"
+      },
+      {
+        "command": "i18n-swapper.configureDefaultRepository",
+        "title": "i18n Swapper: 配置默认多语言仓库路径"
       }
     ],
     "menus": {

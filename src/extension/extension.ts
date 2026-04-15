@@ -3,6 +3,8 @@
  * 负责激活、初始化各模块、注册命令和生命周期管理
  */
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { ConfigManager } from './core/config/ConfigManager';
 import { MESSAGES } from './core/config/defaults';
 import { PlatformRegistry } from './platforms/PlatformRegistry';
@@ -27,6 +29,7 @@ import {
 } from './commands/quickBatchReplace';
 import { PanelBridge } from './panel/PanelBridge';
 import { WorkspaceScanner } from './panel/WorkspaceScanner';
+import type { LocaleFileInfo } from './core/types';
 
 let configManager: ConfigManager;
 let platformRegistry: PlatformRegistry;
@@ -66,6 +69,7 @@ export async function activate(context: vscode.ExtensionContext) {
 
   // 2. 初始化平台注册中心并解析平台
   platformRegistry = new PlatformRegistry();
+  context.subscriptions.push(platformRegistry);
   const rootPath = getRootPath();
 
   if (rootPath) {
@@ -160,7 +164,7 @@ export async function activate(context: vscode.ExtensionContext) {
   });
   context.subscriptions.push(panelBridge);
 
-  // 11. 注册命令
+  // 11. 注册命令（包含 Phase 6 新增的平台切换命令）
   setConfigManagerRef(configManager);
   registerCommands(context);
 
@@ -186,7 +190,12 @@ export async function activate(context: vscode.ExtensionContext) {
     loadLocalesAndRefresh(rootPath!);
   });
 
-  // 14. 首次加载语言文件
+  // 14. 监听平台切换事件 → 重新初始化依赖平台的模块
+  platformRegistry.onDidChangePlatform((newAdapter) => {
+    reinitializeForPlatform(newAdapter, context, hoverProvider);
+  });
+
+  // 15. 首次加载语言文件（自动检测→自动发现→默认仓库→手动选择）
   if (rootPath) {
     await initializeLocales(rootPath);
   }
@@ -194,8 +203,56 @@ export async function activate(context: vscode.ExtensionContext) {
   console.log('[i18n-swapper] 插件激活完成');
 }
 
+/**
+ * 平台切换后重新初始化依赖平台的模块
+ */
+function reinitializeForPlatform(
+  newAdapter: IPlatformAdapter,
+  _context: vscode.ExtensionContext,
+  hoverProvider: I18nHoverProvider
+): void {
+  currentAdapter = newAdapter;
+  localeFileIO.setParser(newAdapter.parser);
+  textScanner.setMatcher(newAdapter.matcher);
+  decorationManager.setMatcher(newAdapter.matcher);
+  hoverProvider.setMatcher(newAdapter.matcher);
+  editModeController.setMatcher(newAdapter.matcher);
+  textReplacer.setReplacer(newAdapter.replacer);
+
+  const rootPath = getRootPath();
+  if (rootPath) {
+    localeStore.clear();
+    loadLocalesAndRefresh(rootPath);
+  }
+
+  console.log(`[i18n-swapper] 已切换到平台: ${newAdapter.displayName}`);
+}
+
+/**
+ * 初始化语言文件，按优先级尝试：
+ * 1. 使用已配置的 localesPaths
+ * 2. 自动发现当前工作区中的语言文件
+ * 3. 从 defaultRepositories 配置的外部仓库路径发现
+ * 4. 提示用户手动选择
+ */
 async function initializeLocales(rootPath: string): Promise<void> {
-  const paths = configManager.localesPaths;
+  let paths = configManager.localesPaths;
+
+  if (paths.length === 0) {
+    // 尝试自动发现工作区内的语言文件
+    const discovered = await autoDiscoverLocaleFiles(rootPath);
+    if (discovered && discovered.length > 0) {
+      paths = configManager.localesPaths;
+    }
+  }
+
+  if (paths.length === 0) {
+    // 尝试从默认仓库路径发现
+    const fromRepo = await discoverFromDefaultRepository(rootPath);
+    if (fromRepo && fromRepo.length > 0) {
+      paths = configManager.localesPaths;
+    }
+  }
 
   if (paths.length === 0) {
     const shouldSkip = configManager.skipPrompt.includes('noLocaleConfigured');
@@ -203,15 +260,114 @@ async function initializeLocales(rootPath: string): Promise<void> {
       const result = await vscode.window.showWarningMessage(
         MESSAGES.noLocaleConfigured,
         MESSAGES.selectFile,
+        MESSAGES.autoDiscover,
         MESSAGES.ignoreTemporarily
       );
       if (result === MESSAGES.selectFile) {
         await selectAndSetLocaleFiles(rootPath);
+      } else if (result === MESSAGES.autoDiscover) {
+        await autoDiscoverLocaleFiles(rootPath);
       }
     }
   }
 
   loadLocalesAndRefresh(rootPath);
+}
+
+/**
+ * 自动发现工作区内的语言文件并提示用户确认
+ */
+async function autoDiscoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[] | null> {
+  const discovered = await platformRegistry.discoverLocaleFiles(rootPath);
+  if (discovered.length === 0) {
+    console.log('[i18n-swapper] 自动发现未找到语言文件');
+    return null;
+  }
+
+  console.log(`[i18n-swapper] 自动发现 ${discovered.length} 个语言文件`);
+
+  const items = discovered.map((file) => ({
+    label: file.filePath,
+    description: `${file.languageCode} (${file.format})`,
+    picked: true,
+    file,
+  }));
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: `发现 ${discovered.length} 个语言文件，请选择要使用的文件`,
+    canPickMany: true,
+  });
+
+  if (!selected || selected.length === 0) return null;
+
+  const selectedPaths = selected.map((item) => item.file.filePath);
+  await configManager.setLocalesPaths(selectedPaths);
+  vscode.window.showInformationMessage(MESSAGES.filesAdded(selectedPaths.length));
+
+  // 自动设置 languageMappings
+  const mappings = selected.map((item) => ({
+    languageCode: item.file.languageCode,
+    filePath: item.file.filePath,
+  }));
+  await configManager.update('tencentTranslation.languageMappings', mappings);
+
+  return selected.map((item) => item.file);
+}
+
+/**
+ * 从 defaultRepositories 配置的外部仓库路径发现语言文件
+ */
+async function discoverFromDefaultRepository(rootPath: string): Promise<LocaleFileInfo[] | null> {
+  if (!currentAdapter) return null;
+
+  const repos = configManager.defaultRepositories;
+  const repoPath = repos[currentAdapter.id];
+
+  if (!repoPath) return null;
+
+  const resolvedPath = path.isAbsolute(repoPath) ? repoPath : path.join(rootPath, repoPath);
+  if (!fs.existsSync(resolvedPath)) {
+    console.log(`[i18n-swapper] 默认仓库路径不存在: ${resolvedPath}`);
+    return null;
+  }
+
+  console.log(`[i18n-swapper] 从默认仓库发现语言文件: ${resolvedPath}`);
+  const discovered = await platformRegistry.discoverLocaleFilesFromPath(resolvedPath);
+  if (discovered.length === 0) return null;
+
+  // 将相对路径调整为相对于仓库路径的绝对路径或工作区相对路径
+  const adjustedFiles = discovered.map((file) => ({
+    ...file,
+    filePath: path.isAbsolute(repoPath)
+      ? path.join(repoPath, file.filePath).replace(/\\/g, '/')
+      : path.join(repoPath, file.filePath).replace(/\\/g, '/'),
+  }));
+
+  const items = adjustedFiles.map((file) => ({
+    label: file.filePath,
+    description: `${file.languageCode} (${file.format}) — 来自默认仓库`,
+    picked: true,
+    file,
+  }));
+
+  const selected = await vscode.window.showQuickPick(items, {
+    placeHolder: `从默认仓库发现 ${adjustedFiles.length} 个语言文件，请选择要使用的文件`,
+    canPickMany: true,
+  });
+
+  if (!selected || selected.length === 0) return null;
+
+  const selectedPaths = selected.map((item) => item.file.filePath);
+  await configManager.setLocalesPaths(selectedPaths);
+  vscode.window.showInformationMessage(MESSAGES.filesAdded(selectedPaths.length));
+
+  const mappings = selected.map((item) => ({
+    languageCode: item.file.languageCode,
+    filePath: item.file.filePath,
+  }));
+  await configManager.update('tencentTranslation.languageMappings', mappings);
+
+  return selected.map((item) => item.file);
 }
 
 async function selectAndSetLocaleFiles(rootPath: string): Promise<void> {
@@ -291,6 +447,54 @@ function registerCommands(context: vscode.ExtensionContext): void {
       'i18n-swapper.cancelReplacement',
       createCancelReplacementCommand(() => refreshActiveEditor())
     )
+  );
+
+  // Phase 6: 手动切换平台
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.switchPlatform', async () => {
+      const selected = await platformRegistry.promptUserSelect();
+      if (selected && selected.id !== currentAdapter?.id) {
+        await platformRegistry.switchPlatform(selected);
+      }
+    })
+  );
+
+  // Phase 6: 自动发现语言文件
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.discoverLocaleFiles', async () => {
+      const rootPath = getRootPath();
+      if (!rootPath) {
+        vscode.window.showWarningMessage(MESSAGES.workspaceNotFound);
+        return;
+      }
+      const result = await autoDiscoverLocaleFiles(rootPath);
+      if (result && result.length > 0) {
+        loadLocalesAndRefresh(rootPath);
+      } else {
+        vscode.window.showInformationMessage(MESSAGES.noLocaleFilesFound);
+      }
+    })
+  );
+
+  // Phase 6: 配置默认仓库路径
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.configureDefaultRepository', async () => {
+      if (!currentAdapter) return;
+      const folder = await vscode.window.showOpenDialog({
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        openLabel: `选择 ${currentAdapter.displayName} 默认多语言仓库目录`,
+      });
+      if (folder && folder.length > 0) {
+        const repos = { ...configManager.defaultRepositories };
+        repos[currentAdapter.id] = folder[0].fsPath;
+        await configManager.update('defaultRepositories', repos, vscode.ConfigurationTarget.Global);
+        vscode.window.showInformationMessage(
+          `已设置 ${currentAdapter.displayName} 默认仓库: ${folder[0].fsPath}`
+        );
+      }
+    })
   );
 
   // 打开管理面板

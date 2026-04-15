@@ -67,7 +67,11 @@ export const DEFAULT_CONFIG: I18nSwapperConfig = {
 export const MESSAGES = {
   noLocaleConfigured: '未配置源语言文件国际化词库路径（将用于国际化函数预览）',
   selectFile: '选择文件',
+  autoDiscover: '自动发现',
   ignoreTemporarily: '暂时忽略',
   workspaceNotFound: '未找到工作区文件夹',
   filesAdded: (count: number) => `已添加 ${count} 个国际化文件`,
+  platformSwitched: (name: string) => `i18n 平台已切换为: ${name}`,
+  noLocaleFilesFound: '未在工作区中发现语言文件',
+  configureDefaultRepo: '配置默认仓库路径',
 } as const;
