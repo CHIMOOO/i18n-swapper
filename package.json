@@ -44,6 +44,10 @@
         "title": "i18n Swapper: 替换为国际化函数"
       },
       {
+        "command": "i18n-swapper.quickBatchReplace",
+        "title": "i18n Swapper: 快速批量替换"
+      },
+      {
         "command": "i18n-swapper.openPanel",
         "title": "i18n Swapper: 打开管理面板"
       },
@@ -54,18 +58,30 @@
       {
         "command": "i18n-swapper.setLocalesPaths",
         "title": "i18n Swapper: 设置国际化文件路径"
+      },
+      {
+        "command": "i18n-swapper.openApiConfig",
+        "title": "i18n Swapper: 翻译 API 配置"
+      },
+      {
+        "command": "i18n-swapper.toggleDecorationStyle",
+        "title": "i18n Swapper: 切换装饰模式"
       }
     ],
     "menus": {
       "editor/context": [
         {
           "command": "i18n-swapper.replaceWithI18n",
-          "group": "i18n-swapper",
+          "group": "i18n-swapper@1",
           "when": "editorHasSelection"
         },
         {
+          "command": "i18n-swapper.quickBatchReplace",
+          "group": "i18n-swapper@2"
+        },
+        {
           "command": "i18n-swapper.openPanel",
-          "group": "i18n-swapper"
+          "group": "i18n-swapper@3"
         }
       ]
     },
@@ -75,6 +91,12 @@
         "key": "ctrl+alt+y",
         "mac": "cmd+alt+y",
         "when": "editorHasSelection"
+      },
+      {
+        "command": "i18n-swapper.quickBatchReplace",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
