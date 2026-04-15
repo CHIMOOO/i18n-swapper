@@ -25,6 +25,8 @@ import {
   createCancelReplacementCommand,
   setConfigManagerRef,
 } from './commands/quickBatchReplace';
+import { PanelBridge } from './panel/PanelBridge';
+import { WorkspaceScanner } from './panel/WorkspaceScanner';
 
 let configManager: ConfigManager;
 let platformRegistry: PlatformRegistry;
@@ -39,6 +41,8 @@ let highlightService: HighlightService;
 let translationService: TranslationService;
 let keyGenerator: KeyGenerator;
 let textReplacer: TextReplacer;
+let panelBridge: PanelBridge | undefined;
+let workspaceScanner: WorkspaceScanner;
 
 export function getConfigManager(): ConfigManager { return configManager; }
 export function getPlatformRegistry(): PlatformRegistry { return platformRegistry; }
@@ -103,7 +107,10 @@ export async function activate(context: vscode.ExtensionContext) {
     keyGenerator
   );
 
-  // 7. 初始化编辑器交互层
+  // 7. 初始化工作区扫描器
+  workspaceScanner = new WorkspaceScanner(textScanner);
+
+  // 8. 初始化编辑器交互层
   decorationManager = new DecorationManager(
     localeStore,
     currentAdapter.matcher,
@@ -122,7 +129,7 @@ export async function activate(context: vscode.ExtensionContext) {
   highlightService = new HighlightService();
   context.subscriptions.push(highlightService);
 
-  // 8. 注册 HoverProvider
+  // 9. 注册 HoverProvider
   const hoverProvider = new I18nHoverProvider(
     localeStore,
     currentAdapter.matcher,
@@ -135,11 +142,29 @@ export async function activate(context: vscode.ExtensionContext) {
   );
   context.subscriptions.push(hoverDisposable);
 
-  // 9. 注册命令
+  // 10. 初始化 WebView 面板桥接
+  panelBridge = new PanelBridge(context.extensionUri, {
+    configManager,
+    localeStore,
+    localeFileIO,
+    keyResolver,
+    textReplacer,
+    translationService,
+    workspaceScanner,
+    adapter: currentAdapter,
+    getRootPath,
+    refreshCallback: () => {
+      const rootPath = getRootPath();
+      if (rootPath) loadLocalesAndRefresh(rootPath);
+    },
+  });
+  context.subscriptions.push(panelBridge);
+
+  // 11. 注册命令
   setConfigManagerRef(configManager);
   registerCommands(context);
 
-  // 10. 注册编辑器事件
+  // 12. 注册编辑器事件
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => refreshActiveEditor()),
     vscode.workspace.onDidChangeTextDocument((e) => {
@@ -150,7 +175,7 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // 11. 监听配置变化
+  // 13. 监听配置变化
   configManager.onDidChange(() => {
     console.log('[i18n-swapper] 配置已变更，重新加载...');
     decorationManager.setFunctionNames(configManager.identifyFunctionNames);
@@ -161,7 +186,7 @@ export async function activate(context: vscode.ExtensionContext) {
     loadLocalesAndRefresh(rootPath!);
   });
 
-  // 12. 首次加载语言文件
+  // 14. 首次加载语言文件
   if (rootPath) {
     await initializeLocales(rootPath);
   }
@@ -271,30 +296,7 @@ function registerCommands(context: vscode.ExtensionContext): void {
   // 打开管理面板
   context.subscriptions.push(
     vscode.commands.registerCommand('i18n-swapper.openPanel', () => {
-      const panel = vscode.window.createWebviewPanel(
-        'i18nSwapperPanel',
-        'i18n Swapper',
-        vscode.ViewColumn.Beside,
-        {
-          enableScripts: true,
-          retainContextWhenHidden: true,
-          localResourceRoots: [
-            vscode.Uri.joinPath(context.extensionUri, 'dist', 'webview'),
-          ],
-        }
-      );
-      panel.webview.html = getWebviewContent(panel.webview, context.extensionUri);
-      panel.webview.onDidReceiveMessage(
-        (message) => {
-          switch (message.command) {
-            case 'ready':
-              console.log('[i18n-swapper] WebView 面板就绪');
-              break;
-          }
-        },
-        undefined,
-        context.subscriptions
-      );
+      panelBridge?.openPanel();
     })
   );
 
@@ -500,41 +502,6 @@ function registerCommands(context: vscode.ExtensionContext): void {
       }
     })
   );
-}
-
-function getWebviewContent(webview: vscode.Webview, extensionUri: vscode.Uri): string {
-  const scriptUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'index.js')
-  );
-  const styleUri = webview.asWebviewUri(
-    vscode.Uri.joinPath(extensionUri, 'dist', 'webview', 'index.css')
-  );
-  const nonce = getNonce();
-
-  return `<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';">
-  <link href="${styleUri}" rel="stylesheet">
-  <title>i18n Swapper</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script nonce="${nonce}" src="${scriptUri}"></script>
-</body>
-</html>`;
-}
-
-function getNonce(): string {
-  let text = '';
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  for (let i = 0; i < 32; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  return text;
 }
 
 export function deactivate() {
