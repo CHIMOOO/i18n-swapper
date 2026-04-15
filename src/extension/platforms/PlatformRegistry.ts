@@ -6,6 +6,8 @@ import * as vscode from 'vscode';
 import type { IPlatformAdapter } from './types';
 import type { PlatformId } from '../core/types';
 import { WebAdapter } from './web/WebAdapter';
+import { AndroidAdapter } from './android/AndroidAdapter';
+import { iOSAdapter } from './ios/iOSAdapter';
 
 export class PlatformRegistry {
   private adapters = new Map<PlatformId, IPlatformAdapter>();
@@ -17,7 +19,8 @@ export class PlatformRegistry {
 
   private registerBuiltinAdapters(): void {
     this.register(new WebAdapter());
-    // Phase 5 将注册 AndroidAdapter 和 iOSAdapter
+    this.register(new AndroidAdapter());
+    this.register(new iOSAdapter());
   }
 
   /** 注册一个平台适配器 */
