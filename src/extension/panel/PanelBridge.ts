@@ -15,6 +15,17 @@ export class PanelBridge implements vscode.Disposable {
     private deps: PanelDependencies
   ) {}
 
+  updateDeps(deps: Partial<PanelDependencies>): void {
+    Object.assign(this.deps, deps);
+    this.messageHandler?.updateDeps(deps);
+    if (this.panel) {
+      this.messageHandler?.handleMessage({ command: 'getPlatformStatus' });
+      this.messageHandler?.handleMessage({ command: 'getConfig' });
+      this.messageHandler?.handleMessage({ command: 'getLocaleData' });
+      this.messageHandler?.handleMessage({ command: 'getLanguageStatus' });
+    }
+  }
+
   openPanel(): void {
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.Beside);
@@ -55,6 +66,7 @@ export class PanelBridge implements vscode.Disposable {
 
     const configDisposable = this.deps.configManager.onDidChange(() => {
       this.sendMessage({ command: 'dataRefreshed' });
+      this.messageHandler?.handleMessage({ command: 'getPlatformStatus' });
       this.messageHandler?.handleMessage({ command: 'getConfig' });
       this.messageHandler?.handleMessage({ command: 'getLocaleData' });
       this.messageHandler?.handleMessage({ command: 'getLanguageStatus' });

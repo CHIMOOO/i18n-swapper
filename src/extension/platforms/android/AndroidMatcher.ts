@@ -9,19 +9,19 @@ export class AndroidMatcher implements ICodeMatcher {
   getPatterns(_functionNames: string[], customPatterns?: MatchPattern[]): MatchPattern[] {
     const defaultPatterns: MatchPattern[] = [
       {
-        source: 'stringResource\\s*\\(\\s*R\\.string\\.(\\w+)\\s*\\)',
+        source: 'stringResource\\s*\\(\\s*(?:[\\w.]+\\.)?R\\.string\\.(\\w+)\\s*\\)',
         flags: 'g',
         keyGroup: 1,
         fileTypes: ['kt'],
       },
       {
-        source: 'getString\\s*\\(\\s*R\\.string\\.(\\w+)\\s*\\)',
+        source: 'getString\\s*\\(\\s*(?:[\\w.]+\\.)?R\\.string\\.(\\w+)\\s*\\)',
         flags: 'g',
         keyGroup: 1,
         fileTypes: ['kt', 'java'],
       },
       {
-        source: 'R\\.string\\.(\\w+)',
+        source: '(?:[\\w.]+\\.)?R\\.string\\.(\\w+)',
         flags: 'g',
         keyGroup: 1,
         fileTypes: ['kt', 'java'],

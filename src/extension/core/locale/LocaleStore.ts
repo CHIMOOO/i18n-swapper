@@ -41,13 +41,19 @@ export class LocaleStore {
   getAllLanguageCodes(): string[] {
     return Array.from(this.allLanguageData.keys());
   }
-
-  /** 从嵌套结构中按 key 路径取值 */
+  /** 从嵌套结构中按 key 路径取值（兼容 iOS 等扁平键格式） */
   getNestedValue(langCode: string, key: string): string | undefined {
     const data = this.allLanguageData.get(langCode);
     if (!data) return undefined;
 
+    // 优先尝试扁平键直接查找（兼容 iOS .strings 等扁平格式）
+    const directValue = (data as Record<string, unknown>)[key];
+    if (typeof directValue === 'string') return directValue;
+
+    // 回退到嵌套路径查找（兼容 Web JSON 等嵌套格式）
     const parts = key.split('.');
+    if (parts.length <= 1) return undefined;
+
     let current: unknown = data;
     for (const part of parts) {
       if (current === null || current === undefined || typeof current !== 'object') return undefined;

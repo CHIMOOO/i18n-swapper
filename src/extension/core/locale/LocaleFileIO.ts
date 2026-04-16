@@ -29,7 +29,7 @@ export class LocaleFileIO {
       try {
         const fullPath = path.join(rootPath, localePath);
         if (!fs.existsSync(fullPath)) {
-          console.warn(`[i18n-swapper] 语言文件不存在: ${fullPath}`);
+          console.log(`[i18n-swapper] 语言文件不存在，已跳过: ${fullPath}`);
           continue;
         }
         const content = fs.readFileSync(fullPath, 'utf8');
@@ -79,19 +79,24 @@ export class LocaleFileIO {
         const dirPath = path.dirname(filePath);
         if (!fs.existsSync(dirPath)) {
           fs.mkdirSync(dirPath, { recursive: true });
-        }
-      }
+        }      }
 
-      const keyParts = key.split('.');
-      let current: Record<string, unknown> = data as Record<string, unknown>;
-      for (let i = 0; i < keyParts.length - 1; i++) {
-        const part = keyParts[i];
-        if (!current[part] || typeof current[part] !== 'object') {
-          current[part] = {};
+      if (this.parser.useFlatKeys) {
+        // 扁平键解析器（iOS .strings / Android strings.xml）：
+        // key 中的 `.` 不表示嵌套，直接作为完整 key 赋值
+        (data as Record<string, unknown>)[key] = value;
+      } else {
+        const keyParts = key.split('.');
+        let current: Record<string, unknown> = data as Record<string, unknown>;
+        for (let i = 0; i < keyParts.length - 1; i++) {
+          const part = keyParts[i];
+          if (!current[part] || typeof current[part] !== 'object') {
+            current[part] = {};
+          }
+          current = current[part] as Record<string, unknown>;
         }
-        current = current[part] as Record<string, unknown>;
+        current[keyParts[keyParts.length - 1]] = value;
       }
-      current[keyParts[keyParts.length - 1]] = value;
 
       const serialized = this.parser.serialize(data, filePath);
       fs.writeFileSync(filePath, serialized, 'utf8');

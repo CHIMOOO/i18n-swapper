@@ -28,7 +28,7 @@ export class WebAdapter implements IPlatformAdapter {
     return fs.existsSync(packageJsonPath);
   }
 
-  async discoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[]> {
+  async discoverLocaleFiles(rootPath: string, _options?: import('../types').DiscoverOptions): Promise<LocaleFileInfo[]> {
     const results: LocaleFileInfo[] = [];
     const commonPaths = [
       'src/locales',

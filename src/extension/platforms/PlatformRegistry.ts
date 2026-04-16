@@ -4,9 +4,12 @@
  * Phase 6: 增加状态栏指示器、平台切换、检测结果持久化
  */
 import * as vscode from 'vscode';
-import type { IPlatformAdapter } from './types';
+import * as path from 'path';
+import * as fs from 'fs';
+import type { IPlatformAdapter, DiscoverOptions } from './types';
 import type { PlatformId } from '../core/types';
 import type { LocaleFileInfo } from '../core/types';
+import type { DefaultRepositories } from '../core/config/types';
 import { WebAdapter } from './web/WebAdapter';
 import { AndroidAdapter } from './android/AndroidAdapter';
 import { iOSAdapter } from './ios/iOSAdapter';
@@ -146,18 +149,43 @@ export class PlatformRegistry implements vscode.Disposable {
 
   /**
    * 使用当前适配器自动发现语言文件
+   * 优先从工作区发现，若未找到则回退到 defaultRepositories 配置的路径
    */
-  async discoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[]> {
+  async discoverLocaleFiles(
+    rootPath: string,
+    defaultRepositories?: DefaultRepositories,
+    discoverOptions?: DiscoverOptions
+  ): Promise<LocaleFileInfo[]> {
     if (!this.currentAdapter) return [];
-    return this.currentAdapter.discoverLocaleFiles(rootPath);
+
+    const results = await this.currentAdapter.discoverLocaleFiles(rootPath, discoverOptions);
+    if (results.length > 0) return results;
+
+    if (!defaultRepositories) return [];
+
+    const repoPath = defaultRepositories[this.currentAdapter.id];
+    if (!repoPath) return [];
+
+    const resolvedPath = path.isAbsolute(repoPath) ? repoPath : path.join(rootPath, repoPath);
+    if (!fs.existsSync(resolvedPath)) {
+      console.log(`[i18n-swapper] defaultRepositories 路径不存在: ${resolvedPath}`);
+      return [];
+    }
+
+    console.log(`[i18n-swapper] 从 defaultRepositories 发现语言文件: ${resolvedPath}`);
+    const repoResults = await this.currentAdapter.discoverLocaleFiles(resolvedPath, discoverOptions);
+    return repoResults.map((file) => ({
+      ...file,
+      filePath: path.join(repoPath, file.filePath).replace(/\\/g, '/'),
+    }));
   }
 
   /**
    * 使用指定路径（可以是外部仓库路径）自动发现语言文件
    */
-  async discoverLocaleFilesFromPath(repoPath: string): Promise<LocaleFileInfo[]> {
+  async discoverLocaleFilesFromPath(repoPath: string, discoverOptions?: DiscoverOptions): Promise<LocaleFileInfo[]> {
     if (!this.currentAdapter) return [];
-    return this.currentAdapter.discoverLocaleFiles(repoPath);
+    return this.currentAdapter.discoverLocaleFiles(repoPath, discoverOptions);
   }
 
   private setCurrentAdapter(adapter: IPlatformAdapter): void {

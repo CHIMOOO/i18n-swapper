@@ -34,6 +34,8 @@
     "onLanguage:kotlin",
     "onLanguage:java",
     "onLanguage:swift",
+    "onLanguage:objective-c",
+    "onLanguage:objective-cpp",
     "onLanguage:xml"
   ],
   "main": "./dist/extension.js",
@@ -175,7 +177,7 @@
         "i18n-swapper.excludeFiles": {
           "type": "array",
           "items": { "type": "string" },
-          "default": ["node_modules", "dist", "build", ".git", "vendor", ".history"],
+          "default": ["node_modules", "dist", "build", ".git", "vendor", ".history", "Pods", "DerivedData", ".build", "Carthage"],
           "description": "扫描时排除的文件/目录"
         },
         "i18n-swapper.includeFiles": {
@@ -283,6 +285,18 @@
             "android": { "type": "string", "description": "Android 项目默认多语言仓库路径" }
           },
           "description": "各平台默认代码仓库路径（用于自动读取多语言库）"
+        },
+        "i18n-swapper.localeResSubPaths": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Android 多模块项目优先扫描的 res 子路径（如 [\"app/src/main/res\", \"module-core/src/main/res\"]），为空时递归扫描全部"
+        },
+        "i18n-swapper.keyMappingFiles": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "iOS key mapping 文件相对路径（如 [\"iot/Resources/Generated/UGLocalizableKey.swift\"]），用于枚举间接引用的 key 解析"
         },
         "i18n-swapper.skipPrompt": {
           "type": "array",

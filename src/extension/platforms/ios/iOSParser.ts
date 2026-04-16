@@ -11,6 +11,7 @@ import type { FlatLocaleData, NestedLocaleData } from '../../core/types';
 
 export class iOSParser implements ILocaleParser {
   readonly supportedExtensions = ['.strings'];
+  readonly useFlatKeys = true;
 
   parse(content: string, _filePath: string): FlatLocaleData {
     return this.parseStringsFile(content);

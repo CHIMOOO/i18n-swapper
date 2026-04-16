@@ -87,6 +87,12 @@ export interface I18nSwapperConfig {
   // 默认仓库
   defaultRepositories: DefaultRepositories;
 
+  // Android 多模块扫描子路径（可选，缩小扫描范围）
+  localeResSubPaths: string[];
+
+  // iOS key mapping 文件相对路径
+  keyMappingFiles: string[];
+
   // 行为配置
   skipPrompt: string[];
 }

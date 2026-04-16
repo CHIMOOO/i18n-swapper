@@ -17,14 +17,14 @@ import { LANGUAGE_NAMES } from '../core/types';
 export interface PanelDependencies {
   configManager: ConfigManager;
   localeStore: LocaleStore;
-  localeFileIO: LocaleFileIO;
-  keyResolver: KeyResolver;
-  textReplacer: TextReplacer;
   translationService: TranslationService;
-  workspaceScanner: WorkspaceScanner;
-  adapter: IPlatformAdapter;
   getRootPath: () => string | undefined;
   refreshCallback: () => void;
+  localeFileIO?: LocaleFileIO;
+  keyResolver?: KeyResolver;
+  textReplacer?: TextReplacer;
+  workspaceScanner?: WorkspaceScanner;
+  adapter?: IPlatformAdapter;
 }
 
 type PostMessage = (message: unknown) => void;
@@ -35,8 +35,22 @@ export class PanelMessageHandler {
     private postMessage: PostMessage
   ) {}
 
+  updateDeps(deps: Partial<PanelDependencies>): void {
+    Object.assign(this.deps, deps);
+  }
+
   updatePostMessage(fn: PostMessage): void {
     this.postMessage = fn;
+  }
+
+  private get platformReady(): boolean {
+    return !!(this.deps.adapter && this.deps.localeFileIO && this.deps.textReplacer && this.deps.workspaceScanner);
+  }
+
+  private ensurePlatformReady(action: string): boolean {
+    if (this.platformReady) return true;
+    this.postMessage({ command: 'error', payload: { message: `${action}: 平台尚未就绪，请先选择平台或配置语言文件` } });
+    return false;
   }
 
   async handleMessage(message: { command: string; payload?: unknown }): Promise<void> {
@@ -54,26 +68,29 @@ export class PanelMessageHandler {
         case 'getLanguageStatus':
           this.handleGetLanguageStatus();
           break;
+        case 'getPlatformStatus':
+          this.handleGetPlatformStatus();
+          break;
         case 'scanWorkspace':
-          await this.handleScanWorkspace();
+          if (this.ensurePlatformReady('扫描工作区')) await this.handleScanWorkspace();
           break;
         case 'scanCurrentFile':
-          await this.handleScanCurrentFile();
+          if (this.ensurePlatformReady('扫描当前文件')) await this.handleScanCurrentFile();
           break;
         case 'replaceItem':
-          await this.handleReplaceItem(message.payload as any);
+          if (this.ensurePlatformReady('替换')) await this.handleReplaceItem(message.payload as any);
           break;
         case 'batchReplace':
-          await this.handleBatchReplace(message.payload as any);
+          if (this.ensurePlatformReady('批量替换')) await this.handleBatchReplace(message.payload as any);
           break;
         case 'translateKey':
-          await this.handleTranslateKey(message.payload as any);
+          if (this.ensurePlatformReady('翻译')) await this.handleTranslateKey(message.payload as any);
           break;
         case 'addTranslation':
-          await this.handleAddTranslation(message.payload as any);
+          if (this.ensurePlatformReady('添加翻译')) await this.handleAddTranslation(message.payload as any);
           break;
         case 'editTranslation':
-          await this.handleEditTranslation(message.payload as any);
+          if (this.ensurePlatformReady('编辑翻译')) await this.handleEditTranslation(message.payload as any);
           break;
         case 'searchKeys':
           this.handleSearchKeys(message.payload as any);
@@ -99,6 +116,15 @@ export class PanelMessageHandler {
         case 'refreshData':
           await this.handleRefreshData();
           break;
+        case 'switchPlatform':
+          await vscode.commands.executeCommand('i18n-swapper.switchPlatform');
+          break;
+        case 'discoverLocaleFiles':
+          await vscode.commands.executeCommand('i18n-swapper.discoverLocaleFiles');
+          break;
+        case 'initializeLocales':
+          await vscode.commands.executeCommand('i18n-swapper.initializeLocales');
+          break;
         default:
           console.warn(`[i18n-swapper] 未知的面板消息: ${message.command}`);
       }
@@ -109,9 +135,24 @@ export class PanelMessageHandler {
   }
 
   private async handleReady(): Promise<void> {
+    this.handleGetPlatformStatus();
     this.handleGetConfig();
-    this.handleGetLocaleData();
-    this.handleGetLanguageStatus();
+    if (this.platformReady) {
+      this.handleGetLocaleData();
+      this.handleGetLanguageStatus();
+    }
+  }
+
+  private handleGetPlatformStatus(): void {
+    const { configManager, adapter } = this.deps;
+    this.postMessage({
+      command: 'platformStatus',
+      payload: {
+        platformReady: this.platformReady,
+        hasLocalesPaths: configManager.localesPaths.length > 0,
+        platformName: adapter?.displayName,
+      },
+    });
   }
 
   private handleGetConfig(): void {
@@ -187,14 +228,13 @@ export class PanelMessageHandler {
   private async handleScanWorkspace(): Promise<void> {
     const rootPath = this.deps.getRootPath();
     if (!rootPath) {
-      this.postMessage({ command: 'error', payload: { message: '未找到工作区' } });
-      return;
+      this.postMessage({ command: 'error', payload: { message: '未找到工作区' } });      return;
     }
 
     const { configManager, adapter, workspaceScanner } = this.deps;
-    const extensions = adapter.supportedExtensions.map((ext) => `.${ext}`);
+    const extensions = adapter!.supportedExtensions;
 
-    const results = await workspaceScanner.scanWorkspace(
+    const results = await workspaceScanner!.scanWorkspace(
       rootPath,
       extensions,
       configManager.excludeFiles,
@@ -222,7 +262,7 @@ export class PanelMessageHandler {
     }
 
     const { workspaceScanner } = this.deps;
-    const result = await workspaceScanner.scanSingleFile(editor.document.uri.fsPath);
+    const result = await workspaceScanner!.scanSingleFile(editor.document.uri.fsPath);
 
     if (result) {
       this.postMessage({ command: 'scanResult', payload: result });
@@ -249,7 +289,7 @@ export class PanelMessageHandler {
     const document = await vscode.workspace.openTextDocument(vscode.Uri.file(absolutePath));
     const ctx = this.buildReplaceContext(rootPath);
 
-    const count = await textReplacer.batchReplace(document, [
+    const count = await textReplacer!.batchReplace(document, [
       { start: payload.start, end: payload.end, key: payload.i18nKey, text: payload.text },
     ], ctx);
 
@@ -277,7 +317,7 @@ export class PanelMessageHandler {
 
     const document = await vscode.workspace.openTextDocument(vscode.Uri.file(absolutePath));
     const ctx = this.buildReplaceContext(rootPath);
-    const count = await textReplacer.batchReplace(document, payload.items, ctx);
+    const count = await textReplacer!.batchReplace(document, payload.items, ctx);
 
     this.postMessage({
       command: 'replaceResult',
@@ -322,7 +362,7 @@ export class PanelMessageHandler {
           const filePath = path.isAbsolute(mapping.filePath)
             ? mapping.filePath
             : path.join(rootPath, mapping.filePath);
-          await localeFileIO.saveTranslation(filePath, payload.key, result.text);
+          await localeFileIO!.saveTranslation(filePath, payload.key, result.text);
         }
       }
     }
@@ -356,7 +396,7 @@ export class PanelMessageHandler {
       ? mapping.filePath
       : path.join(rootPath, mapping.filePath);
 
-    const success = await localeFileIO.saveTranslation(filePath, payload.key, payload.value);
+    const success = await localeFileIO!.saveTranslation(filePath, payload.key, payload.value);
     if (success) {
       this.deps.refreshCallback();
       this.handleGetLocaleData();
@@ -379,7 +419,7 @@ export class PanelMessageHandler {
       ? payload.filePath
       : path.join(rootPath, payload.filePath);
 
-    const success = await localeFileIO.saveTranslation(absolutePath, payload.key, payload.value);
+    const success = await localeFileIO!.saveTranslation(absolutePath, payload.key, payload.value);
     if (success) {
       this.deps.refreshCallback();
       this.handleGetLocaleData();
@@ -483,9 +523,12 @@ export class PanelMessageHandler {
 
   private async handleRefreshData(): Promise<void> {
     this.deps.refreshCallback();
+    this.handleGetPlatformStatus();
     this.handleGetConfig();
-    this.handleGetLocaleData();
-    this.handleGetLanguageStatus();
+    if (this.platformReady) {
+      this.handleGetLocaleData();
+      this.handleGetLanguageStatus();
+    }
     this.postMessage({ command: 'dataRefreshed' });
   }
 

@@ -4,7 +4,13 @@
         "titleBar.activeBackground": "#394504",
         "titleBar.activeForeground": "#F7FDDD",
         "titleBar.inactiveBackground": "#293103",
-        "titleBar.inactiveForeground": "#F7FDDD"
+        "titleBar.inactiveForeground": "#F7FDDD",
+        "statusBar.background": "#293103",
+        "statusBar.foreground": "#F7FDDD",
+        "statusBar.debuggingBackground": "#293103",
+        "statusBar.debuggingForeground": "#F7FDDD",
+        "statusBar.noFolderBackground": "#293103",
+        "statusBar.noFolderForeground": "#F7FDDD"
     },
     "typescript.tsdk": "node_modules/typescript/lib",
     "editor.formatOnSave": true,

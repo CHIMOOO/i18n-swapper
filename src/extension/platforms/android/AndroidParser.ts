@@ -13,6 +13,7 @@ import type { FlatLocaleData, NestedLocaleData } from '../../core/types';
 
 export class AndroidParser implements ILocaleParser {
   readonly supportedExtensions = ['.xml'];
+  readonly useFlatKeys = true;
 
   parse(content: string, _filePath: string): FlatLocaleData {
     return this.parseStringResources(content);

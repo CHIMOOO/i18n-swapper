@@ -4,7 +4,7 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 import { useVscodeApi } from '../composables/useVscodeApi';
-import type { ConfigDataPayload } from '../types/messages';
+import type { ConfigDataPayload, PlatformStatusPayload } from '../types/messages';
 
 export const useConfigStore = defineStore('config', () => {
   const { postMessage, onMessage } = useVscodeApi();
@@ -23,6 +23,9 @@ export const useConfigStore = defineStore('config', () => {
   const languageMappings = ref<Array<{ languageCode: string; filePath: string }>>([]);
   const translationConfigured = ref(false);
   const loaded = ref(false);
+
+  const platformReady = ref(false);
+  const platformName = ref<string>();
 
   const hasLocalesPaths = computed(() => localesPaths.value.length > 0);
   const hasLanguageMappings = computed(() => languageMappings.value.length > 0);
@@ -44,6 +47,11 @@ export const useConfigStore = defineStore('config', () => {
     loaded.value = true;
   }
 
+  function applyPlatformStatus(payload: PlatformStatusPayload) {
+    platformReady.value = payload.platformReady;
+    platformName.value = payload.platformName;
+  }
+
   function fetchConfig() {
     postMessage({ command: 'getConfig' });
   }
@@ -60,9 +68,23 @@ export const useConfigStore = defineStore('config', () => {
     postMessage({ command: 'openSettings', payload: section ? { section } : undefined });
   }
 
+  function switchPlatform() {
+    postMessage({ command: 'switchPlatform' });
+  }
+
+  function discoverLocaleFiles() {
+    postMessage({ command: 'discoverLocaleFiles' });
+  }
+
+  function initializeLocales() {
+    postMessage({ command: 'initializeLocales' });
+  }
+
   onMessage((msg) => {
     if (msg.command === 'configData') {
       applyConfig(msg.payload);
+    } else if (msg.command === 'platformStatus') {
+      applyPlatformStatus(msg.payload);
     }
   });
 
@@ -81,11 +103,16 @@ export const useConfigStore = defineStore('config', () => {
     languageMappings,
     translationConfigured,
     loaded,
+    platformReady,
+    platformName,
     hasLocalesPaths,
     hasLanguageMappings,
     fetchConfig,
     updateConfig,
     selectLocaleFiles,
     openSettings,
+    switchPlatform,
+    discoverLocaleFiles,
+    initializeLocales,
   };
 });

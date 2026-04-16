@@ -155,6 +155,14 @@ export class ConfigManager {
     return this.config.get('defaultRepositories', DEFAULT_CONFIG.defaultRepositories);
   }
 
+  get localeResSubPaths(): string[] {
+    return this.config.get('localeResSubPaths', DEFAULT_CONFIG.localeResSubPaths);
+  }
+
+  get keyMappingFiles(): string[] {
+    return this.config.get('keyMappingFiles', DEFAULT_CONFIG.keyMappingFiles);
+  }
+
   // ── 行为配置 ──────────────────────────────────────
 
   get skipPrompt(): string[] {
@@ -186,6 +194,8 @@ export class ConfigManager {
       autoGenerateKeyPrefix: this.autoGenerateKeyPrefix,
       autoTranslateAllLanguages: this.autoTranslateAllLanguages,
       defaultRepositories: this.defaultRepositories,
+      localeResSubPaths: this.localeResSubPaths,
+      keyMappingFiles: this.keyMappingFiles,
       skipPrompt: this.skipPrompt,
     };
   }

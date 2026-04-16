@@ -143,13 +143,10 @@ function initializePlatformModules(adapter: IPlatformAdapter, context: vscode.Ex
     hoverProvider.setMatcher(adapter.matcher);
   }
 
-  if (!panelBridge) {
-    panelBridge = new PanelBridge(context.extensionUri, {
-      configManager, localeStore, localeFileIO, keyResolver, textReplacer,
-      translationService, workspaceScanner, adapter, getRootPath,
-      refreshCallback: () => { const rp = getRootPath(); if (rp) loadLocalesAndRefresh(rp); },
+  if (panelBridge) {
+    panelBridge.updateDeps({
+      localeFileIO, keyResolver, textReplacer, workspaceScanner, adapter,
     });
-    context.subscriptions.push(panelBridge);
   }
 
   platformModulesReady = true;
@@ -174,7 +171,14 @@ export async function activate(context: vscode.ExtensionContext) {
   highlightService = new HighlightService();
   context.subscriptions.push(highlightService);
 
-  // 4. 尝试自动检测平台
+  // 4. 创建面板桥接（不依赖平台，始终可用）
+  panelBridge = new PanelBridge(context.extensionUri, {
+    configManager, localeStore, translationService, getRootPath,
+    refreshCallback: () => { const rp = getRootPath(); if (rp) loadLocalesAndRefresh(rp); },
+  });
+  context.subscriptions.push(panelBridge);
+
+  // 5. 尝试自动检测平台
   const rootPath = getRootPath();
   if (rootPath) {
     try {
@@ -185,16 +189,16 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   }
 
-  // 5. 如果有适配器，初始化平台相关模块
+  // 6. 如果有适配器，初始化平台相关模块
   if (currentAdapter) {
     initializePlatformModules(currentAdapter, context);
   }
 
-  // 6. 注册所有命令（无论平台是否就绪）
+  // 7. 注册所有命令（无论平台是否就绪）
   setConfigManagerRef(configManager);
   registerCommands(context);
 
-  // 7. 注册编辑器事件
+  // 8. 注册编辑器事件
   context.subscriptions.push(
     vscode.window.onDidChangeActiveTextEditor(() => refreshActiveEditor()),
     vscode.workspace.onDidChangeTextDocument((e) => {
@@ -205,7 +209,7 @@ export async function activate(context: vscode.ExtensionContext) {
     })
   );
 
-  // 8. 监听配置变化
+  // 9. 监听配置变化
   configManager.onDidChange(() => {
     console.log('[i18n-swapper] 配置已变更，重新加载...');
     if (platformModulesReady) {
@@ -219,7 +223,7 @@ export async function activate(context: vscode.ExtensionContext) {
     if (rp && platformModulesReady) loadLocalesAndRefresh(rp);
   });
 
-  // 9. 监听平台切换事件 → 初始化/重新初始化平台模块
+  // 10. 监听平台切换事件 → 初始化/重新初始化平台模块
   platformRegistry.onDidChangePlatform((newAdapter) => {
     initializePlatformModules(newAdapter, context);
     const rp = getRootPath();
@@ -229,7 +233,7 @@ export async function activate(context: vscode.ExtensionContext) {
     }
   });
 
-  // 10. 首次加载语言文件
+  // 11. 首次加载语言文件
   if (rootPath && platformModulesReady) {
     await initializeLocales(rootPath);
   }
@@ -255,13 +259,6 @@ async function initializeLocales(rootPath: string): Promise<void> {
   }
 
   if (paths.length === 0) {
-    const fromRepo = await discoverFromDefaultRepository(rootPath);
-    if (fromRepo && fromRepo.length > 0) {
-      paths = configManager.localesPaths;
-    }
-  }
-
-  if (paths.length === 0) {
     const shouldSkip = configManager.skipPrompt.includes('noLocaleConfigured');
     if (!shouldSkip) {
       const result = await vscode.window.showWarningMessage(
@@ -282,7 +279,14 @@ async function initializeLocales(rootPath: string): Promise<void> {
 }
 
 async function autoDiscoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[] | null> {
-  const discovered = await platformRegistry.discoverLocaleFiles(rootPath);
+  const discovered = await platformRegistry.discoverLocaleFiles(
+    rootPath,
+    configManager.defaultRepositories,
+    {
+      localeResSubPaths: configManager.localeResSubPaths,
+      keyMappingFiles: configManager.keyMappingFiles,
+    }
+  );
   if (discovered.length === 0) {
     console.log('[i18n-swapper] 自动发现未找到语言文件');
     return null;
@@ -299,58 +303,6 @@ async function autoDiscoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo
 
   const selected = await vscode.window.showQuickPick(items, {
     placeHolder: `发现 ${discovered.length} 个语言文件，请选择要使用的文件`,
-    canPickMany: true,
-  });
-
-  if (!selected || selected.length === 0) return null;
-
-  const selectedPaths = selected.map((item) => item.file.filePath);
-  await configManager.setLocalesPaths(selectedPaths);
-  vscode.window.showInformationMessage(MESSAGES.filesAdded(selectedPaths.length));
-
-  const mappings = selected.map((item) => ({
-    languageCode: item.file.languageCode,
-    filePath: item.file.filePath,
-  }));
-  await configManager.update('tencentTranslation.languageMappings', mappings);
-
-  return selected.map((item) => item.file);
-}
-
-async function discoverFromDefaultRepository(rootPath: string): Promise<LocaleFileInfo[] | null> {
-  if (!currentAdapter) return null;
-
-  const repos = configManager.defaultRepositories;
-  const repoPath = repos[currentAdapter.id];
-
-  if (!repoPath) return null;
-
-  const resolvedPath = path.isAbsolute(repoPath) ? repoPath : path.join(rootPath, repoPath);
-  if (!fs.existsSync(resolvedPath)) {
-    console.log(`[i18n-swapper] 默认仓库路径不存在: ${resolvedPath}`);
-    return null;
-  }
-
-  console.log(`[i18n-swapper] 从默认仓库发现语言文件: ${resolvedPath}`);
-  const discovered = await platformRegistry.discoverLocaleFilesFromPath(resolvedPath);
-  if (discovered.length === 0) return null;
-
-  const adjustedFiles = discovered.map((file) => ({
-    ...file,
-    filePath: path.isAbsolute(repoPath)
-      ? path.join(repoPath, file.filePath).replace(/\\/g, '/')
-      : path.join(repoPath, file.filePath).replace(/\\/g, '/'),
-  }));
-
-  const items = adjustedFiles.map((file) => ({
-    label: file.filePath,
-    description: `${file.languageCode} (${file.format}) — 来自默认仓库`,
-    picked: true,
-    file,
-  }));
-
-  const selected = await vscode.window.showQuickPick(items, {
-    placeHolder: `从默认仓库发现 ${adjustedFiles.length} 个语言文件，请选择要使用的文件`,
     canPickMany: true,
   });
 
@@ -499,21 +451,23 @@ function registerCommands(context: vscode.ExtensionContext): void {
     })
   );
 
-  // 打开管理面板（始终可用，未就绪时提示）
+  // 打开管理面板（始终可用）
   context.subscriptions.push(
     vscode.commands.registerCommand('i18n-swapper.openPanel', () => {
-      if (panelBridge) {
-        panelBridge.openPanel();
-      } else {
-        vscode.window.showWarningMessage(
-          '管理面板需要先检测项目平台。请选择平台后再试。',
-          '选择平台'
-        ).then((choice) => {
-          if (choice === '选择平台') {
-            vscode.commands.executeCommand('i18n-swapper.switchPlatform');
-          }
-        });
+      panelBridge?.openPanel();
+    })
+  );
+
+  // 初始化语言文件（面板按钮调用，与启动时流程一致）
+  context.subscriptions.push(
+    vscode.commands.registerCommand('i18n-swapper.initializeLocales', async () => {
+      if (!ensurePlatformReady('初始化语言文件')) return;
+      const rootPath = getRootPath();
+      if (!rootPath) {
+        vscode.window.showWarningMessage(MESSAGES.workspaceNotFound);
+        return;
       }
+      await initializeLocales(rootPath);
     })
   );
 

@@ -28,12 +28,16 @@ export type WebviewMessage =
   | { command: 'openSettings'; payload?: OpenSettingsPayload }
   | { command: 'selectLocaleFiles' }
   | { command: 'copyToClipboard'; payload: CopyPayload }
-  | { command: 'refreshData' };
+  | { command: 'refreshData' }
+  | { command: 'switchPlatform' }
+  | { command: 'discoverLocaleFiles' }
+  | { command: 'initializeLocales' };
 
 // ─── Extension → WebView（响应/推送） ───────────────────
 
 export type ExtensionMessage =
   | { command: 'configData'; payload: ConfigDataPayload }
+  | { command: 'platformStatus'; payload: PlatformStatusPayload }
   | { command: 'localeData'; payload: LocaleDataPayload }
   | { command: 'languageStatus'; payload: LanguageStatusPayload }
   | { command: 'scanResult'; payload: ScanResultPayload }
@@ -204,4 +208,10 @@ export interface ErrorPayload {
 
 export interface InfoPayload {
   message: string;
+}
+
+export interface PlatformStatusPayload {
+  platformReady: boolean;
+  hasLocalesPaths: boolean;
+  platformName?: string;
 }

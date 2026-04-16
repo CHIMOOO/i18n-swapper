@@ -25,6 +25,18 @@ export interface ILocaleParser {
 
   /** 支持的文件扩展名 */
   readonly supportedExtensions: string[];
+
+  /**
+   * 是否使用扁平键（key 中的 `.` 不表示嵌套层级）
+   * iOS (.strings) 和 Android (strings.xml) 等平台的 key 是扁平的，
+   * 保存时不应按 `.` 拆分为嵌套对象。
+   */
+  readonly useFlatKeys?: boolean;
+}
+
+/** key 解析上下文（用于间接引用的 key 解析） */
+export interface KeyResolutionContext {
+  namespace?: string;
 }
 
 /** 代码中 i18n 调用的匹配器 */
@@ -43,6 +55,18 @@ export interface ICodeMatcher {
    * @param customPatterns 用户自定义模式
    */
   findAllMatches(text: string, functionNames: string[], customPatterns?: MatchPattern[]): I18nMatch[];
+
+  /**
+   * 解析间接引用的 key（如枚举属性名 → 实际 i18n key）
+   * 仅在匹配到需要间接解析的模式时调用
+   */
+  resolveKey?(rawKey: string, context?: KeyResolutionContext): string | undefined;
+
+  /**
+   * 加载 key 映射表（如从 Swift 枚举文件加载属性名到实际 key 的映射）
+   * 在语言文件发现阶段由 adapter 触发调用
+   */
+  loadKeyMappings?(rootPath: string, mappingFiles?: string[]): Promise<void>;
 }
 
 /** 代码替换器 */
@@ -67,6 +91,14 @@ export interface ICodeReplacer {
     functionName: string,
     quoteChar: string
   ): SpecialSyntaxResult | null;
+}
+
+/** 语言文件发现选项 */
+export interface DiscoverOptions {
+  /** Android: 优先扫描的 res 子路径 */
+  localeResSubPaths?: string[];
+  /** iOS: 额外的 key mapping 文件路径 */
+  keyMappingFiles?: string[];
 }
 
 /** 平台适配器 */
@@ -97,6 +129,7 @@ export interface IPlatformAdapter {
   /**
    * 自动发现语言文件
    * @param rootPath 工作区根路径
+   * @param options 可选的发现配置
    */
-  discoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[]>;
+  discoverLocaleFiles(rootPath: string, options?: DiscoverOptions): Promise<LocaleFileInfo[]>;
 }

@@ -1,14 +1,21 @@
 /**
  * iOS 平台适配器
- * 支持 .strings 语言文件 + NSLocalizedString/String(localized:) 调用模式
+ * 支持 .strings 语言文件 + NSLocalizedString/String(localized:)/.curLocalized 调用模式
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import type { IPlatformAdapter } from '../types';
+import type { IPlatformAdapter, DiscoverOptions } from '../types';
 import type { LocaleFileInfo, PlatformId } from '../../core/types';
 import { iOSParser } from './iOSParser';
 import { iOSMatcher } from './iOSMatcher';
 import { iOSReplacer } from './iOSReplacer';
+
+const SKIP_DIRS = new Set([
+  'node_modules', '.git', 'Pods', 'build', 'DerivedData', '.build', 'Carthage',
+]);
+
+const KEY_MAPPING_FILENAMES = ['UGLocalizableKey.swift', 'UGStringMapping.swift'];
+const MAX_SCAN_DEPTH = 6;
 
 export class iOSAdapter implements IPlatformAdapter {
   readonly id: PlatformId = 'ios';
@@ -22,17 +29,12 @@ export class iOSAdapter implements IPlatformAdapter {
   readonly activationLanguages = ['swift', 'objective-c', 'objective-cpp'];
 
   async detect(rootPath: string): Promise<boolean> {
-    // 检查标志性文件
-    const directIndicators = [
-      'Podfile',
-      'Package.swift',
-    ];
+    const directIndicators = ['Podfile', 'Package.swift'];
 
     if (directIndicators.some((f) => fs.existsSync(path.join(rootPath, f)))) {
       return true;
     }
 
-    // 检查 .xcodeproj 或 .xcworkspace 目录
     try {
       const entries = fs.readdirSync(rootPath);
       return entries.some(
@@ -43,31 +45,46 @@ export class iOSAdapter implements IPlatformAdapter {
     }
   }
 
-  async discoverLocaleFiles(rootPath: string): Promise<LocaleFileInfo[]> {
+  async discoverLocaleFiles(rootPath: string, options?: DiscoverOptions): Promise<LocaleFileInfo[]> {
     const results: LocaleFileInfo[] = [];
-    this.scanForLprojDirs(rootPath, rootPath, results, 0);
+    const keyMappingFiles: string[] = [];
+    this.scanDirectory(rootPath, rootPath, results, keyMappingFiles, 0);
+
+    if (options?.keyMappingFiles) {
+      for (const relPath of options.keyMappingFiles) {
+        const absPath = path.isAbsolute(relPath) ? relPath : path.join(rootPath, relPath);
+        if (fs.existsSync(absPath) && !keyMappingFiles.includes(absPath)) {
+          keyMappingFiles.push(absPath);
+        }
+      }
+    }
+
+    if (keyMappingFiles.length > 0) {
+      await this.matcher.loadKeyMappings!(rootPath, keyMappingFiles);
+    }
+
     return results;
   }
 
   /**
-   * 递归扫描 .lproj 目录，查找 Localizable.strings 文件
-   * 限制递归深度避免性能问题
+   * 递归扫描目录，同时查找:
+   * 1. .lproj/Localizable.strings 语言文件
+   * 2. key mapping Swift 文件 (UGLocalizableKey.swift, UGStringMapping.swift)
    */
-  private scanForLprojDirs(
+  private scanDirectory(
     dir: string,
     rootPath: string,
     results: LocaleFileInfo[],
+    keyMappingFiles: string[],
     depth: number
   ): void {
-    if (depth > 5) return;
+    if (depth > MAX_SCAN_DEPTH) return;
 
     try {
       const entries = fs.readdirSync(dir);
 
       for (const entry of entries) {
-        if (entry === 'node_modules' || entry === '.git' || entry === 'Pods' || entry === 'build') {
-          continue;
-        }
+        if (SKIP_DIRS.has(entry)) continue;
 
         const fullPath = path.join(dir, entry);
 
@@ -85,10 +102,22 @@ export class iOSAdapter implements IPlatformAdapter {
           continue;
         }
 
+        if (KEY_MAPPING_FILENAMES.includes(entry)) {
+          try {
+            const stat = fs.statSync(fullPath);
+            if (stat.isFile()) {
+              keyMappingFiles.push(fullPath);
+            }
+          } catch {
+            // stat 失败时跳过
+          }
+          continue;
+        }
+
         try {
           const stat = fs.statSync(fullPath);
           if (stat.isDirectory()) {
-            this.scanForLprojDirs(fullPath, rootPath, results, depth + 1);
+            this.scanDirectory(fullPath, rootPath, results, keyMappingFiles, depth + 1);
           }
         } catch {
           // stat 失败时跳过

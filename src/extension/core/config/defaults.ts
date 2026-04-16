@@ -16,7 +16,7 @@ export const DEFAULT_CONFIG: I18nSwapperConfig = {
   matchPatterns: [],
 
   scanPatterns: ['label', 'value', 'placeholder', 'title', 'message', 'text'],
-  excludeFiles: ['node_modules', 'dist', 'build', '.git', 'vendor', '.history'],
+  excludeFiles: ['node_modules', 'dist', 'build', '.git', 'vendor', '.history', 'Pods', 'DerivedData', '.build', 'Carthage'],
   includeFiles: [],
 
   decorationStyle: 'inline',
@@ -59,6 +59,9 @@ export const DEFAULT_CONFIG: I18nSwapperConfig = {
     ios: '',
     android: '',
   },
+
+  localeResSubPaths: [],
+  keyMappingFiles: [],
 
   skipPrompt: [],
 };
