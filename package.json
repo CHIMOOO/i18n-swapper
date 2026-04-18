@@ -94,10 +94,24 @@
         {
           "command": "i18n-swapper.quickBatchReplace",
           "group": "i18n-swapper@2"
-        },
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
         {
-          "command": "i18n-swapper.openPanel",
-          "group": "i18n-swapper@3"
+          "id": "i18nSwapperContainer",
+          "title": "i18n Swapper",
+          "icon": "media/i18n-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "i18nSwapperContainer": [
+        {
+          "type": "webview",
+          "id": "i18nSwapperView",
+          "name": "i18n 管理面板"
         }
       ]
     },

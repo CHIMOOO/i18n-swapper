@@ -176,6 +176,7 @@ export async function activate(context: vscode.ExtensionContext) {
     configManager, localeStore, translationService, getRootPath,
     refreshCallback: () => { const rp = getRootPath(); if (rp) loadLocalesAndRefresh(rp); },
   });
+  panelBridge.register(context);
   context.subscriptions.push(panelBridge);
 
   // 5. 尝试自动检测平台

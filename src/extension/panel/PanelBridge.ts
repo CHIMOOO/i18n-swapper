@@ -1,24 +1,37 @@
 /**
- * WebView 面板桥接
- * 管理 WebView 面板的创建、销毁和消息路由
+ * WebView 视图桥接（Activity Bar 侧边栏）
+ * 通过 WebviewViewProvider 把面板挂载到自定义 Activity Bar 容器内，
+ * 与"资源管理器""搜索"等共用同一侧边栏区域，不再占用编辑器 ViewColumn。
  */
 import * as vscode from 'vscode';
 import { PanelMessageHandler, type PanelDependencies } from './PanelMessageHandler';
 
-export class PanelBridge implements vscode.Disposable {
-  private panel: vscode.WebviewPanel | undefined;
+export const I18N_SWAPPER_VIEW_ID = 'i18nSwapperView';
+
+export class PanelBridge implements vscode.WebviewViewProvider, vscode.Disposable {
+  private view: vscode.WebviewView | undefined;
   private messageHandler: PanelMessageHandler | undefined;
-  private disposables: vscode.Disposable[] = [];
+  private viewDisposables: vscode.Disposable[] = [];
+  private rootDisposables: vscode.Disposable[] = [];
 
   constructor(
     private extensionUri: vscode.Uri,
     private deps: PanelDependencies
   ) {}
 
+  /** 注册到 vscode（在 extension activate 中调用） */
+  register(context: vscode.ExtensionContext): void {
+    const reg = vscode.window.registerWebviewViewProvider(I18N_SWAPPER_VIEW_ID, this, {
+      webviewOptions: { retainContextWhenHidden: true },
+    });
+    context.subscriptions.push(reg);
+    this.rootDisposables.push(reg);
+  }
+
   updateDeps(deps: Partial<PanelDependencies>): void {
     Object.assign(this.deps, deps);
     this.messageHandler?.updateDeps(deps);
-    if (this.panel) {
+    if (this.view) {
       this.messageHandler?.handleMessage({ command: 'getPlatformStatus' });
       this.messageHandler?.handleMessage({ command: 'getConfig' });
       this.messageHandler?.handleMessage({ command: 'getLocaleData' });
@@ -26,70 +39,71 @@ export class PanelBridge implements vscode.Disposable {
     }
   }
 
+  /** 兼容旧 API：聚焦/展开面板 */
   openPanel(): void {
-    if (this.panel) {
-      this.panel.reveal(vscode.ViewColumn.Beside);
-      return;
-    }
-
-    this.panel = vscode.window.createWebviewPanel(
-      'i18nSwapperPanel',
-      'i18n Swapper',
-      vscode.ViewColumn.Beside,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [
-          vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview'),
-        ],
-      }
-    );
-
-    this.messageHandler = new PanelMessageHandler(this.deps, (msg) => {
-      this.panel?.webview.postMessage(msg);
-    });
-
-    this.panel.webview.html = this.getWebviewContent();
-
-    this.panel.webview.onDidReceiveMessage(
-      (message) => this.messageHandler?.handleMessage(message),
-      undefined,
-      this.disposables
-    );
-
-    this.panel.onDidDispose(() => {
-      this.panel = undefined;
-      this.messageHandler = undefined;
-      this.disposables.forEach((d) => d.dispose());
-      this.disposables = [];
-    });
-
-    const configDisposable = this.deps.configManager.onDidChange(() => {
-      this.sendMessage({ command: 'dataRefreshed' });
-      this.messageHandler?.handleMessage({ command: 'getPlatformStatus' });
-      this.messageHandler?.handleMessage({ command: 'getConfig' });
-      this.messageHandler?.handleMessage({ command: 'getLocaleData' });
-      this.messageHandler?.handleMessage({ command: 'getLanguageStatus' });
-    });
-    this.disposables.push(configDisposable);
+    void vscode.commands.executeCommand(`${I18N_SWAPPER_VIEW_ID}.focus`);
   }
 
   sendMessage(message: unknown): void {
-    this.panel?.webview.postMessage(message);
+    this.view?.webview.postMessage(message);
   }
 
   get isVisible(): boolean {
-    return this.panel?.visible ?? false;
+    return this.view?.visible ?? false;
+  }
+
+  resolveWebviewView(
+    webviewView: vscode.WebviewView,
+    _context: vscode.WebviewViewResolveContext,
+    _token: vscode.CancellationToken
+  ): void {
+    this.view = webviewView;
+    this.viewDisposables.forEach((d) => d.dispose());
+    this.viewDisposables = [];
+
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview')],
+    };
+
+    this.messageHandler = new PanelMessageHandler(this.deps, (msg) => {
+      this.view?.webview.postMessage(msg);
+    });
+
+    webviewView.webview.html = this.getWebviewContent(webviewView.webview);
+
+    this.viewDisposables.push(
+      webviewView.webview.onDidReceiveMessage((message) =>
+        this.messageHandler?.handleMessage(message)
+      )
+    );
+
+    this.viewDisposables.push(
+      this.deps.configManager.onDidChange(() => {
+        this.sendMessage({ command: 'dataRefreshed' });
+        this.messageHandler?.handleMessage({ command: 'getPlatformStatus' });
+        this.messageHandler?.handleMessage({ command: 'getConfig' });
+        this.messageHandler?.handleMessage({ command: 'getLocaleData' });
+        this.messageHandler?.handleMessage({ command: 'getLanguageStatus' });
+      })
+    );
+
+    webviewView.onDidDispose(() => {
+      this.view = undefined;
+      this.messageHandler = undefined;
+      this.viewDisposables.forEach((d) => d.dispose());
+      this.viewDisposables = [];
+    });
   }
 
   dispose(): void {
-    this.panel?.dispose();
-    this.disposables.forEach((d) => d.dispose());
-    this.disposables = [];
+    this.viewDisposables.forEach((d) => d.dispose());
+    this.viewDisposables = [];
+    this.rootDisposables.forEach((d) => d.dispose());
+    this.rootDisposables = [];
   }
 
-  private getWebviewContent(): string {
-    const webview = this.panel!.webview;
+  private getWebviewContent(webview: vscode.Webview): string {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'index.js')
     );
