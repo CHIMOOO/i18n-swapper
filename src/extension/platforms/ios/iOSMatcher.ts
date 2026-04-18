@@ -95,18 +95,16 @@ export class iOSMatcher implements ICodeMatcher {
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
 
-        const keyInFull = fullMatch.indexOf(`"${key}"`);
-        const hasDirect = keyInFull >= 0;
-        const keyStartInFull = hasDirect ? keyInFull + 1 : fullMatch.indexOf(`.${match[pattern.keyGroup]}`) + 1;
-
+        // iOS 内联模式希望整段调用（如 "key".curLocalized、NSLocalizedString("key")）
+        // 直接显示为翻译文本，因此把 keyRange 设为整段范围。
         results.push({
           fullMatch,
           key,
           startOffset: match.index,
           endOffset: match.index + fullMatch.length,
-          keyStartOffset: match.index + keyStartInFull,
-          keyEndOffset: match.index + keyStartInFull + (hasDirect ? key.length : match[pattern.keyGroup].length),
-          quoteChar: hasDirect ? '"' : '',
+          keyStartOffset: match.index,
+          keyEndOffset: match.index + fullMatch.length,
+          quoteChar: '',
           functionName: this.inferFunctionName(fullMatch),
         });
       }
