@@ -454,7 +454,11 @@ function registerCommands(context: vscode.ExtensionContext): void {
   // 打开管理面板（始终可用）
   context.subscriptions.push(
     vscode.commands.registerCommand('i18n-swapper.openPanel', () => {
-      panelBridge?.openPanel();
+      if (!panelBridge) {
+        vscode.window.showErrorMessage('i18n Swapper 扩展尚未完成初始化，请稍后重试');
+        return;
+      }
+      panelBridge.openPanel();
     })
   );
 

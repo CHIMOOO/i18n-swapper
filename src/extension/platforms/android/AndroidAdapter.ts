@@ -98,6 +98,14 @@ export class AndroidAdapter implements IPlatformAdapter {
     }
   }
 
+  /**
+   * 收集 res/ 下的多语言 strings.xml
+   * 规则：
+   *  1. 仅识别 values-XXX/（带连字符）目录，跳过纯 values/
+   *  2. XXX 必须是合法语言限定符（排除 sw320dp、v26、land、night、xxhdpi 等非语言限定符）
+   *  3. 该 res 目录必须同时存在 values-en* 与 values-zh* 才视为多语言目录
+   *     （避免把仅含屏幕/夜间等限定符的 res 目录误判为 i18n 源）
+   */
   private collectValuesFromRes(
     resDir: string,
     rootPath: string,
@@ -105,12 +113,30 @@ export class AndroidAdapter implements IPlatformAdapter {
   ): void {
     try {
       const dirs = fs.readdirSync(resDir);
+
+      const candidates: { dir: string; suffix: string; stringsPath: string }[] = [];
+      let hasEn = false;
+      let hasZh = false;
+
       for (const dir of dirs) {
-        if (!dir.startsWith('values')) continue;
+        if (!dir.startsWith('values-')) continue;
+
+        const suffix = dir.slice('values-'.length);
+        if (!AndroidAdapter.isLanguageQualifier(suffix)) continue;
 
         const stringsPath = path.join(resDir, dir, 'strings.xml');
         if (!fs.existsSync(stringsPath)) continue;
 
+        candidates.push({ dir, suffix, stringsPath });
+
+        const langLower = suffix.toLowerCase();
+        if (langLower === 'en' || langLower.startsWith('en-')) hasEn = true;
+        if (langLower === 'zh' || langLower.startsWith('zh-')) hasZh = true;
+      }
+
+      if (!hasEn || !hasZh) return;
+
+      for (const { dir, stringsPath } of candidates) {
         const langCode = this.extractLanguageCode(dir);
         const relativePath = path.relative(rootPath, stringsPath).replace(/\\/g, '/');
         results.push({
@@ -122,6 +148,51 @@ export class AndroidAdapter implements IPlatformAdapter {
     } catch {
       // 目录读取失败时跳过
     }
+  }
+
+  private static readonly NON_LANG_QUALIFIERS = new Set([
+    'land', 'port',
+    'night', 'notnight',
+    'large', 'small', 'xlarge', 'normal',
+    'long', 'notlong',
+    'round', 'notround',
+    'widecg', 'nowidecg',
+    'highdr', 'lowdr',
+    'car', 'tv', 'desk', 'appliance', 'watch', 'vrheadset', 'television',
+    'ldpi', 'mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi', 'tvdpi', 'nodpi', 'anydpi',
+    'keysexposed', 'keyshidden', 'keyssoft',
+    'nokeys', 'qwerty', '12key',
+    'navexposed', 'navhidden',
+    'nonav', 'dpad', 'trackball', 'wheel',
+    'finger', 'notouch', 'stylus',
+    'rtl', 'ltr',
+  ]);
+
+  private static readonly NON_LANG_PATTERNS: RegExp[] = [
+    /^sw\d+dp$/,   // smallest width
+    /^w\d+dp$/,    // available width
+    /^h\d+dp$/,    // available height
+    /^v\d+$/,      // platform version
+    /^\d+x\d+$/,   // screen pixel size (legacy)
+    /dpi$/,        // 兜底匹配密度
+  ];
+
+  /**
+   * 判断 values-XXX 中的 XXX 是否为合法语言限定符
+   * 合法形式：
+   *   - 2~3 位小写字母（ISO 639-1/639-2，如 en/zh/fil）
+   *   - xx-rXX（带地区，如 zh-rCN/pt-rBR）
+   *   - b+xx[+...]（BCP 47 形式，如 b+sr+Latn）
+   */
+  private static isLanguageQualifier(suffix: string): boolean {
+    if (!suffix) return false;
+    if (AndroidAdapter.NON_LANG_QUALIFIERS.has(suffix)) return false;
+    if (AndroidAdapter.NON_LANG_PATTERNS.some((re) => re.test(suffix))) return false;
+
+    if (/^b\+[A-Za-z][A-Za-z0-9]*(?:\+[A-Za-z0-9]+)*$/.test(suffix)) return true;
+    if (/^[a-z]{2,3}(?:-r[A-Z]{2})?$/.test(suffix)) return true;
+
+    return false;
   }
 
   /**

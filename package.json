@@ -25,6 +25,8 @@
     "kotlin"
   ],
   "activationEvents": [
+    "onStartupFinished",
+    "onCommand:i18n-swapper.openPanel",
     "onLanguage:javascript",
     "onLanguage:typescript",
     "onLanguage:javascriptreact",

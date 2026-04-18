@@ -42,7 +42,7 @@ export class AndroidMatcher implements ICodeMatcher {
 
   findAllMatches(text: string, functionNames: string[], customPatterns?: MatchPattern[]): I18nMatch[] {
     const patterns = this.getPatterns(functionNames, customPatterns);
-    const results: I18nMatch[] = [];
+    const candidates: I18nMatch[] = [];
     const seen = new Set<string>();
 
     for (const pattern of patterns) {
@@ -58,22 +58,38 @@ export class AndroidMatcher implements ICodeMatcher {
         if (seen.has(dedupKey)) continue;
         seen.add(dedupKey);
 
-        const keyStartInFull = fullMatch.lastIndexOf(key);
-
-        results.push({
+        // Android 内联模式希望整段调用（如 getString(R.string.key)）
+        // 直接显示为翻译文本，因此把 keyRange 设为整段范围。
+        candidates.push({
           fullMatch,
           key,
           startOffset: match.index,
           endOffset: match.index + fullMatch.length,
-          keyStartOffset: match.index + keyStartInFull,
-          keyEndOffset: match.index + keyStartInFull + key.length,
+          keyStartOffset: match.index,
+          keyEndOffset: match.index + fullMatch.length,
           quoteChar: '',
           functionName: this.inferFunctionName(fullMatch),
         });
       }
     }
 
-    return results;
+    // 范围互斥：外层匹配（如 getString(...R.string.x)）优先，
+    // 丢弃完全落在已接受范围内的内层裸匹配（如 R.string.x）。
+    candidates.sort((a, b) => {
+      if (a.startOffset !== b.startOffset) return a.startOffset - b.startOffset;
+      return b.endOffset - a.endOffset;
+    });
+
+    const accepted: I18nMatch[] = [];
+    for (const cur of candidates) {
+      const containedByAccepted = accepted.some(
+        (m) => m.startOffset <= cur.startOffset && cur.endOffset <= m.endOffset
+      );
+      if (containedByAccepted) continue;
+      accepted.push(cur);
+    }
+
+    return accepted;
   }
 
   /**
