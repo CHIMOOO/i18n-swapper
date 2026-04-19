@@ -51,7 +51,8 @@ export class LocaleStore {
     if (typeof directValue === 'string') return directValue;
 
     // 回退到嵌套路径查找（兼容 Web JSON 等嵌套格式）
-    const parts = key.split('.');
+    // 过滤空段，避免 ".key" / "key." / "a..b" 之类异常输入引发未定义行为
+    const parts = key.split('.').filter((p) => p.length > 0);
     if (parts.length <= 1) return undefined;
 
     let current: unknown = data;

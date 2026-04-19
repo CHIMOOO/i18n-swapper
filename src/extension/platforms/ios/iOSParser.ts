@@ -69,10 +69,25 @@ export class iOSParser implements ILocaleParser {
   }
 
   private unescapeString(text: string): string {
-    return text
-      .replace(/\\n/g, '\n')
-      .replace(/\\t/g, '\t')
-      .replace(/\\"/g, '"')
-      .replace(/\\\\/g, '\\');
+    let result = '';
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      if (ch === '\\' && i + 1 < text.length) {
+        const next = text[i + 1];
+        switch (next) {
+          case 'n': result += '\n'; break;
+          case 't': result += '\t'; break;
+          case 'r': result += '\r'; break;
+          case '"': result += '"'; break;
+          case "'": result += "'"; break;
+          case '\\': result += '\\'; break;
+          default: result += next; break;
+        }
+        i++;
+      } else {
+        result += ch;
+      }
+    }
+    return result;
   }
 }

@@ -107,7 +107,11 @@ export interface TranslationResult {
 /** 支持的平台 ID */
 export type PlatformId = 'web' | 'android' | 'ios';
 
-/** 语言名称映射 */
+/**
+ * 语言名称映射
+ * ⚠️ 与 src/webview/src/types/shared.ts 中的 LANGUAGE_NAMES 必须保持一致；
+ *    新增/修改语言条目时务必同步两处（webview 沙盒不能引用扩展端模块）。
+ */
 export const LANGUAGE_NAMES: Record<string, string> = {
   'zh': '中文',
   'zh-hans': '简体中文',
