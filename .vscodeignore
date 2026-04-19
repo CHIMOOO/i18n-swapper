@@ -8,6 +8,8 @@ pnpm-workspace.yaml
 pnpm-lock.yaml
 .gitignore
 .eslintrc*
+eslint.config.*
 *.map
 **/*.ts
 !dist/**
+.history/**

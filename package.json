@@ -2,9 +2,21 @@
   "name": "i18n-swapper",
   "displayName": "i18n Swapper",
   "description": "一站式国际化（i18n）解决方案：实时翻译预览、智能替换、批量处理、多语言管理。支持 Web/Android/iOS 三端。",
-  "version": "0.0.1",
+  "version": "1.0.2",
   "publisher": "chimoo",
+  "author": {
+    "name": "chimoo"
+  },
+  "icon": "images/icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CHIMOOO/i18n-swapper.git"
+  },
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -134,13 +146,20 @@
       "properties": {
         "i18n-swapper.platform": {
           "type": "string",
-          "enum": ["auto", "web", "android", "ios"],
+          "enum": [
+            "auto",
+            "web",
+            "android",
+            "ios"
+          ],
           "default": "auto",
           "description": "项目平台类型（auto 自动检测）"
         },
         "i18n-swapper.localesPaths": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "源语言文件路径列表"
         },
@@ -151,7 +170,10 @@
         },
         "i18n-swapper.quoteType": {
           "type": "string",
-          "enum": ["single", "double"],
+          "enum": [
+            "single",
+            "double"
+          ],
           "default": "single",
           "description": "生成代码中使用的引号类型"
         },
@@ -162,8 +184,13 @@
         },
         "i18n-swapper.identifyFunctionNames": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["t", "$t"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "t",
+            "$t"
+          ],
           "description": "识别的国际化函数名称列表"
         },
         "i18n-swapper.matchPatterns": {
@@ -171,12 +198,23 @@
           "items": {
             "type": "object",
             "properties": {
-              "source": { "type": "string", "description": "正则表达式字符串" },
-              "flags": { "type": "string", "description": "正则标志" },
-              "keyGroup": { "type": "number", "description": "键名捕获组索引" },
+              "source": {
+                "type": "string",
+                "description": "正则表达式字符串"
+              },
+              "flags": {
+                "type": "string",
+                "description": "正则标志"
+              },
+              "keyGroup": {
+                "type": "number",
+                "description": "键名捕获组索引"
+              },
               "fileTypes": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "description": "适用的文件类型"
               }
             }
@@ -186,25 +224,52 @@
         },
         "i18n-swapper.scanPatterns": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["label", "value", "placeholder", "title", "message", "text"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "label",
+            "value",
+            "placeholder",
+            "title",
+            "message",
+            "text"
+          ],
           "description": "扫描的属性名列表（用于批量替换）"
         },
         "i18n-swapper.excludeFiles": {
           "type": "array",
-          "items": { "type": "string" },
-          "default": ["node_modules", "dist", "build", ".git", "vendor", ".history", "Pods", "DerivedData", ".build", "Carthage"],
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "node_modules",
+            "dist",
+            "build",
+            ".git",
+            "vendor",
+            ".history",
+            "Pods",
+            "DerivedData",
+            ".build",
+            "Carthage"
+          ],
           "description": "扫描时排除的文件/目录"
         },
         "i18n-swapper.includeFiles": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "指定扫描范围（为空则扫描全部）"
         },
         "i18n-swapper.decorationStyle": {
           "type": "string",
-          "enum": ["suffix", "inline"],
+          "enum": [
+            "suffix",
+            "inline"
+          ],
           "default": "inline",
           "description": "翻译预览显示模式（suffix: 后缀显示, inline: 内联替换显示）"
         },
@@ -270,8 +335,14 @@
           "items": {
             "type": "object",
             "properties": {
-              "languageCode": { "type": "string", "description": "语言代码" },
-              "filePath": { "type": "string", "description": "对应的语言文件路径" }
+              "languageCode": {
+                "type": "string",
+                "description": "语言代码"
+              },
+              "filePath": {
+                "type": "string",
+                "description": "对应的语言文件路径"
+              }
             }
           },
           "default": [],
@@ -294,29 +365,48 @@
         },
         "i18n-swapper.defaultRepositories": {
           "type": "object",
-          "default": { "web": "", "ios": "", "android": "" },
+          "default": {
+            "web": "",
+            "ios": "",
+            "android": ""
+          },
           "properties": {
-            "web": { "type": "string", "description": "Web 项目默认多语言仓库路径" },
-            "ios": { "type": "string", "description": "iOS 项目默认多语言仓库路径" },
-            "android": { "type": "string", "description": "Android 项目默认多语言仓库路径" }
+            "web": {
+              "type": "string",
+              "description": "Web 项目默认多语言仓库路径"
+            },
+            "ios": {
+              "type": "string",
+              "description": "iOS 项目默认多语言仓库路径"
+            },
+            "android": {
+              "type": "string",
+              "description": "Android 项目默认多语言仓库路径"
+            }
           },
           "description": "各平台默认代码仓库路径（用于自动读取多语言库）"
         },
         "i18n-swapper.localeResSubPaths": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "Android 多模块项目优先扫描的 res 子路径（如 [\"app/src/main/res\", \"module-core/src/main/res\"]），为空时递归扫描全部"
         },
         "i18n-swapper.keyMappingFiles": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "iOS key mapping 文件相对路径（如 [\"iot/Resources/Generated/UGLocalizableKey.swift\"]），用于枚举间接引用的 key 解析"
         },
         "i18n-swapper.skipPrompt": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "default": [],
           "description": "跳过提示的功能模块名称"
         }
@@ -345,7 +435,8 @@
     "esbuild": "^0.24.0",
     "eslint": "^9.0.0",
     "typescript": "^5.7.0",
-    "@vscode/vsce": "^3.0.0"
+    "@vscode/vsce": "^3.0.0",
+    "vue-eslint-parser": "^10.0.0"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
