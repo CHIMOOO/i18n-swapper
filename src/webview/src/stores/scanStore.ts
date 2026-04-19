@@ -16,7 +16,13 @@ import type { FlatLocaleData } from '../types/shared';
 export interface FileScanResult {
   filePath: string;
   fileName: string;
-  existing: Array<{ key: string; fullMatch: string; startOffset: number; endOffset: number }>;
+  existing: Array<{
+    key: string;
+    fullMatch: string;
+    startOffset: number;
+    endOffset: number;
+    existingValue?: string;
+  }>;
   pending: Array<{
     text: string;
     i18nKey: string;
@@ -26,6 +32,8 @@ export interface FileScanResult {
     selected: boolean;
   }>;
 }
+
+export type ScanFilter = 'all' | 'pending' | 'existing' | 'missingTranslation';
 
 export interface LanguageInfo {
   code: string;
@@ -64,6 +72,11 @@ export const useScanStore = defineStore('scan', () => {
   // filters
   const filterText = ref('');
   const showPendingOnly = ref(false);
+  const scanFilter = ref<ScanFilter>('pending');
+
+  function setScanFilter(f: ScanFilter) {
+    scanFilter.value = f;
+  }
 
   const totalPending = computed(() =>
     scanResults.value.reduce((sum, f) => sum + f.pending.length, 0)
@@ -90,6 +103,53 @@ export const useScanStore = defineStore('scan', () => {
     return results;
   });
 
+  /**
+   * 当前文件的扫描结果（current 模式下专用）
+   * 通过 currentFilePath 和已扫结果匹配（路径以"包含尾匹配"方式比对，
+   * 兼容 currentFilePath 为相对路径而 result.filePath 为绝对路径的场景）
+   */
+  const currentFileResult = computed<FileScanResult | null>(() => {
+    const cp = currentFilePath.value;
+    if (!cp) return null;
+    const norm = cp.replace(/\\/g, '/');
+    const found = scanResults.value.find((r) => {
+      const fp = r.filePath.replace(/\\/g, '/');
+      return fp === norm || fp.endsWith(norm) || norm.endsWith(fp);
+    });
+    return found ?? null;
+  });
+
+  /** current 模式下，当前文件 pending 列表（应用 filter + scanFilter） */
+  const currentFilePending = computed(() => {
+    const r = currentFileResult.value;
+    if (!r) return [];
+    if (scanFilter.value === 'existing') return [];
+    const q = filterText.value.toLowerCase();
+    let list = q
+      ? r.pending.filter((p) => p.text.includes(q) || p.i18nKey.toLowerCase().includes(q))
+      : r.pending;
+    if (scanFilter.value === 'missingTranslation') {
+      const codes = languageCodes.value;
+      list = list.filter((p) => {
+        if (!p.i18nKey) return true;
+        return codes.some((c) => !flatData.value[`${c}.${p.i18nKey}`]);
+      });
+    }
+    return list;
+  });
+
+  /** current 模式下，当前文件已国际化项（应用 filter + scanFilter） */
+  const currentFileExisting = computed(() => {
+    const r = currentFileResult.value;
+    if (!r) return [];
+    if (scanFilter.value === 'pending' || scanFilter.value === 'missingTranslation') return [];
+    const q = filterText.value.toLowerCase();
+    if (!q) return r.existing;
+    return r.existing.filter(
+      (e) => e.key.toLowerCase().includes(q) || (e.existingValue ?? '').toLowerCase().includes(q)
+    );
+  });
+
   function applyLocaleData(payload: LocaleDataPayload) {
     flatData.value = payload.flatData;
     keyCount.value = payload.keyCount;
@@ -111,6 +171,7 @@ export const useScanStore = defineStore('scan', () => {
         fullMatch: e.fullMatch,
         startOffset: e.startOffset,
         endOffset: e.endOffset,
+        existingValue: e.existingValue,
       })),
       pending: payload.pending.map((p) => ({
         text: p.text,
@@ -137,6 +198,8 @@ export const useScanStore = defineStore('scan', () => {
   }
 
   function scanCurrentFile() {
+    // current 模式下，重扫前清掉旧结果，避免堆积
+    scanResults.value = [];
     scanning.value = true;
     postMessage({ command: 'scanCurrentFile' });
   }
@@ -307,9 +370,14 @@ export const useScanStore = defineStore('scan', () => {
     searchTotal,
     filterText,
     showPendingOnly,
+    scanFilter,
+    setScanFilter,
     totalPending,
     totalExisting,
     filteredResults,
+    currentFileResult,
+    currentFilePending,
+    currentFileExisting,
     scanWorkspace,
     scanCurrentFile,
     setScanMode,

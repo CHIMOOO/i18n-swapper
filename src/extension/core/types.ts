@@ -40,6 +40,8 @@ export interface I18nMatch {
   quoteChar: string;
   /** 函数名，如 t、$t */
   functionName: string;
+  /** 该 key 在默认语言文件中的当前译文（PanelMessageHandler 推送前 enrich，扫描器本身不填） */
+  existingValue?: string;
 }
 
 /** 匹配模式定义（支持用户自定义正则） */

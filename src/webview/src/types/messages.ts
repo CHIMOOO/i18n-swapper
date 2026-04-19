@@ -226,6 +226,12 @@ export interface ConfigDataPayload {
   // 基础
   localesPaths: string[];
   functionName: string;
+  /** 实际生效的 i18n 函数名（按当前平台默认值兜底） */
+  effectiveFunctionName: string;
+  /** 当前平台的默认 i18n 函数名（用于占位/恢复） */
+  platformDefaultFunctionName: string;
+  /** 当前平台可选的 i18n 调用方式列表（供下拉） */
+  availableFunctionNames: string[];
   quoteType: 'single' | 'double';
   defaultLocale: string;
 

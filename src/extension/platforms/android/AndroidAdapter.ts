@@ -21,6 +21,9 @@ export class AndroidAdapter implements IPlatformAdapter {
   readonly supportedExtensions = ['.kt', '.java', '.xml'];
   readonly activationLanguages = ['kotlin', 'java', 'xml'];
 
+  readonly defaultFunctionName = 'getString';
+  readonly availableFunctionNames = ['getString', 'stringResource', 'R.string', '@string'];
+
   async detect(rootPath: string): Promise<boolean> {
     const indicators = [
       'build.gradle',

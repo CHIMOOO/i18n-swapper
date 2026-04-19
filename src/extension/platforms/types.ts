@@ -121,6 +121,20 @@ export interface IPlatformAdapter {
   readonly activationLanguages: string[];
 
   /**
+   * 该平台的默认 i18n 函数名（用于配置面板回显与作为 fallback）
+   * - Web: 't'
+   * - iOS: 'NSLocalizedString'
+   * - Android: 'getString'
+   */
+  readonly defaultFunctionName: string;
+
+  /**
+   * 该平台可选的 i18n 调用方式（供配置面板下拉）
+   * 例如 iOS: ['NSLocalizedString', 'String(localized:)', 'LocalizedStringKey', 'Text']
+   */
+  readonly availableFunctionNames: string[];
+
+  /**
    * 检测当前工作区是否为该平台项目
    * @param rootPath 工作区根路径
    */

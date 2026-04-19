@@ -43,6 +43,9 @@ export const useConfigStore = defineStore('config', () => {
   // ── 基础 ──────────────────────────────────────
   const localesPaths = ref<string[]>([]);
   const functionName = ref('t');
+  const effectiveFunctionName = ref('t');
+  const platformDefaultFunctionName = ref('t');
+  const availableFunctionNames = ref<string[]>([]);
   const quoteType = ref<'single' | 'double'>('single');
   const defaultLocale = ref('zh-CN');
 
@@ -94,6 +97,9 @@ export const useConfigStore = defineStore('config', () => {
     platform.value = payload.platform;
     localesPaths.value = payload.localesPaths ?? [];
     functionName.value = payload.functionName ?? 't';
+    effectiveFunctionName.value = payload.effectiveFunctionName ?? payload.functionName ?? 't';
+    platformDefaultFunctionName.value = payload.platformDefaultFunctionName ?? 't';
+    availableFunctionNames.value = payload.availableFunctionNames ?? [];
     quoteType.value = payload.quoteType ?? 'single';
     defaultLocale.value = payload.defaultLocale ?? 'zh-CN';
 
@@ -206,6 +212,9 @@ export const useConfigStore = defineStore('config', () => {
     platformName,
     localesPaths,
     functionName,
+    effectiveFunctionName,
+    platformDefaultFunctionName,
+    availableFunctionNames,
     quoteType,
     defaultLocale,
     identifyFunctionNames,

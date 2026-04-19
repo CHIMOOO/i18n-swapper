@@ -16,6 +16,8 @@ export interface I18nMatch {
   keyEndOffset: number;
   quoteChar: string;
   functionName: string;
+  /** 该 key 在默认语言文件中的当前译文（由扩展端在推送前 enrich） */
+  existingValue?: string;
 }
 
 export interface ScanResultItem {

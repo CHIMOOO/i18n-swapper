@@ -23,6 +23,9 @@ export class WebAdapter implements IPlatformAdapter {
     'javascript', 'typescript', 'javascriptreact', 'typescriptreact', 'vue', 'html',
   ];
 
+  readonly defaultFunctionName = 't';
+  readonly availableFunctionNames = ['t', '$t', 'i18n.t', 'i18next.t'];
+
   async detect(rootPath: string): Promise<boolean> {
     const packageJsonPath = path.join(rootPath, 'package.json');
     return fs.existsSync(packageJsonPath);

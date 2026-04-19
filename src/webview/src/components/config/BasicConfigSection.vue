@@ -39,16 +39,38 @@ const dropdownStyle = {
 
 <template>
   <div class="space-y-3">
-    <label class="grid grid-cols-[6rem_1fr] items-center gap-2 text-xs">
-      <span class="opacity-70">i18n 函数名</span>
-      <input
-        :value="configStore.functionName"
-        @change="(e) => configStore.updateConfig('functionName', (e.target as HTMLInputElement).value)"
-        class="font-mono text-xs px-2 py-1 rounded outline-none"
-        :style="inputStyle"
-        placeholder="t / $t / i18n.t"
-      />
-    </label>
+    <div class="grid grid-cols-[6rem_1fr] items-start gap-2 text-xs">
+      <span class="opacity-70 mt-1">i18n 函数名</span>
+      <div class="flex flex-col gap-1">
+        <select
+          v-if="configStore.availableFunctionNames.length > 0"
+          :value="configStore.functionName"
+          @change="(e) => configStore.updateConfig('functionName', (e.target as HTMLSelectElement).value)"
+          class="text-xs px-2 py-1 rounded"
+          :style="dropdownStyle"
+        >
+          <option
+            v-for="name in configStore.availableFunctionNames"
+            :key="name"
+            :value="name"
+          >
+            {{ name }}{{ name === configStore.platformDefaultFunctionName ? '（平台默认）' : '' }}
+          </option>
+        </select>
+        <input
+          v-else
+          :value="configStore.functionName"
+          @change="(e) => configStore.updateConfig('functionName', (e.target as HTMLInputElement).value)"
+          class="font-mono text-xs px-2 py-1 rounded outline-none"
+          :style="inputStyle"
+          placeholder="t / $t / i18n.t"
+        />
+        <p class="text-[10px] opacity-60 leading-tight">
+          当前生效：<code class="font-mono">{{ configStore.effectiveFunctionName }}</code>
+          <span v-if="configStore.platformName"> ·  跟随平台「{{ configStore.platformName }}」</span>
+        </p>
+      </div>
+    </div>
 
     <label class="grid grid-cols-[6rem_1fr] items-center gap-2 text-xs">
       <span class="opacity-70">引号类型</span>

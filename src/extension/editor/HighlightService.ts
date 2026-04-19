@@ -10,7 +10,10 @@ export class HighlightService implements vscode.Disposable {
 
   constructor() {
     this.highlightType = vscode.window.createTextEditorDecorationType({
-      backgroundColor: 'rgba(255, 235, 59, 0.3)',
+      isWholeLine: true,
+      backgroundColor: 'rgba(255, 235, 59, 0.28)',
+      overviewRulerColor: '#FFC107',
+      overviewRulerLane: vscode.OverviewRulerLane.Center,
       border: '1px solid #FFC107',
       borderRadius: '2px',
     });

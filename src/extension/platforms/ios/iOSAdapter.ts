@@ -28,6 +28,14 @@ export class iOSAdapter implements IPlatformAdapter {
   readonly supportedExtensions = ['.swift', '.m', '.mm', '.storyboard', '.xib'];
   readonly activationLanguages = ['swift', 'objective-c', 'objective-cpp'];
 
+  readonly defaultFunctionName = 'NSLocalizedString';
+  readonly availableFunctionNames = [
+    'NSLocalizedString',
+    'String(localized:)',
+    'LocalizedStringKey',
+    'Text',
+  ];
+
   async detect(rootPath: string): Promise<boolean> {
     const directIndicators = ['Podfile', 'Package.swift'];
 

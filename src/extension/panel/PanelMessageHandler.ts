@@ -193,14 +193,24 @@ export class PanelMessageHandler {
   }
 
   private handleGetConfig(): void {
-    const { configManager, translationService } = this.deps;
+    const { configManager, translationService, adapter } = this.deps;
     const tt = configManager.tencentTranslation;
+    const userFunctionName = configManager.functionName;
+    const platformDefaultFunctionName = adapter?.defaultFunctionName ?? userFunctionName;
+    // 用户未显式覆盖时（保持默认 't'），按平台返回更合适的函数名
+    const effectiveFunctionName =
+      adapter && (!userFunctionName || userFunctionName === 't')
+        ? platformDefaultFunctionName
+        : userFunctionName;
     this.postMessage({
       command: 'configData',
       payload: {
         platform: configManager.platform,
         localesPaths: configManager.localesPaths,
         functionName: configManager.functionName,
+        effectiveFunctionName,
+        platformDefaultFunctionName,
+        availableFunctionNames: adapter?.availableFunctionNames ?? [],
         quoteType: configManager.quoteType,
         defaultLocale: configManager.defaultLocale,
         identifyFunctionNames: configManager.identifyFunctionNames,
@@ -298,7 +308,7 @@ export class PanelMessageHandler {
     );
 
     for (const result of results) {
-      this.postMessage({ command: 'scanResult', payload: result });
+      this.postMessage({ command: 'scanResult', payload: this.enrichExistingValues(result) });
     }
 
     this.postMessage({
@@ -318,7 +328,7 @@ export class PanelMessageHandler {
     const result = await workspaceScanner!.scanSingleFile(editor.document.uri.fsPath);
 
     if (result) {
-      this.postMessage({ command: 'scanResult', payload: result });
+      this.postMessage({ command: 'scanResult', payload: this.enrichExistingValues(result) });
     } else {
       this.postMessage({ command: 'info', payload: { message: '当前文件没有发现待处理文本' } });
     }
@@ -532,7 +542,11 @@ export class PanelMessageHandler {
   }
 
   private async handleHighlightText(payload: { filePath: string; start: number; end: number }): Promise<void> {
-    await vscode.commands.executeCommand('i18n-swapper.highlightText', payload);
+    const root = this.deps.getRootPath();
+    const abs = !payload.filePath || path.isAbsolute(payload.filePath) || !root
+      ? payload.filePath
+      : path.join(root, payload.filePath);
+    await vscode.commands.executeCommand('i18n-swapper.highlightText', { ...payload, filePath: abs });
   }
 
   private async handleUpdateConfig(payload: { key: string; value: unknown }): Promise<void> {
@@ -767,9 +781,14 @@ export class PanelMessageHandler {
   }
 
   private buildReplaceContext(rootPath: string) {
-    const { configManager } = this.deps;
+    const { configManager, adapter } = this.deps;
+    const userFunctionName = configManager.functionName;
+    const effectiveFunctionName =
+      adapter && (!userFunctionName || userFunctionName === 't')
+        ? adapter.defaultFunctionName
+        : userFunctionName;
     return {
-      functionName: configManager.functionName,
+      functionName: effectiveFunctionName,
       quoteChar: configManager.quoteChar,
       autoGenerateKeyFromText: configManager.autoGenerateKeyFromText,
       autoGenerateKeyPrefix: configManager.autoGenerateKeyPrefix,
@@ -777,6 +796,38 @@ export class PanelMessageHandler {
       languageMappings: configManager.languageMappings,
       sourceLanguage: configManager.sourceLanguage,
       rootPath,
+    };
+  }
+
+  /**
+   * 给 scanResult.existing 中每个 I18nMatch 补充 existingValue（默认语言文件中的当前译文）
+   */
+  private enrichExistingValues<T extends { existing: Array<{ key: string; existingValue?: string }> }>(
+    result: T
+  ): T {
+    const { localeStore, configManager } = this.deps;
+    const defaultLocale = configManager.defaultLocale;
+    const sourceLanguage = configManager.sourceLanguage;
+    const allCodes = localeStore.getAllLanguageCodes();
+    const lookup = (key: string): string => {
+      const flat = localeStore.getValue(key);
+      if (flat) return flat;
+      const byDefault = localeStore.getNestedValue(defaultLocale, key);
+      if (byDefault) return byDefault;
+      const bySource = sourceLanguage ? localeStore.getNestedValue(sourceLanguage, key) : undefined;
+      if (bySource) return bySource;
+      for (const c of allCodes) {
+        const v = localeStore.getNestedValue(c, key);
+        if (v) return v;
+      }
+      return '';
+    };
+    return {
+      ...result,
+      existing: result.existing.map((m) => ({
+        ...m,
+        existingValue: lookup(m.key),
+      })),
     };
   }
 }

@@ -44,6 +44,7 @@ function commit() {
         :key="`${item}-${idx}`"
         class="flex items-center gap-2 text-xs"
       >
+        <slot name="item-prefix" :item="item" :index="idx" />
         <span
           class="flex-1 min-w-0 truncate px-1.5 py-1 rounded"
           :class="mono ? 'font-mono' : ''"
