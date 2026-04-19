@@ -152,16 +152,45 @@ function selectedCount(file: FileScanResult) {
               @change="scanStore.toggleItemSelection(getFileIndex(file.filePath), idx)"
             />
             <span
-              class="truncate flex-1 cursor-pointer hover:underline"
+              class="truncate flex-1 min-w-0 cursor-pointer hover:underline"
               :title="item.text"
               @click="handleLocate(file.filePath, item)"
             >
               {{ item.text }}
             </span>
-            <span v-if="item.i18nKey" class="opacity-60 truncate max-w-[120px]" :title="item.i18nKey">
-              {{ item.i18nKey }}
-            </span>
-            <span v-else class="opacity-40 italic">无匹配键</span>
+            <input
+              type="text"
+              class="text-xs px-1.5 py-0.5 rounded w-[180px] min-w-0
+                     bg-[var(--vscode-input-background)] text-[var(--vscode-input-foreground)]
+                     border border-[var(--vscode-input-border,transparent)]
+                     focus:outline-none focus:border-[var(--vscode-focusBorder)]"
+              :value="item.i18nKey"
+              :placeholder="item.i18nKey ? '' : '无匹配键，可输入新键'"
+              :title="item.i18nKey || '输入 i18n key'"
+              @change="scanStore.updateItemKey(
+                getFileIndex(file.filePath),
+                idx,
+                ($event.target as HTMLInputElement).value.trim()
+              )"
+            />
+            <button
+              v-if="item.i18nKey"
+              class="shrink-0 px-1 py-0.5 rounded text-xs opacity-70 hover:opacity-100
+                     hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              title="复制 key"
+              @click="scanStore.copyToClipboard(item.i18nKey)"
+            >
+              📋
+            </button>
+            <button
+              v-if="item.i18nKey"
+              class="shrink-0 px-1 py-0.5 rounded text-xs opacity-70 hover:opacity-100
+                     hover:bg-[var(--vscode-toolbar-hoverBackground)]"
+              title="翻译并写入所有语言文件"
+              @click="scanStore.translateScanItem(item)"
+            >
+              🌐
+            </button>
             <button
               v-if="item.i18nKey"
               class="shrink-0 px-1.5 py-0.5 rounded text-xs

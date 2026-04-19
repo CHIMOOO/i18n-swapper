@@ -36,7 +36,10 @@ export type WebviewMessage =
   | { command: 'refreshData' }
   | { command: 'switchPlatform' }
   | { command: 'discoverLocaleFiles' }
-  | { command: 'initializeLocales' };
+  | { command: 'initializeLocales' }
+  | { command: 'setScanMode'; payload: ScanModePayload }
+  | { command: 'setFollowActiveEditor'; payload: FollowActiveEditorPayload }
+  | { command: 'translateScanItem'; payload: TranslateScanItemPayload };
 
 // ─── Extension → WebView（响应/推送） ───────────────────
 
@@ -53,6 +56,8 @@ export type ExtensionMessage =
   | { command: 'error'; payload: ErrorPayload }
   | { command: 'info'; payload: InfoPayload }
   | { command: 'testApiResult'; payload: TestApiResultPayload }
+  | { command: 'activeEditorChanged'; payload: ActiveEditorChangedPayload }
+  | { command: 'scanModeState'; payload: ScanModeStatePayload }
   | { command: 'dataRefreshed' };
 
 // ─── 消息负载类型 ───────────────────────────────────────
@@ -141,6 +146,35 @@ export interface OpenSettingsPayload {
 
 export interface CopyPayload {
   text: string;
+}
+
+/** 扫描模式：current=当前文件 / all=全工作区 */
+export type ScanMode = 'current' | 'all';
+
+export interface ScanModePayload {
+  mode: ScanMode;
+}
+
+export interface FollowActiveEditorPayload {
+  enabled: boolean;
+}
+
+export interface TranslateScanItemPayload {
+  key: string;
+  text: string;
+}
+
+export interface ActiveEditorChangedPayload {
+  /** 工作区相对路径；无活动编辑器或非 file 协议时为 null */
+  filePath: string | null;
+  /** 是否被识别为语言资源文件（true 时面板不会自动重扫） */
+  isLanguageFile: boolean;
+}
+
+export interface ScanModeStatePayload {
+  mode: ScanMode;
+  followActiveEditor: boolean;
+  currentFilePath: string | null;
 }
 
 /** 让扩展端弹出文件/文件夹选择器，结果直接 push 到指定数组配置 */

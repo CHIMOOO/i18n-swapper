@@ -52,6 +52,10 @@ export const useScanStore = defineStore('scan', () => {
   const scanResults = ref<FileScanResult[]>([]);
   const scanning = ref(false);
   const scanProgress = ref<ScanProgressPayload | null>(null);
+  const scanMode = ref<'current' | 'all'>('current');
+  const followActiveEditor = ref(true);
+  const currentFilePath = ref<string | null>(null);
+  const currentFileIsLanguageFile = ref(false);
 
   // search
   const searchResults = ref<Array<{ key: string; value: string; translations: Record<string, string> }>>([]);
@@ -135,6 +139,35 @@ export const useScanStore = defineStore('scan', () => {
   function scanCurrentFile() {
     scanning.value = true;
     postMessage({ command: 'scanCurrentFile' });
+  }
+
+  function setScanMode(mode: 'current' | 'all') {
+    if (scanMode.value === mode) return;
+    scanMode.value = mode;
+    if (mode === 'all') {
+      scanResults.value = [];
+    }
+    postMessage({ command: 'setScanMode', payload: { mode } });
+  }
+
+  function setFollowActiveEditor(enabled: boolean) {
+    followActiveEditor.value = enabled;
+    postMessage({ command: 'setFollowActiveEditor', payload: { enabled } });
+  }
+
+  function updateItemKey(fileIndex: number, itemIndex: number, key: string) {
+    const file = scanResults.value[fileIndex];
+    if (file && file.pending[itemIndex]) {
+      file.pending[itemIndex].i18nKey = key;
+    }
+  }
+
+  function translateScanItem(item: FileScanResult['pending'][0]) {
+    if (!item.i18nKey || !item.text) return;
+    postMessage({
+      command: 'translateScanItem',
+      payload: { key: item.i18nKey, text: item.text },
+    });
   }
 
   function replaceItem(filePath: string, item: FileScanResult['pending'][0]) {
@@ -241,6 +274,17 @@ export const useScanStore = defineStore('scan', () => {
           refreshData();
         }
         break;
+      case 'activeEditorChanged':
+        currentFilePath.value = msg.payload.filePath;
+        currentFileIsLanguageFile.value = msg.payload.isLanguageFile;
+        break;
+      case 'scanModeState':
+        scanMode.value = msg.payload.mode;
+        followActiveEditor.value = msg.payload.followActiveEditor;
+        if (msg.payload.currentFilePath !== undefined) {
+          currentFilePath.value = msg.payload.currentFilePath;
+        }
+        break;
       case 'dataRefreshed':
         break;
     }
@@ -255,6 +299,10 @@ export const useScanStore = defineStore('scan', () => {
     scanResults,
     scanning,
     scanProgress,
+    scanMode,
+    followActiveEditor,
+    currentFilePath,
+    currentFileIsLanguageFile,
     searchResults,
     searchTotal,
     filterText,
@@ -264,6 +312,10 @@ export const useScanStore = defineStore('scan', () => {
     filteredResults,
     scanWorkspace,
     scanCurrentFile,
+    setScanMode,
+    setFollowActiveEditor,
+    updateItemKey,
+    translateScanItem,
     replaceItem,
     batchReplace,
     searchKeys,

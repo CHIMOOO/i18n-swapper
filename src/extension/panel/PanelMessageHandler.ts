@@ -29,7 +29,14 @@ export interface PanelDependencies {
 
 type PostMessage = (message: unknown) => void;
 
+type ScanMode = 'current' | 'all';
+
 export class PanelMessageHandler {
+  private scanMode: ScanMode = 'current';
+  private followActiveEditor = true;
+  /** 上一次推送给前端的活动编辑器路径，避免重复触发扫描 */
+  private lastActiveFilePath: string | null = null;
+
   constructor(
     private deps: PanelDependencies,
     private postMessage: PostMessage
@@ -131,6 +138,15 @@ export class PanelMessageHandler {
         case 'copyToClipboard':
           await this.handleCopyToClipboard(message.payload as any);
           break;
+        case 'setScanMode':
+          this.handleSetScanMode(message.payload as any);
+          break;
+        case 'setFollowActiveEditor':
+          this.handleSetFollowActiveEditor(message.payload as any);
+          break;
+        case 'translateScanItem':
+          if (this.ensurePlatformReady('翻译')) await this.handleTranslateScanItem(message.payload as any);
+          break;
         case 'refreshData':
           await this.handleRefreshData();
           break;
@@ -155,9 +171,12 @@ export class PanelMessageHandler {
   private async handleReady(): Promise<void> {
     this.handleGetPlatformStatus();
     this.handleGetConfig();
+    this.postScanModeState();
     if (this.platformReady) {
       this.handleGetLocaleData();
       this.handleGetLanguageStatus();
+      // 初始上报当前活动编辑器
+      this.notifyActiveEditorChanged(vscode.window.activeTextEditor, { rescan: false });
     }
   }
 
@@ -646,6 +665,94 @@ export class PanelMessageHandler {
   private async handleCopyToClipboard(payload: { text: string }): Promise<void> {
     await vscode.env.clipboard.writeText(payload.text);
     this.postMessage({ command: 'info', payload: { message: '已复制到剪贴板' } });
+  }
+
+  private handleSetScanMode(payload: { mode: ScanMode }): void {
+    if (payload?.mode !== 'all' && payload?.mode !== 'current') return;
+    this.scanMode = payload.mode;
+    this.postScanModeState();
+    // 切换到「当前文件」模式时，立即扫一次当前文件
+    if (this.scanMode === 'current' && this.platformReady) {
+      void this.handleScanCurrentFile();
+    }
+  }
+
+  private handleSetFollowActiveEditor(payload: { enabled: boolean }): void {
+    this.followActiveEditor = !!payload?.enabled;
+    this.postScanModeState();
+  }
+
+  private async handleTranslateScanItem(payload: { key: string; text: string }): Promise<void> {
+    if (!payload?.key || !payload?.text) {
+      this.postMessage({ command: 'error', payload: { message: '缺少 key 或文本' } });
+      return;
+    }
+    await this.handleTranslateKey({ key: payload.key, text: payload.text });
+  }
+
+  /**
+   * 由 PanelBridge 调用：活动编辑器切换时通知前端，并按需自动重扫
+   * @param editor 当前活动编辑器
+   * @param opts.rescan 是否在满足条件时触发重扫（默认 true）
+   */
+  notifyActiveEditorChanged(
+    editor: vscode.TextEditor | undefined,
+    opts: { rescan?: boolean } = {}
+  ): void {
+    const rescan = opts.rescan !== false;
+    const filePath = editor?.document.uri.scheme === 'file' ? editor.document.uri.fsPath : null;
+    const isLang = filePath ? this.isLanguageFile(filePath) : false;
+    const relPath = filePath ? vscode.workspace.asRelativePath(filePath, false).replace(/\\/g, '/') : null;
+
+    this.postMessage({
+      command: 'activeEditorChanged',
+      payload: { filePath: relPath, isLanguageFile: isLang },
+    });
+
+    if (!rescan) {
+      this.lastActiveFilePath = filePath;
+      return;
+    }
+    if (!this.followActiveEditor) return;
+    if (this.scanMode !== 'current') return;
+    if (!filePath || isLang) return;
+    if (filePath === this.lastActiveFilePath) return;
+    if (!this.platformReady) return;
+
+    this.lastActiveFilePath = filePath;
+    void this.handleScanCurrentFile();
+  }
+
+  private postScanModeState(): void {
+    this.postMessage({
+      command: 'scanModeState',
+      payload: {
+        mode: this.scanMode,
+        followActiveEditor: this.followActiveEditor,
+        currentFilePath: this.lastActiveFilePath
+          ? vscode.workspace.asRelativePath(this.lastActiveFilePath, false).replace(/\\/g, '/')
+          : null,
+      },
+    });
+  }
+
+  /** 判断给定绝对路径是否为已配置的语言资源文件（避免切到 zh-CN.json 时触发扫描） */
+  private isLanguageFile(absPath: string): boolean {
+    const { configManager } = this.deps;
+    const rootPath = this.deps.getRootPath();
+    const norm = absPath.replace(/\\/g, '/').toLowerCase();
+
+    const candidates: string[] = [];
+    for (const p of configManager.localesPaths) candidates.push(p);
+    for (const m of configManager.languageMappings) candidates.push(m.filePath);
+    for (const f of configManager.keyMappingFiles ?? []) candidates.push(f);
+
+    for (const rel of candidates) {
+      if (!rel) continue;
+      const abs = path.isAbsolute(rel) ? rel : (rootPath ? path.join(rootPath, rel) : rel);
+      if (abs.replace(/\\/g, '/').toLowerCase() === norm) return true;
+    }
+    return false;
   }
 
   private async handleRefreshData(): Promise<void> {

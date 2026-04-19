@@ -88,6 +88,13 @@ export class PanelBridge implements vscode.WebviewViewProvider, vscode.Disposabl
       })
     );
 
+    // 活动编辑器跟随：监听用户切换编辑器，由 messageHandler 决定是否重扫
+    this.viewDisposables.push(
+      vscode.window.onDidChangeActiveTextEditor((editor) => {
+        this.messageHandler?.notifyActiveEditorChanged(editor);
+      })
+    );
+
     webviewView.onDidDispose(() => {
       this.view = undefined;
       this.messageHandler = undefined;
