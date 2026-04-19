@@ -24,9 +24,14 @@ export type WebviewMessage =
   | { command: 'openFile'; payload: OpenFilePayload }
   | { command: 'highlightText'; payload: HighlightTextPayload }
   | { command: 'updateConfig'; payload: UpdateConfigPayload }
+  | { command: 'configArrayAdd'; payload: ConfigArrayOpPayload }
+  | { command: 'configArrayRemove'; payload: ConfigArrayOpPayload }
   | { command: 'setLocalesPaths'; payload: SetLocalesPathsPayload }
+  | { command: 'setLanguageMappings'; payload: SetLanguageMappingsPayload }
   | { command: 'openSettings'; payload?: OpenSettingsPayload }
   | { command: 'selectLocaleFiles' }
+  | { command: 'pickPathForConfig'; payload: PickPathPayload }
+  | { command: 'testTranslationApi' }
   | { command: 'copyToClipboard'; payload: CopyPayload }
   | { command: 'refreshData' }
   | { command: 'switchPlatform' }
@@ -47,6 +52,7 @@ export type ExtensionMessage =
   | { command: 'searchResult'; payload: SearchResultPayload }
   | { command: 'error'; payload: ErrorPayload }
   | { command: 'info'; payload: InfoPayload }
+  | { command: 'testApiResult'; payload: TestApiResultPayload }
   | { command: 'dataRefreshed' };
 
 // ─── 消息负载类型 ───────────────────────────────────────
@@ -114,8 +120,19 @@ export interface UpdateConfigPayload {
   value: unknown;
 }
 
+export interface ConfigArrayOpPayload {
+  /** 配置项 key（如 'scanPatterns'、'excludeFiles'、'identifyFunctionNames'） */
+  key: string;
+  /** 数组元素值 */
+  value: string;
+}
+
 export interface SetLocalesPathsPayload {
   paths: string[];
+}
+
+export interface SetLanguageMappingsPayload {
+  mappings: Array<{ languageCode: string; filePath: string }>;
 }
 
 export interface OpenSettingsPayload {
@@ -126,22 +143,101 @@ export interface CopyPayload {
   text: string;
 }
 
+/** 让扩展端弹出文件/文件夹选择器，结果直接 push 到指定数组配置 */
+export interface PickPathPayload {
+  /** 目标配置 key */
+  configKey: string;
+  /** 选择类型：file 文件 / folder 文件夹 / fileMulti 多文件 */
+  pickType: 'file' | 'folder' | 'fileMulti';
+  /** 文件过滤器（pickType=file/fileMulti 时使用） */
+  filters?: Record<string, string[]>;
+  /** 选择按钮文案 */
+  openLabel?: string;
+}
+
 // ─── 响应负载类型 ───────────────────────────────────────
 
+export interface TextStylePayload {
+  color: string;
+  fontSize: string;
+  fontWeight: string;
+  fontStyle: string;
+  margin: string;
+}
+
+export interface MissingKeyStylePayload {
+  borderWidth: string;
+  borderStyle: 'solid' | 'dashed' | 'dotted' | 'double';
+  borderColor: string;
+  borderSpacing: string;
+}
+
+export interface MatchPatternPayload {
+  source: string;
+  flags: string;
+  keyGroup: number;
+  fileTypes: string[];
+}
+
+export interface DefaultRepositoriesPayload {
+  web: string;
+  ios: string;
+  android: string;
+}
+
 export interface ConfigDataPayload {
+  // 平台
   platform: PlatformId | 'auto';
+
+  // 基础
   localesPaths: string[];
   functionName: string;
   quoteType: 'single' | 'double';
   defaultLocale: string;
+
+  // 识别
   identifyFunctionNames: string[];
+  matchPatterns: MatchPatternPayload[];
+
+  // 扫描
   scanPatterns: string[];
   excludeFiles: string[];
+  includeFiles: string[];
+
+  // 显示/装饰
   decorationStyle: 'suffix' | 'inline';
-  autoGenerateKeyFromText: boolean;
-  autoTranslateAllLanguages: boolean;
+  showFullFormInEditMode: boolean;
+  suffixStyle: TextStylePayload;
+  inlineStyle: TextStylePayload;
+  missingKeyStyle: MissingKeyStylePayload;
+
+  // 翻译
+  apiKey: string;
+  apiSecret: string;
+  apiRegion: string;
+  sourceLanguage: string;
   languageMappings: Array<{ languageCode: string; filePath: string }>;
   translationConfigured: boolean;
+
+  // 自动化
+  autoGenerateKeyFromText: boolean;
+  autoGenerateKeyPrefix: string;
+  autoTranslateAllLanguages: boolean;
+
+  // 平台扩展
+  defaultRepositories: DefaultRepositoriesPayload;
+  localeResSubPaths: string[];
+  keyMappingFiles: string[];
+
+  // 高级
+  skipPrompt: string[];
+}
+
+export interface TestApiResultPayload {
+  success: boolean;
+  message: string;
+  /** 测试翻译产物（成功时） */
+  translated?: string;
 }
 
 export interface LocaleDataPayload {

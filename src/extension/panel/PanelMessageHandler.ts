@@ -104,6 +104,24 @@ export class PanelMessageHandler {
         case 'updateConfig':
           await this.handleUpdateConfig(message.payload as any);
           break;
+        case 'configArrayAdd':
+          await this.handleConfigArrayAdd(message.payload as any);
+          break;
+        case 'configArrayRemove':
+          await this.handleConfigArrayRemove(message.payload as any);
+          break;
+        case 'setLocalesPaths':
+          await this.handleSetLocalesPaths(message.payload as any);
+          break;
+        case 'setLanguageMappings':
+          await this.handleSetLanguageMappings(message.payload as any);
+          break;
+        case 'pickPathForConfig':
+          await this.handlePickPathForConfig(message.payload as any);
+          break;
+        case 'testTranslationApi':
+          await this.handleTestTranslationApi();
+          break;
         case 'selectLocaleFiles':
           await this.handleSelectLocaleFiles();
           break;
@@ -157,6 +175,7 @@ export class PanelMessageHandler {
 
   private handleGetConfig(): void {
     const { configManager, translationService } = this.deps;
+    const tt = configManager.tencentTranslation;
     this.postMessage({
       command: 'configData',
       payload: {
@@ -166,13 +185,28 @@ export class PanelMessageHandler {
         quoteType: configManager.quoteType,
         defaultLocale: configManager.defaultLocale,
         identifyFunctionNames: configManager.identifyFunctionNames,
+        matchPatterns: configManager.matchPatterns,
         scanPatterns: configManager.scanPatterns,
         excludeFiles: configManager.excludeFiles,
+        includeFiles: configManager.includeFiles,
         decorationStyle: configManager.decorationStyle,
-        autoGenerateKeyFromText: configManager.autoGenerateKeyFromText,
-        autoTranslateAllLanguages: configManager.autoTranslateAllLanguages,
-        languageMappings: configManager.languageMappings,
+        showFullFormInEditMode: configManager.showFullFormInEditMode,
+        suffixStyle: configManager.suffixStyle,
+        inlineStyle: configManager.inlineStyle,
+        missingKeyStyle: configManager.missingKeyStyle,
+        apiKey: tt.apiKey,
+        apiSecret: tt.apiSecret,
+        apiRegion: tt.region,
+        sourceLanguage: tt.sourceLanguage,
+        languageMappings: tt.languageMappings,
         translationConfigured: translationService.isConfigured,
+        autoGenerateKeyFromText: configManager.autoGenerateKeyFromText,
+        autoGenerateKeyPrefix: configManager.autoGenerateKeyPrefix,
+        autoTranslateAllLanguages: configManager.autoTranslateAllLanguages,
+        defaultRepositories: configManager.defaultRepositories,
+        localeResSubPaths: configManager.localeResSubPaths,
+        keyMappingFiles: configManager.keyMappingFiles,
+        skipPrompt: configManager.skipPrompt,
       },
     });
   }
@@ -485,6 +519,99 @@ export class PanelMessageHandler {
   private async handleUpdateConfig(payload: { key: string; value: unknown }): Promise<void> {
     await this.deps.configManager.update(payload.key, payload.value);
     this.handleGetConfig();
+  }
+
+  private async handleConfigArrayAdd(payload: { key: string; value: string }): Promise<void> {
+    const trimmed = (payload.value ?? '').toString().trim();
+    if (!trimmed) {
+      this.postMessage({ command: 'error', payload: { message: '请输入有效内容' } });
+      return;
+    }
+    const ok = await this.deps.configManager.pushArrayItem(payload.key, trimmed);
+    if (!ok) {
+      this.postMessage({ command: 'info', payload: { message: '该项已存在或不可添加' } });
+    }
+    this.handleGetConfig();
+  }
+
+  private async handleConfigArrayRemove(payload: { key: string; value: string }): Promise<void> {
+    await this.deps.configManager.removeArrayItem(payload.key, payload.value);
+    this.handleGetConfig();
+  }
+
+  private async handleSetLocalesPaths(payload: { paths: string[] }): Promise<void> {
+    await this.deps.configManager.setLocalesPaths(payload.paths || []);
+    this.deps.refreshCallback();
+    this.handleGetConfig();
+    this.handleGetLocaleData();
+    this.handleGetLanguageStatus();
+  }
+
+  private async handleSetLanguageMappings(payload: {
+    mappings: Array<{ languageCode: string; filePath: string }>;
+  }): Promise<void> {
+    await this.deps.configManager.setLanguageMappings(payload.mappings || []);
+    this.deps.refreshCallback();
+    this.handleGetConfig();
+    this.handleGetLanguageStatus();
+  }
+
+  private async handlePickPathForConfig(payload: {
+    configKey: string;
+    pickType: 'file' | 'folder' | 'fileMulti';
+    filters?: Record<string, string[]>;
+    openLabel?: string;
+  }): Promise<void> {
+    const rootPath = this.deps.getRootPath();
+    if (!rootPath) return;
+
+    const isFolder = payload.pickType === 'folder';
+    const files = await vscode.window.showOpenDialog({
+      canSelectMany: payload.pickType === 'fileMulti',
+      canSelectFiles: !isFolder,
+      canSelectFolders: isFolder,
+      openLabel: payload.openLabel || (isFolder ? '选择文件夹' : '选择文件'),
+      filters: payload.filters,
+      defaultUri: vscode.Uri.file(rootPath),
+    });
+
+    if (!files || files.length === 0) return;
+
+    for (const file of files) {
+      const rel = vscode.workspace.asRelativePath(file, false).replace(/\\/g, '/');
+      await this.deps.configManager.pushArrayItem(payload.configKey, rel);
+    }
+    this.handleGetConfig();
+  }
+
+  private async handleTestTranslationApi(): Promise<void> {
+    const { translationService, configManager } = this.deps;
+    if (!translationService.isConfigured) {
+      this.postMessage({
+        command: 'testApiResult',
+        payload: { success: false, message: '尚未配置 apiKey 与 apiSecret' },
+      });
+      return;
+    }
+    try {
+      const sample = '你好';
+      const target = configManager.sourceLanguage === 'en' ? 'zh' : 'en';
+      const translated = await translationService.translate(sample, target, configManager.sourceLanguage);
+      this.postMessage({
+        command: 'testApiResult',
+        payload: {
+          success: true,
+          message: `连接成功：${sample} → ${translated}`,
+          translated,
+        },
+      });
+    } catch (e) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      this.postMessage({
+        command: 'testApiResult',
+        payload: { success: false, message: `连接失败：${errMsg}` },
+      });
+    }
   }
 
   private async handleSelectLocaleFiles(): Promise<void> {

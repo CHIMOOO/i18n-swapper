@@ -205,6 +205,30 @@ export class ConfigManager {
     await this.config.update(key, value, target);
   }
 
+  /** 数组追加（去重） */
+  async pushArrayItem(key: string, value: string): Promise<boolean> {
+    const current = this.config.get<string[]>(key, []);
+    if (!Array.isArray(current)) return false;
+    if (current.includes(value)) return false;
+    await this.update(key, [...current, value]);
+    return true;
+  }
+
+  /** 数组移除 */
+  async removeArrayItem(key: string, value: string): Promise<boolean> {
+    const current = this.config.get<string[]>(key, []);
+    if (!Array.isArray(current)) return false;
+    const next = current.filter((v) => v !== value);
+    if (next.length === current.length) return false;
+    await this.update(key, next);
+    return true;
+  }
+
+  /** 设置语言映射数组 */
+  async setLanguageMappings(mappings: LanguageMapping[]): Promise<void> {
+    await this.update('tencentTranslation.languageMappings', mappings);
+  }
+
   dispose(): void {
     this.disposable.dispose();
     this._onDidChange.dispose();
